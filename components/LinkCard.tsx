@@ -1,8 +1,10 @@
 import type { Link } from "@/types/link";
+import { formatDate } from "@/lib/links";
+
 
 type LinkCardProps = {
   link: Link;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
 };
 
 export default function LinkCard({ link, onDelete }: LinkCardProps) {
@@ -17,7 +19,7 @@ export default function LinkCard({ link, onDelete }: LinkCardProps) {
         >
           {link.url}
         </a>
-        <p className="text-sm text-slate-400">Saved {link.createdAt}</p>
+        <p className="text-sm text-slate-400">Saved {formatDate(link.createdAt)}</p>
       </div>
       <button
         onClick={() => onDelete(link.id)}

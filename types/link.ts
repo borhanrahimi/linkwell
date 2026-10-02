@@ -1,5 +1,5 @@
 export type Link = {
-  id: number;
+  id: string;
   url: string;
   createdAt: string;
 };

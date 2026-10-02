@@ -15,7 +15,7 @@ export default function Home() {
   }
 
 
-  function deleteLink(id: number) {
+  function deleteLink(id: string) {
     setLinks(links.filter((link) => link.id !== id));
   }
 
