@@ -4,6 +4,8 @@ import { useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
 import { createLink } from "@/lib/links";
+import type { Link } from "@/types/link";
+
 
 export default function Home() {
   const [links, setLinks] = useState<Link[]>([]);
