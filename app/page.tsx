@@ -3,20 +3,15 @@
 import { useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
-import type { Link } from "@/types/link";
+import { createLink } from "@/lib/links";
 
 export default function Home() {
   const [links, setLinks] = useState<Link[]>([]);
 
   function addLink(url: string) {
-    const newLink: Link = {
-      id: Date.now(),
-      url,
-      createdAt: new Date().toLocaleString(),
-    };
-
-    setLinks([newLink, ...links]);
+    setLinks([createLink(url), ...links]);
   }
+
 
   function deleteLink(id: number) {
     setLinks(links.filter((link) => link.id !== id));
