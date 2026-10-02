@@ -27,10 +27,11 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 | [TypeScript](https://www.typescriptlang.org) | 5 | Type safety |
 | [Tailwind CSS](https://tailwindcss.com) | 4 | Styling |
 | [ESLint](https://eslint.org) | 9 | Linting |
+| [Vitest](https://vitest.dev) + [Testing Library](https://testing-library.com) | 5 / 16 | Automated tests |
 
 ## Getting started
 
-**Prerequisites:** [Node.js](https://nodejs.org) 20 or newer.
+**Prerequisites:** [Node.js](https://nodejs.org) 22.12 or newer (required by Vitest).
 
 ```bash
 # 1. Install dependencies
@@ -50,7 +51,8 @@ Then open [http://localhost:3000](http://localhost:3000).
 | `npm run build` | Builds the app for production |
 | `npm run start` | Runs the production build (run `build` first) |
 | `npm run lint` | Checks the code with ESLint |
-| `npx tsc --noEmit` | Type-checks the code without building |
+| `npm test` | Runs the tests in watch mode (re-runs on every save) |
+| `npm run check` | Type-check + lint + tests, once. **Run before every commit.** |
 
 ## Project structure
 
@@ -58,12 +60,14 @@ Then open [http://localhost:3000](http://localhost:3000).
 linkwell/
 ├── app/            # Routes only: pages and layouts (Next.js App Router)
 │   ├── layout.tsx  # Root layout wrapping every page
+│   ├── globals.css # Global styles (Tailwind)
 │   └── page.tsx    # Home page: holds the links state, composes components
 ├── components/     # Reusable UI components (LinkForm, LinkCard)
-├── lib/            # Non-UI logic: helpers, data access (empty for now)
+├── lib/            # Non-UI logic: helpers, data access
 ├── types/          # Shared TypeScript types (Link)
+├── __tests__/      # Automated tests (Vitest)
 ├── docs/           # Architecture and roadmap
-└── public/         # Static files served as-is
+└── public/         # Static files served as-is (empty for now)
 ```
 
 For how these pieces fit together and the rules for where new code goes, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

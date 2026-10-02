@@ -16,16 +16,17 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 - [x] Split UI into `LinkForm` and `LinkCard` components
 - [x] Shared `Link` type in `types/`
 - [x] README, architecture doc, roadmap
+- [x] Automated tests with Vitest (`npm run check`)
 
-## 🔜 v0.2: Links survive a refresh
+## 🚧 v0.2: Links survive a refresh (in progress)
 
 The biggest problem right now is that links disappear when you reload the page.
 
-- [ ] Create `lib/links.ts` with `createLink(url)`, `loadLinks()` and `saveLinks(links)`
-- [ ] Store links in `localStorage`
-- [ ] Load saved links when the page opens (`useEffect`)
-- [ ] Use `crypto.randomUUID()` for IDs instead of `Date.now()`, so two quick saves can't share an ID
-- [ ] Store `createdAt` as an ISO string and format it only when displaying it
+- [x] Create `lib/links.ts` with `createLink(url)`
+- [x] Use `crypto.randomUUID()` for IDs instead of `Date.now()`, so two quick saves can't share an ID
+- [x] Store `createdAt` as an ISO string and format it only when displaying it
+- [ ] Add `loadLinks()` and `saveLinks(links)` to `lib/links.ts`, using `localStorage` (with tests)
+- [ ] Load saved links when the page opens (`useEffect`), save on add/delete (with tests)
 
 **You'll learn:** `useEffect`, browser storage, and keeping data access in `lib/`.
 
@@ -81,7 +82,7 @@ Moves data from the browser to a server, so links follow you across devices.
 - [ ] User accounts (sign up and log in)
 - [ ] Each user sees only their own links
 - [ ] Deploy to the web (for example Vercel)
-- [ ] Automated tests for `lib/` and key components
+- [ ] End-to-end tests in a real browser (for example Playwright)
 
 **You'll learn:** authentication, deployment, and testing.
 

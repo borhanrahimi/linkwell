@@ -12,6 +12,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props |
 | `lib/` | Plain TypeScript functions | No JSX and no React. Easy to test on its own |
 | `types/` | Shared type definitions | Only types, no runtime code |
+| `__tests__/` | Automated tests | One test file per module or page (`links.test.ts`, `page.test.tsx`) |
 | `docs/` | Project documentation | |
 
 ## 2. Layers
@@ -102,8 +103,18 @@ Each time the storage changes, only the `lib/` module should need to change.
 - **Imports:** use the `@/` alias (`@/types/link`), not long relative paths (`../../types/link`).
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
+- **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display (`formatDate`).
 
-## 7. Decision log
+## 7. Testing
+
+Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake browser).
+
+- **`lib/` functions** get unit tests: call the function, check the result.
+- **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class.
+- Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
+- `npm run check` (types + lint + tests) must pass before committing.
+
+## 8. Decision log
 
 Record important decisions here so the reasons aren't forgotten.
 
@@ -111,3 +122,5 @@ Record important decisions here so the reasons aren't forgotten.
 |---|---|---|
 | 2026-10-02 | Split `page.tsx` into `LinkForm` and `LinkCard`, move `Link` into `types/` | Smaller files, reusable pieces, one source of truth for the type |
 | 2026-10-02 | Keep project code outside `app/` | `app/` stays focused on routing, as one of the layouts in the Next.js docs |
+| 2026-10-02 | Link IDs use `crypto.randomUUID()`, dates stored as ISO strings | `Date.now()` IDs can collide; locale date strings can't be sorted or parsed reliably |
+| 2026-10-02 | Vitest + React Testing Library for tests | Recommended in the Next.js docs; fast; tests behave like a user. Requires Node 22.12+ |
