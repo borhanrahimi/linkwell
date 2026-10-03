@@ -43,25 +43,30 @@ Why: when dependencies only point downward, you can change the UI without touchi
 **Data flows down, events flow up.**
 
 ```
-            page.tsx
-      state: links: Link[]
-      ┌─────────┴──────────┐
- props│onAdd         props │link, onDelete
-      ▼                    ▼
-  LinkForm             LinkCard × N
-      │                    │
-      └─ onAdd(url) ─┐ ┌───┴─ onDelete(id)
-                     ▼ ▼
-               page.tsx updates state
-                     │
-                     ▼
-           React re-renders with new data
+       localStorage ◀──── saveLinks(updated) ─────┐
+            │                                     │
+  loadLinks() on first render (useEffect)         │
+            ▼                                     │
+         page.tsx                                 │
+   state: links: Link[]                           │
+      ┌─────────┴──────────┐                      │
+ props│onAdd         props │link, onDelete        │
+      ▼                    ▼                      │
+  LinkForm             LinkCard × N               │
+      │                    │                      │
+      └─ onAdd(url) ─┐ ┌───┴─ onDelete(id)        │
+                     ▼ ▼                          │
+         page.tsx computes `updated` list ────────┤
+                     │                            │
+                     ▼                            │
+         setLinks(updated) → React re-renders     │
 ```
 
-1. `page.tsx` owns the list of links (the **single source of truth**).
-2. It passes data and callback functions down to children as props.
-3. Children never change the list directly. They call the callback.
-4. The page updates its state, and React re-renders.
+1. `page.tsx` owns the list of links (the **single source of truth** while the page is open).
+2. When the page opens, it loads saved links from storage once.
+3. It passes data and callback functions down to children as props.
+4. Children never change the list directly. They call the callback.
+5. The page computes the new list once, then hands that same value to both `setLinks` (screen) and `saveLinks` (storage).
 
 **Where state lives:** keep state in the lowest component that needs it. The text typed in the form only matters to `LinkForm`, so `LinkForm` owns it. The list of links is needed by both the form (adding) and the cards (deleting), so it lives in their shared parent, `page.tsx`.
 
@@ -77,7 +82,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 
 | File | Type | Why |
 |---|---|---|
-| `app/page.tsx` | Client | Holds `useState` for links |
+| `app/page.tsx` | Client | Holds `useState` for links, loads from `localStorage` in `useEffect` |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
 | `components/LinkCard.tsx` | (inherits client) | Pure display, rendered by a client page |
 
@@ -89,11 +94,25 @@ Storage will change over time, so all reading and writing of links goes through 
 
 | Stage | Where links live | Survives refresh? |
 |---|---|---|
-| v0.1 (now) | React state in memory | ❌ |
-| v0.2 | Browser `localStorage` | ✅ (this browser only) |
+| v0.1 | React state in memory | ❌ |
+| **v0.2 (now)** | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
 | v0.5 | Database on the server | ✅ (any device) |
 
 Each time the storage changes, only the `lib/` module should need to change.
+
+**Today that module is `lib/links.ts`:**
+
+| Function | Job |
+|---|---|
+| `loadLinks()` | Reads and parses saved links. Returns `[]` if nothing is saved or the data is broken |
+| `saveLinks(links)` | Writes the whole list as JSON |
+| `STORAGE_KEY` | The storage key, exported so tests use the exact same value |
+
+**Rules for storage:**
+
+- **Load once, after the first render, in `useEffect`.** Next.js renders pages on the server first, where `localStorage` doesn't exist, so it can't be read during render or in `useState(...)`.
+- **Save inside the event handlers** (`addLink`, `deleteLink`), **not in an effect** that watches `links`. Such an effect would run with the empty starting list before loading finishes, and could wipe saved links.
+- The load effect needs `// eslint-disable-next-line react-hooks/set-state-in-effect`. The extra render it warns about is harmless here, and the code is temporary until v0.5. Any other lint disable needs a comment explaining why.
 
 ## 6. Conventions
 
@@ -113,6 +132,10 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class.
 - Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
 - `npm run check` (types + lint + tests) must pass before committing.
+- **Write the test first** when you can: watch it fail (🔴), then write the code (🟢). A test that never failed hasn't proven anything.
+- **Never copy values like storage keys into tests.** Import them (`STORAGE_KEY`), so a typo can't make a test pass for the wrong reason.
+- **Storage in tests:** clear `localStorage` in `afterEach`, so saved links can't leak into the next test.
+- **Simulating a page refresh:** call `cleanup()`, then `render(<Home />)` again. React state is gone, and only `localStorage` survives.
 
 ## 8. Decision log
 
@@ -124,3 +147,6 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-02 | Keep project code outside `app/` | `app/` stays focused on routing, as one of the layouts in the Next.js docs |
 | 2026-10-02 | Link IDs use `crypto.randomUUID()`, dates stored as ISO strings | `Date.now()` IDs can collide; locale date strings can't be sorted or parsed reliably |
 | 2026-10-02 | Vitest + React Testing Library for tests | Recommended in the Next.js docs; fast; tests behave like a user. Requires Node 22.12+ |
+| 2026-10-03 | Store links in `localStorage` for v0.2 | No server or database needed yet; good enough until accounts and syncing (v0.5) |
+| 2026-10-03 | Save in event handlers, load once in `useEffect` | A save effect on `[links]` can overwrite storage with the empty starting list |
+| 2026-10-03 | Allow `set-state-in-effect` for the one load effect | One extra render on page open is harmless; `useSyncExternalStore` is overkill for temporary code |

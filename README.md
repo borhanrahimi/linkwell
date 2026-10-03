@@ -6,13 +6,15 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.1).** You can add and delete links, but they are only kept in memory and **disappear when you refresh the page**. Saving links is the next milestone. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.2).** You can add and delete links, and they're saved in your browser, so they survive a refresh. They don't sync between devices yet. Next up: titles, duplicate detection and friendlier dates (v0.3). See the [roadmap](docs/ROADMAP.md).
+
+> **Where is my data?** Links are stored in your browser's `localStorage` under the key `linkwell:links`. They stay on this computer and in this browser only. Clearing your browser's site data deletes them.
 
 ## Features
 
 - [x] Save a link
 - [x] Delete a link
-- [ ] Links survive a page refresh
+- [x] Links survive a page refresh
 - [ ] Titles and descriptions for links
 - [ ] Tags and search
 - [ ] Dead-link detection ("keep them alive")
@@ -63,7 +65,7 @@ linkwell/
 │   ├── globals.css # Global styles (Tailwind)
 │   └── page.tsx    # Home page: holds the links state, composes components
 ├── components/     # Reusable UI components (LinkForm, LinkCard)
-├── lib/            # Non-UI logic: helpers, data access
+├── lib/            # Non-UI logic: creating, formatting, saving and loading links
 ├── types/          # Shared TypeScript types (Link)
 ├── __tests__/      # Automated tests (Vitest)
 ├── docs/           # Architecture and roadmap

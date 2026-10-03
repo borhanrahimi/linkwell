@@ -18,9 +18,9 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 - [x] README, architecture doc, roadmap
 - [x] Automated tests with Vitest (`npm run check`)
 
-## 🚧 v0.2: Links survive a refresh (in progress)
+## ✅ v0.2: Links survive a refresh (done)
 
-The biggest problem right now is that links disappear when you reload the page.
+Links used to disappear when you reloaded the page. Now they're saved in the browser's `localStorage`.
 
 - [x] Create `lib/links.ts` with `createLink(url)`
 - [x] Use `crypto.randomUUID()` for IDs instead of `Date.now()`, so two quick saves can't share an ID
@@ -30,13 +30,14 @@ The biggest problem right now is that links disappear when you reload the page.
 
 **You'll learn:** `useEffect`, browser storage, and keeping data access in `lib/`.
 
-## v0.3: Better links
+## 🔜 v0.3: Better links
 
 - [ ] Optional title for each link (fall back to the domain name)
 - [ ] Stop the same URL from being saved twice
 - [ ] Edit a link's title
 - [ ] Show the site's favicon next to each link
 - [ ] Friendlier dates ("3 days ago")
+- [ ] Replace leftover Create Next App settings: the browser tab title in `app/layout.tsx`, and the unused Geist font (or switch `globals.css` to use it)
 
 **You'll learn:** form validation, editing state, and small pure functions in `lib/`.
 
