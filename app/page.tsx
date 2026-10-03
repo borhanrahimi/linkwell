@@ -1,22 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
-import { createLink } from "@/lib/links";
+import { createLink, loadLinks, saveLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
-
 
 export default function Home() {
   const [links, setLinks] = useState<Link[]>([]);
+  useEffect(() => {
+    // localStorage is only available in the browser, so we need to check if we're running in the browser before accessing it
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLinks(loadLinks());
+  }, []);
 
   function addLink(url: string) {
-    setLinks([createLink(url), ...links]);
+    const updated = [createLink(url), ...links];
+    setLinks(updated);
+    saveLinks(updated);
   }
 
 
   function deleteLink(id: string) {
-    setLinks(links.filter((link) => link.id !== id));
+    const updated = links.filter((link) => link.id !== id);
+    setLinks(updated);
+    saveLinks(updated);
   }
 
   return (

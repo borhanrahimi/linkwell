@@ -4,6 +4,7 @@ import Home from "@/app/page";
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });
 
 function addLink(url: string) {
@@ -35,6 +36,26 @@ describe("Home page", () => {
     addLink("   ");
 
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  test("keeps links after a page refresh", () => {
+    render(<Home />);
+    addLink("https://example.com");
+
+    cleanup();
+    render(<Home />);
+    expect(screen.getByRole("link", { name: "https://example.com" })).toBeDefined();
+  });
+
+  test("keeps a deleted link removed after a page refresh", () => {
+    render(<Home />);
+    addLink("https://example.com");
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    cleanup();
+    render(<Home />);
+    expect(screen.queryByRole("link", { name: "https://example.com" })).toBeNull();
   });
 
   test("deletes a link", () => {
