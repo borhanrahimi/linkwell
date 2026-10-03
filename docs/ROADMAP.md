@@ -37,7 +37,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 - [ ] Edit a link's title
 - [ ] Show the site's favicon next to each link
 - [ ] Friendlier dates ("3 days ago")
-- [ ] Replace leftover Create Next App settings: the browser tab title in `app/layout.tsx`, and the unused Geist font (or switch `globals.css` to use it)
+- [x] Replace leftover Create Next App settings: the browser tab title in `app/layout.tsx`, and the unused Geist font (or switch `globals.css` to use it)
 
 **You'll learn:** form validation, editing state, and small pure functions in `lib/`.
 
