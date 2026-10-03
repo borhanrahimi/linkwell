@@ -1,6 +1,6 @@
 import type { Link } from "@/types/link";
 
-const STORAGE_KEY = "linkwell:links";
+export const STORAGE_KEY = "linkwell:links";
 
 export function createLink(url: string): Link {
   return {
