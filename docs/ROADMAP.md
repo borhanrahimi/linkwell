@@ -25,8 +25,8 @@ The biggest problem right now is that links disappear when you reload the page.
 - [x] Create `lib/links.ts` with `createLink(url)`
 - [x] Use `crypto.randomUUID()` for IDs instead of `Date.now()`, so two quick saves can't share an ID
 - [x] Store `createdAt` as an ISO string and format it only when displaying it
-- [ ] Add `loadLinks()` and `saveLinks(links)` to `lib/links.ts`, using `localStorage` (with tests)
-- [ ] Load saved links when the page opens (`useEffect`), save on add/delete (with tests)
+- [x] Add `loadLinks()` and `saveLinks(links)` to `lib/links.ts`, using `localStorage` (with tests)
+- [x] Load saved links when the page opens (`useEffect`), save on add/delete (with tests)
 
 **You'll learn:** `useEffect`, browser storage, and keeping data access in `lib/`.
 
