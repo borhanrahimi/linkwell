@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect ,useState } from "react";
+import { useEffect ,useState } from "react";
 
 type LinkFormProps = {
   onAdd: (url: string, title: string) => string | null;
