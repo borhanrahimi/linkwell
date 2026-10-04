@@ -32,8 +32,8 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 ## 🔜 v0.3: Better links
 
-- [X] Optional title for each link (fall back to the domain name)
-- [ ] Stop the same URL from being saved twice
+- [x] Optional title for each link (fall back to the domain name)
+- [x] Stop the same URL from being saved twice
 - [ ] Edit a link's title
 - [ ] Show the site's favicon next to each link
 - [ ] Friendlier dates ("3 days ago")

@@ -97,6 +97,38 @@ describe("Home page", () => {
     expect(screen.getByRole("link", { name: "My favourite site" })).toBeDefined();
   });
 
+  test("does not save the same link twice", () => {
+    render(<Home />);
+
+    addLink("https://example.com");
+    addLink("https://example.com");
+
+    expect(screen.getByText("You already saved this link!")).toBeDefined();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  test("keeps the typed link after a duplicate, so it can be fixed", () => {
+    render(<Home />);
+
+    addLink("https://example.com");
+    addLink("https://example.com");
+
+    const input = screen.getByPlaceholderText("Paste a link...") as HTMLInputElement;
+    expect(input.value).toBe("https://example.com");
+  });
+
+  test("hides the error when the link is changed", () => {
+    render(<Home />);
+    addLink("https://example.com");
+    addLink("https://example.com");
+    expect(screen.getByRole("alert")).toBeDefined();
+
+    fireEvent.change(screen.getByPlaceholderText("Paste a link..."), {
+      target: { value: "https://example.com/other" },
+    });
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 
 });
  
