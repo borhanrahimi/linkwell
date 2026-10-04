@@ -54,11 +54,12 @@ Why: when dependencies only point downward, you can change the UI without touchi
       ▼                    ▼                      │
   LinkForm             LinkCard × N               │
       │                    │                      │
-      └─ onAdd(url) ─┐ ┌───┴─ onDelete(id)        │
-                     ▼ ▼                          │
+ onAdd(url, title)    onDelete(id)                │
+      └──────────┐ ┌───────┘                      │
+                 ▼ ▼                              │
          page.tsx computes `updated` list ────────┤
-                     │                            │
-                     ▼                            │
+                 │                                │
+                 ▼                                │
          setLinks(updated) → React re-renders     │
 ```
 
@@ -68,7 +69,9 @@ Why: when dependencies only point downward, you can change the UI without touchi
 4. Children never change the list directly. They call the callback.
 5. The page computes the new list once, then hands that same value to both `setLinks` (screen) and `saveLinks` (storage).
 
-**Where state lives:** keep state in the lowest component that needs it. The text typed in the form only matters to `LinkForm`, so `LinkForm` owns it. The list of links is needed by both the form (adding) and the cards (deleting), so it lives in their shared parent, `page.tsx`.
+**When a child needs an answer back:** `onAdd(url, title)` returns `null` when the link was saved, or an error message (a string) when it wasn't, for example a duplicate. The page decides (it owns the list), and the form shows the message and keeps the input so the user can fix it (it owns the inputs). Use this pattern when the parent has to accept or reject what a child sends up.
+
+**Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting), so it lives in their shared parent, `page.tsx`.
 
 ## 4. Server vs. client components
 
@@ -104,6 +107,10 @@ Each time the storage changes, only the `lib/` module should need to change.
 
 | Function | Job |
 |---|---|
+| `createLink(url, title?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined` |
+| `formatDate(iso)` | Formats a stored ISO date for display |
+| `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
+| `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
 | `loadLinks()` | Reads and parses saved links. Returns `[]` if nothing is saved or the data is broken |
 | `saveLinks(links)` | Writes the whole list as JSON |
 | `STORAGE_KEY` | The storage key, exported so tests use the exact same value |
@@ -123,6 +130,9 @@ Each time the storage changes, only the `lib/` module should need to change.
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
 - **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display (`formatDate`).
+- **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`).
+- **Parsing URLs:** use `new URL(...)` inside `try/catch` and fall back to the original text. Old saved data may not be a valid URL, and that must never crash the page.
+- **Auto-imports:** check the imports at the top of a file after accepting an autocomplete suggestion. VS Code has added `import { get } from "http"` and `import { title } from "process"` by mistake.
 
 ## 7. Testing
 
@@ -150,3 +160,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-03 | Store links in `localStorage` for v0.2 | No server or database needed yet; good enough until accounts and syncing (v0.5) |
 | 2026-10-03 | Save in event handlers, load once in `useEffect` | A save effect on `[links]` can overwrite storage with the empty starting list |
 | 2026-10-03 | Allow `set-state-in-effect` for the one load effect | One extra render on page open is harmless; `useSyncExternalStore` is overkill for temporary code |
+| 2026-10-03 | `title` is optional; cards fall back to the domain | Old saved links have no title, and a domain is more readable than a full URL |
+| 2026-10-03 | Duplicates are found by comparing `new URL().href` | The browser already normalizes case and the trailing `/` on a bare domain, so we don't write those rules ourselves |
+| 2026-10-03 | `onAdd` returns an error message (`string \| null`) | The page owns the list and decides; the form owns the inputs and shows the message |
+| 2026-10-03 | Error message hides after 5 seconds, or as soon as the user types | Short enough to stay out of the way, long enough to read |

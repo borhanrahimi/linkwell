@@ -6,7 +6,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.2).** You can add and delete links, and they're saved in your browser, so they survive a refresh. They don't sync between devices yet. Next up: titles, duplicate detection and friendlier dates (v0.3). See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.3 in progress).** You can add and delete links, give them an optional title, and they're saved in your browser, so they survive a refresh. Saving the same link twice shows an error instead. Links don't sync between devices yet. Next up: editing titles, favicons and friendlier dates. See the [roadmap](docs/ROADMAP.md).
 
 > **Where is my data?** Links are stored in your browser's `localStorage` under the key `linkwell:links`. They stay on this computer and in this browser only. Clearing your browser's site data deletes them.
 
@@ -15,7 +15,9 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Save a link
 - [x] Delete a link
 - [x] Links survive a page refresh
-- [ ] Titles and descriptions for links
+- [x] Optional title for each link (shows the domain when there's none)
+- [x] The same link can't be saved twice
+- [ ] Edit a link's title
 - [ ] Tags and search
 - [ ] Dead-link detection ("keep them alive")
 - [ ] Resurfacing old links ("actually come back to them")
