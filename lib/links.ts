@@ -26,3 +26,11 @@ export function loadLinks(): Link[] {
 export function saveLinks(links: Link[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
 }
+
+export function getDomain(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}

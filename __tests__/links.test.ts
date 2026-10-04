@@ -3,6 +3,7 @@ import {
   STORAGE_KEY,
   createLink,
   formatDate,
+  getDomain,
   loadLinks,
   saveLinks,
 } from "@/lib/links";
@@ -58,5 +59,19 @@ describe("loadLinks and saveLinks", () => {
     localStorage.setItem(STORAGE_KEY, "invalid json");
 
     expect(loadLinks()).toEqual([]);
+  });
+});
+
+describe("getDomain", () => {
+  test("returns the domain of a URL", () => {
+    expect(getDomain("https://nextjs.org/docs/app")).toBe("nextjs.org");
+  });
+
+  test("drop a leading www", () => {
+    expect(getDomain("https://www.example.com/path")).toBe("example.com");
+  });
+
+  test("returns the text unchanged if the URL is invalid", () => {
+    expect(getDomain("not a url")).toBe("not a url");
   });
 });
