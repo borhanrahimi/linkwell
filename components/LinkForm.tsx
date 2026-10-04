@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useEffect ,useState } from "react";
 
 type LinkFormProps = {
   onAdd: (url: string, title: string) => string | null;
@@ -10,6 +10,13 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  },[error]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
