@@ -54,7 +54,7 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
         />
         <button
           type="submit"
-          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+          className="rounded-lg bg-green-700 px-4 py-2 font-medium text-white hover:bg-green-800"
         >
           Save
         </button>
