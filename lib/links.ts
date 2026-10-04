@@ -1,11 +1,13 @@
 import type { Link } from "@/types/link";
+import { title } from "process";
 
 export const STORAGE_KEY = "linkwell:links";
 
-export function createLink(url: string): Link {
+export function createLink(url: string, title?: string): Link {
   return {
     id: crypto.randomUUID(),
     url,
+    title: title?.trim() || undefined,
     createdAt: new Date().toISOString(),
   };
 }

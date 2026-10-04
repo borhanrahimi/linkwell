@@ -31,6 +31,21 @@ describe("createLink", () => {
 
     expect(new Date(link.createdAt).toISOString()).toBe(link.createdAt);
   });
+
+  test("Keep the title it was given", () => {
+    const link = createLink("https://example.com", "Example site");
+
+    expect(link.title).toBe("Example site");
+  });
+  test ("trims spaces around the title", () => {
+    const link = createLink("https://example.com", "  Example site  ");
+
+    expect(link.title).toBe("Example site");
+  });
+  test ("has no title when none or only spaces are given", () => {
+    expect(createLink("https://example.com").title).toBeUndefined();
+    expect(createLink("https://example.com", "   ").title).toBeUndefined();
+  });
 });
 
 describe("formatDate", () => {
@@ -75,3 +90,4 @@ describe("getDomain", () => {
     expect(getDomain("not a url")).toBe("not a url");
   });
 });
+
