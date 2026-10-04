@@ -30,7 +30,7 @@ describe("Home page", () => {
 
     addLink("https://example.com");
 
-    expect(screen.getByRole("link", { name: "https://example.com" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
     expect(screen.queryByText("No links yet. Add your first one above.")).toBeNull();
   });
 
@@ -48,7 +48,7 @@ describe("Home page", () => {
 
     cleanup();
     render(<Home />);
-    expect(screen.getByRole("link", { name: "https://example.com" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
   });
 
   test("keeps a deleted link removed after a page refresh", () => {
@@ -59,7 +59,7 @@ describe("Home page", () => {
 
     cleanup();
     render(<Home />);
-    expect(screen.queryByRole("link", { name: "https://example.com" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "example.com" })).toBeNull();
   });
 
   test("deletes a link", () => {
@@ -68,7 +68,7 @@ describe("Home page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(screen.queryByRole("link", { name: "https://example.com" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "example.com" })).toBeNull();
   });
 
   test("the link opens the full url", () => {
@@ -79,6 +79,24 @@ describe("Home page", () => {
     const link = screen.getByRole("link", { name: "My favourite site" });
     expect(link.getAttribute("href")).toBe("https://example.com/some/page");
   });
+
+  test("shows the title when one is given", () => {
+    render(<Home />);
+
+    addLink("https://example.com", "My favourite site");
+
+    expect(screen.getByRole("link", { name: "My favourite site" })).toBeDefined();
+  });
+
+  test("keeps the title after a page refresh", () => {
+    render(<Home />);
+    addLink("https://example.com", "My favourite site");
+
+    cleanup();
+    render(<Home />);
+    expect(screen.getByRole("link", { name: "My favourite site" })).toBeDefined();
+  });
+
 
 });
  
