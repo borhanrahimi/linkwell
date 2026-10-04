@@ -4,6 +4,7 @@ import {
   createLink,
   formatDate,
   getDomain,
+  isDuplicate,
   loadLinks,
   saveLinks,
 } from "@/lib/links";
@@ -89,5 +90,32 @@ describe("getDomain", () => {
   test("returns the text unchanged if the URL is invalid", () => {
     expect(getDomain("not a url")).toBe("not a url");
   });
+
+  describe("isDuplicate", () => {
+    const links = [createLink("https://example.com/page")];
+  
+    test("is false when the list is empty", () => {
+      expect(isDuplicate([], "https://example.com/page")).toBe(false);
+    });
+  
+    test("is true when the url is already saved", () => {
+      expect(isDuplicate(links, "https://example.com/page")).toBe(true);
+    });
+  
+    test("is false for a different url", () => {
+      expect(isDuplicate(links, "https://example.com/other")).toBe(false);
+    });
+  
+    test("ignores uppercase letters in the domain", () => {
+      expect(isDuplicate(links, "https://EXAMPLE.com/page")).toBe(true);
+    });
+  
+    test("treats a domain with and without a trailing slash as the same", () => {
+      const saved = [createLink("https://example.com")];
+  
+      expect(isDuplicate(saved, "https://example.com/")).toBe(true);
+    });
+  });
+  
 });
 

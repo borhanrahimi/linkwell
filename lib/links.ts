@@ -35,3 +35,16 @@ export function getDomain(url: string) {
     return url;
   }
 }
+
+function normalizeUrl(url: string) {
+  try {
+    return new URL(url).href;
+  } catch {
+    return url;
+  }
+}
+
+export function isDuplicate(links: Link[], url: string) {
+  const target = normalizeUrl(url);
+  return links.some((link) => normalizeUrl(link.url) === target);
+}
