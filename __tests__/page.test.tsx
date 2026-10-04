@@ -7,12 +7,16 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function addLink(url: string) {
+function addLink(url: string, title = "") {
   fireEvent.change(screen.getByPlaceholderText("Paste a link..."), {
     target: { value: url },
   });
+  fireEvent.change(screen.getByPlaceholderText("Title (optional)"), {
+    target: { value: title },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
+
 
 describe("Home page", () => {
   test("shows a message when there are no links", () => {
@@ -66,5 +70,15 @@ describe("Home page", () => {
 
     expect(screen.queryByRole("link", { name: "https://example.com" })).toBeNull();
   });
+
+  test("the link opens the full url", () => {
+    render(<Home />);
+
+    addLink("https://example.com/some/page", "My favourite site");
+
+    const link = screen.getByRole("link", { name: "My favourite site" });
+    expect(link.getAttribute("href")).toBe("https://example.com/some/page");
+  });
+
 });
  

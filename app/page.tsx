@@ -14,8 +14,8 @@ export default function Home() {
     setLinks(loadLinks());
   }, []);
 
-  function addLink(url: string) {
-    const updated = [createLink(url), ...links];
+  function addLink(url: string, title: string) {
+    const updated = [createLink(url, title), ...links];
     setLinks(updated);
     saveLinks(updated);
   }

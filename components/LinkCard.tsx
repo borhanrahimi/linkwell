@@ -1,5 +1,5 @@
 import type { Link } from "@/types/link";
-import { formatDate } from "@/lib/links";
+import { formatDate, getDomain } from "@/lib/links";
 
 
 type LinkCardProps = {
@@ -17,7 +17,7 @@ export default function LinkCard({ link, onDelete }: LinkCardProps) {
           rel="noopener noreferrer"
           className="block truncate font-medium text-blue-600 hover:underline"
         >
-          {link.url}
+          {link.title || getDomain(link.url)}
         </a>
         <p className="text-sm text-slate-400">Saved {formatDate(link.createdAt)}</p>
       </div>
