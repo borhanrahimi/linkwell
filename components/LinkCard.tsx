@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Link } from "@/types/link";
-import { formatDate, getDomain } from "@/lib/links";
+import { getDomain } from "@/lib/links";
 
 
 type LinkCardProps = {
@@ -30,7 +30,7 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
     setIsEditing(false);
   }
 
-  if (isEditing)
+  if (isEditing){
     return (
       <li className="rounded-lg bg-white p-4 shadow-sm">
         <form onSubmit={handleSave} className="flex items-center gap-2">
@@ -38,6 +38,7 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            aria-label="Title"
             className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
           />
           <button
@@ -56,6 +57,7 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
         </form>
       </li>
     );
+  }
   return (
     <li className="flex items-center justify-between rounded-lg bg-white p-4 shadow-sm">
       <div className="min-w-0">
@@ -67,7 +69,8 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
         >
           {link.title || getDomain(link.url)}
         </a>
-        <p className="text-sm text-slate-400">Saved {formatDate(link.createdAt)}</p>
+        <p className="truncate text-sm text-slate-500">{link.url}</p>
+        <p className="text-sm text-slate-400">Saved {new Date(link.createdAt).toLocaleDateString()}</p>
       </div>
       <div className="ml-4 flex shrink-0 gap-3">
         <button onClick={startEditing}className="text-sm text-slate-400 hover:text-blue-600">
