@@ -8,6 +8,7 @@ import {
   loadLinks,
   saveLinks,
   updateTitle,
+  getFaviconUrl,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -152,6 +153,19 @@ describe("getDomain", () => {
       expect(updated[0].title).toBeUndefined();
     });
   });
+
+  describe("getFaviconUrl", () => {
+    test("returns a favicon address for the link's domain", () => {
+      expect(getFaviconUrl("https://nextjs.org/docs")).toBe(
+        "https://www.google.com/s2/favicons?domain=nextjs.org&sz=32"
+      );
+    });
+  
+    test("returns null when the URL is invalid", () => {
+      expect(getFaviconUrl("not a url")).toBeNull();
+    });
+  });
+  
   
 });
 

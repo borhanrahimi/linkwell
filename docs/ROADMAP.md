@@ -34,7 +34,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 - [x] Optional title for each link (fall back to the domain name)
 - [x] Stop the same URL from being saved twice
-- [ ] Edit a link's title
+- [x] Edit a link's title
 - [ ] Show the site's favicon next to each link
 - [ ] Friendlier dates ("3 days ago")
 - [x] Replace leftover Create Next App settings: the browser tab title in `app/layout.tsx`, and the unused Geist font (or switch `globals.css` to use it)
