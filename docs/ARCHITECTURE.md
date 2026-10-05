@@ -43,24 +43,26 @@ Why: when dependencies only point downward, you can change the UI without touchi
 **Data flows down, events flow up.**
 
 ```
-       localStorage ◀──── saveLinks(updated) ─────┐
-            │                                     │
-  loadLinks() on first render (useEffect)         │
-            ▼                                     │
-         page.tsx                                 │
-   state: links: Link[]                           │
-      ┌─────────┴──────────┐                      │
- props│onAdd         props │link, onDelete        │
-      ▼                    ▼                      │
-  LinkForm             LinkCard × N               │
-      │                    │                      │
- onAdd(url, title)    onDelete(id)                │
-      └──────────┐ ┌───────┘                      │
-                 ▼ ▼                              │
-         page.tsx computes `updated` list ────────┤
-                 │                                │
-                 ▼                                │
-         setLinks(updated) → React re-renders     │
+       localStorage ◀──── saveLinks(updated) ─────────┐
+            │                                         │
+  loadLinks() on first render (useEffect)             │
+            ▼                                         │
+         page.tsx                                     │
+   state: links: Link[]                               │
+      ┌─────┴───────────────┐                         │
+      │ props: onAdd        │ props: link, onDelete,  │
+      │                     │        onEditTitle      │
+      ▼                     ▼                         │
+  LinkForm             LinkCard × N                   │
+      │                     │                         │
+ onAdd(url, title)     onDelete(id)                   │
+      │                onEditTitle(id, title)         │
+      └──────────┐ ┌────────┘                         │
+                 ▼ ▼                                  │
+         page.tsx computes `updated` list ────────────┤
+                 │                                    │
+                 ▼                                    │
+         setLinks(updated) → React re-renders         │
 ```
 
 1. `page.tsx` owns the list of links (the **single source of truth** while the page is open).
@@ -71,7 +73,7 @@ Why: when dependencies only point downward, you can change the UI without touchi
 
 **When a child needs an answer back:** `onAdd(url, title)` returns `null` when the link was saved, or an error message (a string) when it wasn't, for example a duplicate. The page decides (it owns the list), and the form shows the message and keeps the input so the user can fix it (it owns the inputs). Use this pattern when the parent has to accept or reject what a child sends up.
 
-**Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting), so it lives in their shared parent, `page.tsx`.
+**Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting, editing), so it lives in their shared parent, `page.tsx`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The page only hears about an edit when the user presses Save. Cancel just throws the draft away.
 
 ## 4. Server vs. client components
 
@@ -87,7 +89,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 |---|---|---|
 | `app/page.tsx` | Client | Holds `useState` for links, loads from `localStorage` in `useEffect` |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
-| `components/LinkCard.tsx` | (inherits client) | Pure display, rendered by a client page |
+| `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel |
 
 **Goal:** keep `"use client"` as low in the tree as possible. Once links are stored on a server (see the roadmap), `page.tsx` can become a Server Component that loads data, with only the interactive parts as client components.
 
@@ -108,17 +110,19 @@ Each time the storage changes, only the `lib/` module should need to change.
 | Function | Job |
 |---|---|
 | `createLink(url, title?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined` |
-| `formatDate(iso)` | Formats a stored ISO date for display |
+| `formatDate(iso)` | Formats a stored ISO date with date and time. **Currently unused:** the card shows only the date (`toLocaleDateString()`). Will be replaced by friendly dates ("3 days ago") |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
+| `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL, and the card then shows no icon |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
 | `loadLinks()` | Reads and parses saved links. Returns `[]` if nothing is saved or the data is broken |
 | `saveLinks(links)` | Writes the whole list as JSON |
+| `updateTitle(links, id, title)` | Returns a **new** list where the matching link has the new title (trimmed; blank → `undefined`). Other links are returned unchanged, and the original list is never modified |
 | `STORAGE_KEY` | The storage key, exported so tests use the exact same value |
 
 **Rules for storage:**
 
 - **Load once, after the first render, in `useEffect`.** Next.js renders pages on the server first, where `localStorage` doesn't exist, so it can't be read during render or in `useState(...)`.
-- **Save inside the event handlers** (`addLink`, `deleteLink`), **not in an effect** that watches `links`. Such an effect would run with the empty starting list before loading finishes, and could wipe saved links.
+- **Save inside the event handlers** (`addLink`, `deleteLink`, `editTitle`), **not in an effect** that watches `links`. Such an effect would run with the empty starting list before loading finishes, and could wipe saved links.
 - The load effect needs `// eslint-disable-next-line react-hooks/set-state-in-effect`. The extra render it warns about is harmless here, and the code is temporary until v0.5. Any other lint disable needs a comment explaining why.
 
 ## 6. Conventions
@@ -129,8 +133,11 @@ Each time the storage changes, only the `lib/` module should need to change.
 - **Imports:** use the `@/` alias (`@/types/link`), not long relative paths (`../../types/link`).
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
-- **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display (`formatDate`).
+- **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display. The card currently shows the date only (`toLocaleDateString()`).
 - **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`).
+- **Never change state in place.** Functions like `updateTitle` build a new array (`map`) and new objects (`{ ...link, title }`). React only re-renders when it gets a new value.
+- **Images:** use `<Image>` from `next/image` with `width` and `height`. For tiny remote images like favicons (under 1 KB), add `unoptimized`: there's nothing to gain from resizing them, and it means we don't need `remotePatterns` in `next.config.ts`.
+- **Accessible names:** every input needs a name: a visible `<label>`, a `placeholder`, or `aria-label` when there's no visible label (the edit box uses `aria-label="Title"`). Decorative images, like favicons next to a title that already names the site, get `alt=""` so screen readers skip them.
 - **Parsing URLs:** use `new URL(...)` inside `try/catch` and fall back to the original text. Old saved data may not be a valid URL, and that must never crash the page.
 - **Auto-imports:** check the imports at the top of a file after accepting an autocomplete suggestion. VS Code has added `import { get } from "http"` and `import { title } from "process"` by mistake.
 
@@ -139,7 +146,8 @@ Each time the storage changes, only the `lib/` module should need to change.
 Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake browser).
 
 - **`lib/` functions** get unit tests: call the function, check the result.
-- **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class.
+- **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class. If a test can't find an element by role and name, a screen reader probably can't either. Fix the markup, not the test.
+- **Decorative images** (`alt=""`) are hidden from role queries on purpose, so tests find them with `document.querySelector("img")`.
 - Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
 - `npm run check` (types + lint + tests) must pass before committing.
 - **Write the test first** when you can: watch it fail (🔴), then write the code (🟢). A test that never failed hasn't proven anything.
@@ -164,3 +172,8 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-03 | Duplicates are found by comparing `new URL().href` | The browser already normalizes case and the trailing `/` on a bare domain, so we don't write those rules ourselves |
 | 2026-10-03 | `onAdd` returns an error message (`string \| null`) | The page owns the list and decides; the form owns the inputs and shows the message |
 | 2026-10-03 | Error message hides after 5 seconds, or as soon as the user types | Short enough to stay out of the way, long enough to read |
+| 2026-10-04 | Edit-mode state (`isEditing`, `draft`) lives in `LinkCard`; the page gets `onEditTitle(id, title)` | Only that card needs to know it's being edited; Cancel discards the draft without touching the list |
+| 2026-10-04 | `updateTitle` is a pure function in `lib/` that returns a new list | Easy to unit-test; same trim/blank rules as `createLink`; React needs a new array to re-render |
+| 2026-10-04 | Cards show the date only, not the time | The time of day isn't useful for a bookmark; cleaner card |
+| 2026-10-04 | Favicons come from Google's favicon service | Every site stores its icon differently; one URL pattern works for all. Trade-off: Google sees the domains of saved links |
+| 2026-10-04 | Favicons use `<Image unoptimized>` | Icons are under 1 KB, so optimizing them gains nothing, and it avoids `remotePatterns` config (recommended in the Next.js image docs) |

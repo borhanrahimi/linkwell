@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { Link } from "@/types/link";
-import { getDomain } from "@/lib/links";
+import { getDomain, getFaviconUrl } from "@/lib/links";
 
 
 type LinkCardProps = {
@@ -14,6 +15,7 @@ type LinkCardProps = {
 export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
+  const faviconUrl = getFaviconUrl(link.url);
 
   function startEditing() {
     setDraft(link.title || "");
@@ -30,7 +32,7 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
     setIsEditing(false);
   }
 
-  if (isEditing){
+  if (isEditing) {
     return (
       <li className="rounded-lg bg-white p-4 shadow-sm">
         <form onSubmit={handleSave} className="flex items-center gap-2">
@@ -60,26 +62,30 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
   }
   return (
     <li className="flex items-center justify-between rounded-lg bg-white p-4 shadow-sm">
-      <div className="min-w-0">
-        <a
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block truncate font-medium text-blue-600 hover:underline"
-        >
-          {link.title || getDomain(link.url)}
-        </a>
-        <p className="truncate text-sm text-slate-500">{link.url}</p>
-        <p className="text-sm text-slate-400">Saved {new Date(link.createdAt).toLocaleDateString()}</p>
+      <div className="flex min-w-0 items-center gap-3">
+        {faviconUrl && (
+          <Image src={faviconUrl} alt="" width={30} height={30} unoptimized className="shrink-0" />)}
+        <div className="min-w-0">
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block truncate font-medium text-blue-600 hover:underline"
+          >
+            {link.title || getDomain(link.url)}
+          </a>
+          <p className="truncate text-sm text-slate-500">{link.url}</p>
+          <p className="text-sm text-slate-400">Saved {new Date(link.createdAt).toLocaleDateString()}</p>
+        </div>
       </div>
       <div className="ml-4 flex shrink-0 gap-3">
-        <button onClick={startEditing}className="text-sm text-slate-400 hover:text-blue-600">
-        Edit
+        <button onClick={startEditing} className="text-sm text-slate-400 hover:text-blue-600">
+          Edit
         </button>
         <button
-        onClick={() => onDelete(link.id)}
-        className="text-sm text-slate-400 hover:text-red-500">
-        Delete 
+          onClick={() => onDelete(link.id)}
+          className="text-sm text-slate-400 hover:text-red-500">
+          Delete
         </button>
       </div>
     </li>

@@ -6,9 +6,11 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.3 in progress).** You can add and delete links, give them an optional title, and they're saved in your browser, so they survive a refresh. Saving the same link twice shows an error instead. Links don't sync between devices yet. Next up: editing titles, favicons and friendlier dates. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.3 in progress).** You can add and delete links, give them an optional title and edit it later, and they're saved in your browser, so they survive a refresh. Each card shows the site's icon, the full URL and the date it was saved. Saving the same link twice shows an error instead. Links don't sync between devices yet. Next up: friendlier dates ("3 days ago"), the last item in v0.3. See the [roadmap](docs/ROADMAP.md).
 
 > **Where is my data?** Links are stored in your browser's `localStorage` under the key `linkwell:links`. They stay on this computer and in this browser only. Clearing your browser's site data deletes them.
+>
+> **Favicons:** site icons are loaded from Google's favicon service (`www.google.com/s2/favicons`), so Google sees the *domain* of each saved link (not the full URL) when the icons load.
 
 ## Features
 
@@ -17,7 +19,8 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Links survive a page refresh
 - [x] Optional title for each link (shows the domain when there's none)
 - [x] The same link can't be saved twice
-- [ ] Edit a link's title
+- [x] Edit a link's title (Enter saves, Escape cancels)
+- [x] Site icon (favicon) next to each link
 - [ ] Tags and search
 - [ ] Dead-link detection ("keep them alive")
 - [ ] Resurfacing old links ("actually come back to them")

@@ -40,12 +40,12 @@ describe("createLink", () => {
 
     expect(link.title).toBe("Example site");
   });
-  test ("trims spaces around the title", () => {
+  test("trims spaces around the title", () => {
     const link = createLink("https://example.com", "  Example site  ");
 
     expect(link.title).toBe("Example site");
   });
-  test ("has no title when none or only spaces are given", () => {
+  test("has no title when none or only spaces are given", () => {
     expect(createLink("https://example.com").title).toBeUndefined();
     expect(createLink("https://example.com", "   ").title).toBeUndefined();
   });
@@ -95,26 +95,26 @@ describe("getDomain", () => {
 
   describe("isDuplicate", () => {
     const links = [createLink("https://example.com/page")];
-  
+
     test("is false when the list is empty", () => {
       expect(isDuplicate([], "https://example.com/page")).toBe(false);
     });
-  
+
     test("is true when the url is already saved", () => {
       expect(isDuplicate(links, "https://example.com/page")).toBe(true);
     });
-  
+
     test("is false for a different url", () => {
       expect(isDuplicate(links, "https://example.com/other")).toBe(false);
     });
-  
+
     test("ignores uppercase letters in the domain", () => {
       expect(isDuplicate(links, "https://EXAMPLE.com/page")).toBe(true);
     });
-  
+
     test("treats a domain with and without a trailing slash as the same", () => {
       const saved = [createLink("https://example.com")];
-  
+
       expect(isDuplicate(saved, "https://example.com/")).toBe(true);
     });
   });
@@ -122,34 +122,34 @@ describe("getDomain", () => {
   describe("updateTitle", () => {
     const first = createLink("https://example.com", "Old title");
     const second = createLink("https://nextjs.org", "Next.js");
-  
+
     test("changes the title of the matching link", () => {
       const updated = updateTitle([first, second], first.id, "New title");
-  
+
       expect(updated[0].title).toBe("New title");
     });
-  
+
     test("leaves the other links alone", () => {
       const updated = updateTitle([first, second], first.id, "New title");
-  
+
       expect(updated[1]).toBe(second);
     });
-  
+
     test("does not change the original list", () => {
       updateTitle([first, second], first.id, "New title");
-  
+
       expect(first.title).toBe("Old title");
     });
-  
+
     test("trims spaces around the title", () => {
       const updated = updateTitle([first], first.id, "  New title  ");
-  
+
       expect(updated[0].title).toBe("New title");
     });
-  
+
     test("removes the title when it is empty", () => {
       const updated = updateTitle([first], first.id, "   ");
-  
+
       expect(updated[0].title).toBeUndefined();
     });
   });
@@ -160,12 +160,9 @@ describe("getDomain", () => {
         "https://www.google.com/s2/favicons?domain=nextjs.org&sz=32"
       );
     });
-  
+
     test("returns null when the URL is invalid", () => {
       expect(getFaviconUrl("not a url")).toBeNull();
     });
   });
-  
-  
 });
-

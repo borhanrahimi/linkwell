@@ -181,5 +181,15 @@ describe("Home page", () => {
     });
   });
 
+  test("shows the site's favicon next to a link", () => {
+    render(<Home />);
+    addLink("https://example.com");
+
+    const icon = document.querySelector("img");
+    expect(icon?.getAttribute("src")).toBe(
+      "https://www.google.com/s2/favicons?domain=example.com&sz=32"
+    );
+  });
+
+
 });
- 
