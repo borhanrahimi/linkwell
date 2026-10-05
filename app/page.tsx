@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
-import { createLink, isDuplicate, loadLinks, saveLinks } from "@/lib/links";
+import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle } from "@/lib/links";
 import type { Link } from "@/types/link";
 
 export default function Home() {
@@ -32,6 +32,12 @@ export default function Home() {
     saveLinks(updated);
   }
 
+  function editTitle(id: string, title: string) {
+    const updated = updateTitle(links, id, title);
+    setLinks(updated);
+    saveLinks(updated);
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-8">
       <div className="mx-auto max-w-2xl">
@@ -47,7 +53,8 @@ export default function Home() {
             <p className="text-slate-400">No links yet. Add your first one above.</p>
           )}
           {links.map((link) => (
-            <LinkCard key={link.id} link={link} onDelete={deleteLink} />
+          <LinkCard key={link.id} link={link} onDelete={deleteLink} onEditTitle={editTitle}
+            />
           ))}
         </ul>
       </div>

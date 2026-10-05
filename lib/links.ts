@@ -48,3 +48,10 @@ export function isDuplicate(links: Link[], url: string) {
   const target = normalizeUrl(url);
   return links.some((link) => normalizeUrl(link.url) === target);
 }
+
+export function updateTitle(links: Link[], id: string, title: string): Link[] {
+  return links.map((link) =>
+    link.id === id ? { ...link, title: title.trim() || undefined } : link
+  );
+}
+

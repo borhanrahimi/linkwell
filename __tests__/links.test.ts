@@ -7,6 +7,7 @@ import {
   isDuplicate,
   loadLinks,
   saveLinks,
+  updateTitle,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -114,6 +115,41 @@ describe("getDomain", () => {
       const saved = [createLink("https://example.com")];
   
       expect(isDuplicate(saved, "https://example.com/")).toBe(true);
+    });
+  });
+
+  describe("updateTitle", () => {
+    const first = createLink("https://example.com", "Old title");
+    const second = createLink("https://nextjs.org", "Next.js");
+  
+    test("changes the title of the matching link", () => {
+      const updated = updateTitle([first, second], first.id, "New title");
+  
+      expect(updated[0].title).toBe("New title");
+    });
+  
+    test("leaves the other links alone", () => {
+      const updated = updateTitle([first, second], first.id, "New title");
+  
+      expect(updated[1]).toBe(second);
+    });
+  
+    test("does not change the original list", () => {
+      updateTitle([first, second], first.id, "New title");
+  
+      expect(first.title).toBe("Old title");
+    });
+  
+    test("trims spaces around the title", () => {
+      const updated = updateTitle([first], first.id, "  New title  ");
+  
+      expect(updated[0].title).toBe("New title");
+    });
+  
+    test("removes the title when it is empty", () => {
+      const updated = updateTitle([first], first.id, "   ");
+  
+      expect(updated[0].title).toBeUndefined();
     });
   });
   

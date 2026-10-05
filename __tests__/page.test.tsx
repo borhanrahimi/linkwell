@@ -130,5 +130,56 @@ describe("Home page", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  describe("editing a title", () => {
+    function editTitle(newTitle: string) {
+      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+      fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
+        target: { value: newTitle },
+      });
+    }
+
+    test("changes the title of a link", () => {
+      render(<Home />);
+      addLink("https://example.com", "Old title");
+
+      editTitle("New title");
+      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+      expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
+      expect(screen.queryByRole("link", { name: "Old title" })).toBeNull();
+    });
+
+    test("keeps the new title after a page refresh", () => {
+      render(<Home />);
+      addLink("https://example.com", "Old title");
+      editTitle("New title");
+      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+      cleanup();
+      render(<Home />);
+      expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
+    });
+
+    test("falls back to the domain when the title is cleared", () => {
+      render(<Home />);
+      addLink("https://example.com", "Old title");
+
+      editTitle("");
+      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+      expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
+    });
+
+    test("cancel keeps the old title", () => {
+      render(<Home />);
+      addLink("https://example.com", "Old title");
+
+      editTitle("New title");
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(screen.getByRole("link", { name: "Old title" })).toBeDefined();
+    });
+  });
+
 });
  
