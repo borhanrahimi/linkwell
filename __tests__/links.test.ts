@@ -11,6 +11,7 @@ import {
   getFaviconUrl,
   parseTags,
   filterByTag,
+  searchLinks,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -244,6 +245,28 @@ describe("filterByTag", () => {
 
   test("skips links saved before tags existed", () => {
     expect(filterByTag([old], "react")).toEqual([]);
+  });
+});
+
+
+describe("searchLinks", () => {
+  const react = createLink("https://react.dev", "React docs");
+  const news = createLink("https://news.ycombinator.com");
+
+  test("returns every link when the search is empty", () => {
+    expect(searchLinks([react, news], "  ")).toEqual([react, news]);
+  });
+
+  test("finds links by title, ignoring case", () => {
+    expect(searchLinks([react, news], "DOCS")).toEqual([react]);
+  });
+
+  test("finds links by url", () => {
+    expect(searchLinks([react, news], "ycombinator")).toEqual([news]);
+  });
+
+  test("returns nothing when no link matches", () => {
+    expect(searchLinks([react, news], "vue")).toEqual([]);
   });
 });
 

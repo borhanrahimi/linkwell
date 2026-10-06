@@ -202,6 +202,47 @@ describe("Home page", () => {
     expect(screen.queryByText("Showing links tagged #react")).toBeNull();
   });
 
+
+  test("shows only links that match the search", () => {
+    render(<Home />);
+    addLink("https://react.dev", "React docs");
+    addLink("https://news.ycombinator.com");
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
+      target: { value: "react" },
+    });
+
+    expect(screen.getByRole("link", { name: "React docs" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "news.ycombinator.com" })).toBeNull();
+  });
+
+  test("shows a message when nothing matches the search", () => {
+    render(<Home />);
+    addLink("https://react.dev");
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
+      target: { value: "vue" },
+    });
+
+    expect(screen.getByText("No links match your search.")).toBeDefined();
+    expect(screen.queryByText("No links yet. Add your first one above.")).toBeNull();
+  });
+
+  test("searches only inside the chosen tag", () => {
+    render(<Home />);
+    addLink("https://react.dev", "", "docs");
+    addLink("https://vuejs.org", "", "docs");
+    addLink("https://reactjs.org/blog", "", "news");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "#docs" })[0]);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
+      target: { value: "react" },
+    });
+
+    expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "vuejs.org" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "reactjs.org" })).toBeNull();
+  });
 });
 
   describe("editing a title", () => {

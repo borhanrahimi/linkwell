@@ -97,3 +97,16 @@ export function filterByTag(links: Link[], tag: string | null): Link[] {
   }
   return links.filter((link) => link.tags?.includes(tag));
 }
+
+
+export function searchLinks(links: Link[], query: string): Link[] {
+  const text = query.trim().toLowerCase();
+  if (!text) {
+    return links;
+  }
+  return links.filter(
+    (link) =>
+      link.url.toLowerCase().includes(text) ||
+      link.title?.toLowerCase().includes(text)
+  );
+}

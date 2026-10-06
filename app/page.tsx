@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
-import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle, parseTags, filterByTag } from "@/lib/links";
+import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle, parseTags, filterByTag, searchLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
 
 export default function Home() {
   const [links, setLinks] = useState<Link[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const visibleLinks = filterByTag(links, activeTag);
+  const [query, setQuery] = useState("");
+  const visibleLinks = searchLinks(filterByTag(links, activeTag), query);
+
 
   useEffect(() => {
     // localStorage is only available in the browser, so we need to check if we're running in the browser before accessing it
@@ -18,7 +20,7 @@ export default function Home() {
   }, []);
 
   function addLink(url: string, title: string, tags: string) {
-    if (isDuplicate(links, url)){
+    if (isDuplicate(links, url)) {
       return "You already saved this link!";
     }
 
@@ -47,6 +49,15 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-slate-900">Linkwell</h1>
         <p className="mt-1 text-slate-500">
           Save links. Keep them alive. Actually come back to them.
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search links..."
+            aria-label="Search links"
+            className="mt-6 w-full rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+          />
+
         </p>
         <LinkForm onAdd={addLink} />
         {activeTag && (
@@ -56,16 +67,18 @@ export default function Home() {
               onClick={() => setActiveTag(null)}
               className="rounded bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-800 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1">
               Show all
-              </button>
-              </div>
+            </button>
+          </div>
         )}
-
+        {links.length > 0 && visibleLinks.length === 0 && (
+          <p className="text-slate-400">No links match your search.</p>
+        )}
         <ul className="mt-6 space-y-3">
           {links.length === 0 && (
             <p className="text-slate-400">No links yet. Add your first one above.</p>
           )}
           {visibleLinks.map((link) => (
-          <LinkCard key={link.id} link={link} onDelete={deleteLink} onEditTitle={editTitle} onTagClick={setActiveTag}
+            <LinkCard key={link.id} link={link} onDelete={deleteLink} onEditTitle={editTitle} onTagClick={setActiveTag}
             />
           ))}
         </ul>
