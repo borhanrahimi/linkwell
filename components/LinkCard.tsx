@@ -81,6 +81,14 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
             {timeAgo(link.createdAt)}
             </time>
           </p>
+          {link.tags && link.tags.length > 0 && (
+            <ul aria-label="Tags" className="mt-1 flex flex-wrap gap-1">
+              {link.tags.map((tag) => (
+                <li key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                  #{tag}
+                </li>))}
+            </ul>
+          )}
         </div>
       </div>
       <div className="ml-4 flex shrink-0 gap-3">

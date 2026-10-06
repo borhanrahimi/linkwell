@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { loadLinks } from "@/lib/links";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { loadLinks, saveLinks } from "@/lib/links";
 import Home from "@/app/page";
 
 afterEach(() => {
@@ -150,6 +150,34 @@ describe("Home page", () => {
 
     expect(screen.queryByRole("alert")).toBeNull();
   });
+  test("shows tags on the card", () => {
+    render(<Home />);
+
+    addLink("https://example.com", "", "react, news");
+
+    const tags = screen.getByRole("list", { name: "Tags" });
+    expect(within(tags).getAllByRole("listitem").map((tag) => tag.textContent)).toEqual([
+      "#react",
+      "#news",
+    ]);
+  });
+
+  test("shows no tag list for a link without tags", () => {
+    render(<Home />);
+
+    addLink("https://example.com");
+
+    expect(screen.queryByRole("list", { name: "Tags" })).toBeNull();
+  });
+
+  test("still shows links saved before tags existed", () => {
+    saveLinks([{ id: "old", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" }]);
+
+    render(<Home />);
+
+    expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
+  });
+});
 
   describe("editing a title", () => {
     function editTitle(newTitle: string) {
@@ -211,6 +239,3 @@ describe("Home page", () => {
       "https://www.google.com/s2/favicons?domain=example.com&sz=32"
     );
   });
-
-
-});
