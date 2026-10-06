@@ -81,3 +81,11 @@ export function getFaviconUrl(url: string) {
     return null;
   }
 }
+
+export function parseTags(input: string): string[] {
+  const tags = input
+    .split(",")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter((tag) => tag !== "");
+  return [...new Set(tags)];
+}

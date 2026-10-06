@@ -9,6 +9,7 @@ import {
   saveLinks,
   updateTitle,
   getFaviconUrl,
+  parseTags,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -119,6 +120,7 @@ describe("getDomain", () => {
   test("returns the text unchanged if the URL is invalid", () => {
     expect(getDomain("not a url")).toBe("not a url");
   });
+});
 
   describe("isDuplicate", () => {
     const links = [createLink("https://example.com/page")];
@@ -192,4 +194,26 @@ describe("getDomain", () => {
       expect(getFaviconUrl("not a url")).toBeNull();
     });
   });
-});
+
+  describe("parseTags", () => {
+    test("splits text on commas", () => {
+      expect(parseTags("news,react,css")).toEqual(["news", "react", "css"]);
+    });
+
+    test("trims spaces and lowercases each tag", () => {
+      expect(parseTags("  News , React ")).toEqual(["news", "react"]);
+    });
+
+    test("skips empty tags", () => {
+      expect(parseTags("news,, ,react,")).toEqual(["news", "react"]);
+    });
+
+    test("removes duplicate tags", () => {
+      expect(parseTags("react, React, news")).toEqual(["react", "news"]);
+    });
+
+    test("returns an empty list for empty text", () => {
+      expect(parseTags("")).toEqual([]);
+      expect(parseTags("   ")).toEqual([]);
+    });
+  });
