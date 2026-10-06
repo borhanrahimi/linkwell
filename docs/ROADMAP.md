@@ -44,7 +44,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 ## 🔜 v0.4: Organize and find
 
 - [x] Add tags to links
-- [ ] Filter the list by tag
+- [x] Filter the list by tag
 - [ ] Search by URL or title
 - [ ] Sort by newest, oldest or title
 
