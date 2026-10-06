@@ -45,7 +45,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 - [x] Add tags to links
 - [x] Filter the list by tag
-- [ ] Search by URL or title
+- [x] Search by URL or title
 - [ ] Sort by newest, oldest or title
 
 **You'll learn:** derived state (computing the visible list from state plus filters, without storing it twice).

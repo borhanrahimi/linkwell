@@ -76,7 +76,7 @@ Why: when dependencies only point downward, you can change the UI without touchi
 
 **Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). The page turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
 
-**Derived state: store the facts, compute the rest:** the page stores two things in state: `links` (every link) and `activeTag` (the tag the user clicked, or `null`). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render with `filterByTag`. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and the page passes `setActiveTag` straight in.
+**Derived state: store the facts, compute the rest:** the page stores three things in state: `links` (every link), `activeTag` (the tag the user clicked, or `null`) and `query` (the text in the search box). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `searchLinks(filterByTag(links, activeTag), query)`. Each filter takes a list and returns a smaller one, so they chain: first the tag, then the search inside it. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and the page passes `setActiveTag` straight in.
 
 **Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting, editing), so it lives in their shared parent, `page.tsx`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The page only hears about an edit when the user presses Save. Cancel just throws the draft away.
 
@@ -116,6 +116,7 @@ Each time the storage changes, only the `lib/` module should need to change.
 |---|---|
 | `createLink(url, title?, tags?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
 | `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links saved before tags existed (no `tags` field) never match |
+| `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank. Links without a title are matched by URL only |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
 | `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL, and the card then shows no icon |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
@@ -156,6 +157,8 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class. If a test can't find an element by role and name, a screen reader probably can't either. Fix the markup, not the test.
 - **Old saved data:** when a new field is added to `Link`, add a test that saves an old-style link with `saveLinks` (without the field) and checks the page still shows it.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
+- **Several matching elements:** `getByRole` fails when more than one element matches (two cards with a `#docs` tag). Use `getAllByRole(...)[0]` when any of them will do.
+- **Search box:** an `<input type="search">` has the role `searchbox`; find it with `getByRole("searchbox", { name: "Search links" })`.
 - **Decorative images** (`alt=""`) are hidden from role queries on purpose, so tests find them with `document.querySelector("img")`.
 - Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
 - `npm run check` (types + lint + tests) must pass before committing.
@@ -196,3 +199,5 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-06 | New links store `tags: []`; old links have no `tags` field | `tags?` stays optional for old data; the card shows no tag list in either case |
 | 2026-10-06 | The visible list is derived (`filterByTag(links, activeTag)`), not stored in state | One source of truth; add/delete/edit can't forget to update a second list |
 | 2026-10-06 | One active tag at a time, cleared with "Show all" | Simplest filter that's useful; combining tags can come later if needed |
+| 2026-10-06 | Search matches URL and title only (not tags), as you type, with a plain `includes` | Tags already have their own filter; `includes` is simple and fast enough for a personal list. No search button or debounce needed |
+| 2026-10-06 | Search runs inside the active tag filter (`searchLinks(filterByTag(...))`) | Filters combine instead of replacing each other, which is what users expect |
