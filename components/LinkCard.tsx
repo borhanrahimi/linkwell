@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { Link } from "@/types/link";
-import { getDomain, getFaviconUrl } from "@/lib/links";
+import { getDomain, getFaviconUrl, timeAgo } from "@/lib/links";
 
 
 type LinkCardProps = {
@@ -75,7 +75,12 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
             {link.title || getDomain(link.url)}
           </a>
           <p className="truncate text-sm text-slate-500">{link.url}</p>
-          <p className="text-sm text-slate-400">Saved {new Date(link.createdAt).toLocaleDateString()}</p>
+          <p className="text-sm text-slate-400">
+            Saved{" "}
+            <time dateTime = {link.createdAt} title={new Date(link.createdAt).toLocaleDateString()}>
+            {timeAgo(link.createdAt)}
+            </time>
+          </p>
         </div>
       </div>
       <div className="ml-4 flex shrink-0 gap-3">

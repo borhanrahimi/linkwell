@@ -11,8 +11,26 @@ export function createLink(url: string, title?: string): Link {
   };
 }
 
-export function formatDate(iso: string) {
-  return new Date(iso).toLocaleString();
+const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["year", 365 * 24 * 60 * 60],
+  ["month", 30 * 24 * 60 * 60],
+  ["week", 7 * 24 * 60 * 60],
+  ["day", 24 * 60 * 60],
+  ["hour", 60 * 60],
+  ["minute", 60],
+];
+
+const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+export function timeAgo(isoDate: string, now = new Date()) {
+  const seconds = (now.getTime() - new Date(isoDate).getTime()) / 1000;
+
+  for (const [unit, size] of UNITS) {
+    if (seconds >= size) {
+      return relativeTime.format(-Math.floor(seconds / size), unit);
+    }
+  }
+  return "just now";
 }
 
 export function loadLinks(): Link[] {

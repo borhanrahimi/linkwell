@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   STORAGE_KEY,
   createLink,
-  formatDate,
+  timeAgo,
   getDomain,
   isDuplicate,
   loadLinks,
@@ -51,11 +51,38 @@ describe("createLink", () => {
   });
 });
 
-describe("formatDate", () => {
-  test("turns an ISO string into a readable date", () => {
-    const iso = "2026-10-02T14:30:00.000Z";
+describe("timeAgo", () => {
+  const now = new Date("2026-10-05T12:00:00.000Z");
+  test("says 'just now' for less than a minute ago", () => {
+    expect(timeAgo("2026-10-05T11:59:30.000Z", now)).toBe("just now");
+  });
 
-    expect(formatDate(iso)).toBe(new Date(iso).toLocaleString());
+  test("counts minutes", () => {
+    expect(timeAgo("2026-10-05T11:55:00.000Z", now)).toBe("5 minutes ago");
+  });
+
+  test("counts hours", () => {
+    expect(timeAgo("2026-10-05T09:00:00.000Z", now)).toBe("3 hours ago");
+  });
+
+  test("says 'yesterday' for one day ago", () => {
+    expect(timeAgo("2026-10-04T12:00:00.000Z", now)).toBe("yesterday");
+  });
+
+  test("counts days", () => {
+    expect(timeAgo("2026-10-02T12:00:00.000Z", now)).toBe("3 days ago");
+  });
+
+  test("counts weeks", () => {
+    expect(timeAgo("2026-09-21T12:00:00.000Z", now)).toBe("2 weeks ago");
+  });
+
+  test("counts months", () => {
+    expect(timeAgo("2026-07-05T12:00:00.000Z", now)).toBe("3 months ago");
+  });
+
+  test("says 'last year' for one year ago", () => {
+    expect(timeAgo("2025-10-05T12:00:00.000Z", now)).toBe("last year");
   });
 });
 
