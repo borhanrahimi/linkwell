@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect ,useState } from "react";
+import { useEffect, useState } from "react";
 
 type LinkFormProps = {
-  onAdd: (url: string, title: string) => string | null;
+  onAdd: (url: string, title: string, tags: string) => string | null;
 };
 
 export default function LinkForm({ onAdd }: LinkFormProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
+  const [tags, setTags] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -16,13 +17,13 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
       const timer = setTimeout(() => setError(null), 5000);
       return () => clearTimeout(timer);
     }
-  },[error]);
+  }, [error]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
 
-    const message = onAdd(url.trim(), title);
+    const message = onAdd(url.trim(), title, tags);
     if (message) {
       setError(message);
       return;
@@ -30,6 +31,7 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
 
     setUrl("");
     setTitle("");
+    setTags("");
   }
 
   return (
@@ -52,6 +54,14 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
           placeholder="Title (optional)"
           className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <input
+          type="text"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="Tags, comma separated"
+          className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+
         <button
           type="submit"
           className="rounded-lg bg-green-700 px-4 py-2 font-medium text-white hover:bg-green-800"

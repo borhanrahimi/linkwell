@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
-import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle } from "@/lib/links";
+import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle, parseTags } from "@/lib/links";
 import type { Link } from "@/types/link";
 
 export default function Home() {
@@ -14,12 +14,12 @@ export default function Home() {
     setLinks(loadLinks());
   }, []);
 
-  function addLink(url: string, title: string) {
+  function addLink(url: string, title: string, tags: string) {
     if (isDuplicate(links, url)){
       return "You already saved this link!";
     }
 
-    const updated = [createLink(url, title), ...links];
+    const updated = [createLink(url, title, parseTags(tags)), ...links];
     setLinks(updated);
     saveLinks(updated);
     return null;

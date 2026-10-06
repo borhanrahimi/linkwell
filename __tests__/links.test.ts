@@ -50,6 +50,15 @@ describe("createLink", () => {
     expect(createLink("https://example.com").title).toBeUndefined();
     expect(createLink("https://example.com", "   ").title).toBeUndefined();
   });
+  test("keeps the tags it was given", () => {
+    const link = createLink("https://example.com", "", ["react", "news"]);
+
+    expect(link.tags).toEqual(["react", "news"]);
+  });
+
+  test("has an empty tag list when none are given", () => {
+    expect(createLink("https://example.com").tags).toEqual([]);
+  });
 });
 
 describe("timeAgo", () => {

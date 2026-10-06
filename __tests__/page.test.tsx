@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { loadLinks } from "@/lib/links";
 import Home from "@/app/page";
 
 afterEach(() => {
@@ -7,15 +8,35 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function addLink(url: string, title = "") {
+function addLink(url: string, title = "", tags = "") {
   fireEvent.change(screen.getByPlaceholderText("Paste a link..."), {
     target: { value: url },
   });
   fireEvent.change(screen.getByPlaceholderText("Title (optional)"), {
     target: { value: title },
   });
+  fireEvent.change(screen.getByPlaceholderText("Tags, comma separated"), {
+    target: { value: tags },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
+
+test("saves tags with a new link", () => {
+  render(<Home />);
+
+  addLink("https://example.com", "", "React, news");
+
+  expect(loadLinks()[0].tags).toEqual(["react", "news"]);
+});
+
+test("clears the tags box after saving", () => {
+  render(<Home />);
+
+  addLink("https://example.com", "", "react");
+
+  expect(screen.getByPlaceholderText("Tags, comma separated")).toHaveProperty("value", "");
+});
+
 
 
 describe("Home page", () => {
