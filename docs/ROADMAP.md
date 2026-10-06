@@ -18,7 +18,7 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 - [x] README, architecture doc, roadmap
 - [x] Automated tests with Vitest (`npm run check`)
 
-## -[x] v0.2: Links survive a refresh (done)
+## ✅ v0.2: Links survive a refresh (done)
 
 Links used to disappear when you reloaded the page. Now they're saved in the browser's `localStorage`.
 
