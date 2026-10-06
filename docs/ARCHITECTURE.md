@@ -110,12 +110,12 @@ Each time the storage changes, only the `lib/` module should need to change.
 | Function | Job |
 |---|---|
 | `createLink(url, title?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined` |
-| `formatDate(iso)` | Formats a stored ISO date with date and time. **Currently unused:** the card shows only the date (`toLocaleDateString()`). Will be replaced by friendly dates ("3 days ago") |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
 | `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL, and the card then shows no icon |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
 | `loadLinks()` | Reads and parses saved links. Returns `[]` if nothing is saved or the data is broken |
 | `saveLinks(links)` | Writes the whole list as JSON |
+| `timeAgo(iso, now?)` | `"just now"`, `"5 minutes ago"`, `"yesterday"`, `"3 weeks ago"`, `"last year"`… Uses the biggest unit that fits and rounds down. `now` defaults to the current time; tests pass a fixed date |
 | `updateTitle(links, id, title)` | Returns a **new** list where the matching link has the new title (trimmed; blank → `undefined`). Other links are returned unchanged, and the original list is never modified |
 | `STORAGE_KEY` | The storage key, exported so tests use the exact same value |
 
@@ -133,7 +133,7 @@ Each time the storage changes, only the `lib/` module should need to change.
 - **Imports:** use the `@/` alias (`@/types/link`), not long relative paths (`../../types/link`).
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
-- **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display. The card currently shows the date only (`toLocaleDateString()`).
+- **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display. The card shows a relative date (`timeAgo`) inside `<time dateTime={iso}>`, with the exact date (`toLocaleDateString()`) as a hover tooltip.
 - **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`).
 - **Never change state in place.** Functions like `updateTitle` build a new array (`map`) and new objects (`{ ...link, title }`). React only re-renders when it gets a new value.
 - **Images:** use `<Image>` from `next/image` with `width` and `height`. For tiny remote images like favicons (under 1 KB), add `unoptimized`: there's nothing to gain from resizing them, and it means we don't need `remotePatterns` in `next.config.ts`.
@@ -151,6 +151,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
 - `npm run check` (types + lint + tests) must pass before committing.
 - **Write the test first** when you can: watch it fail (🔴), then write the code (🟢). A test that never failed hasn't proven anything.
+- **Time-dependent functions take `now` as a parameter** (with a default), so tests pass a fixed date and give the same result every day. Don't read the clock inside logic you want to test.
 - **Never copy values like storage keys into tests.** Import them (`STORAGE_KEY`), so a typo can't make a test pass for the wrong reason.
 - **Storage in tests:** clear `localStorage` in `afterEach`, so saved links can't leak into the next test.
 - **Simulating a page refresh:** call `cleanup()`, then `render(<Home />)` again. React state is gone, and only `localStorage` survives.
@@ -177,3 +178,6 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-04 | Cards show the date only, not the time | The time of day isn't useful for a bookmark; cleaner card |
 | 2026-10-04 | Favicons come from Google's favicon service | Every site stores its icon differently; one URL pattern works for all. Trade-off: Google sees the domains of saved links |
 | 2026-10-04 | Favicons use `<Image unoptimized>` | Icons are under 1 KB, so optimizing them gains nothing, and it avoids `remotePatterns` config (recommended in the Next.js image docs) |
+| 2026-10-05 | Relative dates use the built-in `Intl.RelativeTimeFormat` (`"en"`, `numeric: "auto"`) | No library needed; it handles plurals and "yesterday" / "last year". Fixed to English to match the UI and keep tests the same on every machine |
+| 2026-10-05 | `timeAgo` takes `now` as a parameter instead of reading the clock | Keeps it a pure function, so tests don't depend on today's date (simpler than faking timers) |
+| 2026-10-05 | Months are 30 days, years 365 days, always rounded down | Exact enough for "how long ago"; rounding down never claims a link is older than it is |

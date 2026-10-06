@@ -30,18 +30,18 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 **You'll learn:** `useEffect`, browser storage, and keeping data access in `lib/`.
 
-## 🔜 v0.3: Better links
+## ✅ v0.3: Better links (done)
 
 - [x] Optional title for each link (fall back to the domain name)
 - [x] Stop the same URL from being saved twice
 - [x] Edit a link's title
 - [x] Show the site's favicon next to each link
-- [ ] Friendlier dates ("3 days ago")
+- [x] Friendlier dates ("3 days ago")
 - [x] Replace leftover Create Next App settings: the browser tab title in `app/layout.tsx`, and the unused Geist font (or switch `globals.css` to use it)
 
 **You'll learn:** form validation, editing state, and small pure functions in `lib/`.
 
-## v0.4: Organize and find
+## 🔜 v0.4: Organize and find
 
 - [ ] Add tags to links
 - [ ] Filter the list by tag
