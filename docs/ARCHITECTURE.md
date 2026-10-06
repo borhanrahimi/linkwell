@@ -55,8 +55,9 @@ Why: when dependencies only point downward, you can change the UI without touchi
       ▼                     ▼                         │
   LinkForm             LinkCard × N                   │
       │                     │                         │
- onAdd(url, title)     onDelete(id)                   │
-      │                onEditTitle(id, title)         │
+ onAdd(url, title,     onDelete(id)                   │
+       tags)           onEditTitle(id, title)         │
+      │                     │                         │
       └──────────┐ ┌────────┘                         │
                  ▼ ▼                                  │
          page.tsx computes `updated` list ────────────┤
@@ -71,7 +72,9 @@ Why: when dependencies only point downward, you can change the UI without touchi
 4. Children never change the list directly. They call the callback.
 5. The page computes the new list once, then hands that same value to both `setLinks` (screen) and `saveLinks` (storage).
 
-**When a child needs an answer back:** `onAdd(url, title)` returns `null` when the link was saved, or an error message (a string) when it wasn't, for example a duplicate. The page decides (it owns the list), and the form shows the message and keeps the input so the user can fix it (it owns the inputs). Use this pattern when the parent has to accept or reject what a child sends up.
+**When a child needs an answer back:** `onAdd(url, title, tags)` returns `null` when the link was saved, or an error message (a string) when it wasn't, for example a duplicate. The page decides (it owns the list), and the form shows the message and keeps the input so the user can fix it (it owns the inputs). Use this pattern when the parent has to accept or reject what a child sends up.
+
+**Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). The page turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
 
 **Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting, editing), so it lives in their shared parent, `page.tsx`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The page only hears about an edit when the user presses Save. Cancel just throws the draft away.
 
@@ -109,10 +112,11 @@ Each time the storage changes, only the `lib/` module should need to change.
 
 | Function | Job |
 |---|---|
-| `createLink(url, title?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined` |
+| `createLink(url, title?, tags?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
 | `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL, and the card then shows no icon |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
+| `parseTags(text)` | `"React, news,,react "` → `["react", "news"]`. Splits on commas, trims, lowercases, drops empty tags and duplicates (first one wins) |
 | `loadLinks()` | Reads and parses saved links. Returns `[]` if nothing is saved or the data is broken |
 | `saveLinks(links)` | Writes the whole list as JSON |
 | `timeAgo(iso, now?)` | `"just now"`, `"5 minutes ago"`, `"yesterday"`, `"3 weeks ago"`, `"last year"`… Uses the biggest unit that fits and rounds down. `now` defaults to the current time; tests pass a fixed date |
@@ -134,10 +138,10 @@ Each time the storage changes, only the `lib/` module should need to change.
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
 - **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display. The card shows a relative date (`timeAgo`) inside `<time dateTime={iso}>`, with the exact date (`toLocaleDateString()`) as a hover tooltip.
-- **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`).
+- **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`), or check before using them (`link.tags && link.tags.length > 0`).
 - **Never change state in place.** Functions like `updateTitle` build a new array (`map`) and new objects (`{ ...link, title }`). React only re-renders when it gets a new value.
 - **Images:** use `<Image>` from `next/image` with `width` and `height`. For tiny remote images like favicons (under 1 KB), add `unoptimized`: there's nothing to gain from resizing them, and it means we don't need `remotePatterns` in `next.config.ts`.
-- **Accessible names:** every input needs a name: a visible `<label>`, a `placeholder`, or `aria-label` when there's no visible label (the edit box uses `aria-label="Title"`). Decorative images, like favicons next to a title that already names the site, get `alt=""` so screen readers skip them.
+- **Accessible names:** every input needs a name: a visible `<label>`, a `placeholder`, or `aria-label` when there's no visible label (the edit box uses `aria-label="Title"`). Lists without a heading get `aria-label` too (the tag list uses `aria-label="Tags"`). Decorative images, like favicons next to a title that already names the site, get `alt=""` so screen readers skip them.
 - **Parsing URLs:** use `new URL(...)` inside `try/catch` and fall back to the original text. Old saved data may not be a valid URL, and that must never crash the page.
 - **Auto-imports:** check the imports at the top of a file after accepting an autocomplete suggestion. VS Code has added `import { get } from "http"` and `import { title } from "process"` by mistake.
 
@@ -147,6 +151,8 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 
 - **`lib/` functions** get unit tests: call the function, check the result.
 - **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class. If a test can't find an element by role and name, a screen reader probably can't either. Fix the markup, not the test.
+- **Old saved data:** when a new field is added to `Link`, add a test that saves an old-style link with `saveLinks` (without the field) and checks the page still shows it.
+- **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
 - **Decorative images** (`alt=""`) are hidden from role queries on purpose, so tests find them with `document.querySelector("img")`.
 - Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
 - `npm run check` (types + lint + tests) must pass before committing.
@@ -181,3 +187,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-05 | Relative dates use the built-in `Intl.RelativeTimeFormat` (`"en"`, `numeric: "auto"`) | No library needed; it handles plurals and "yesterday" / "last year". Fixed to English to match the UI and keep tests the same on every machine |
 | 2026-10-05 | `timeAgo` takes `now` as a parameter instead of reading the clock | Keeps it a pure function, so tests don't depend on today's date (simpler than faking timers) |
 | 2026-10-05 | Months are 30 days, years 365 days, always rounded down | Exact enough for "how long ago"; rounding down never claims a link is older than it is |
+| 2026-10-06 | Tags are typed as one comma-separated text box | Simplest input that works; no chip-input component needed yet |
+| 2026-10-06 | Tags are stored lowercase, trimmed and without duplicates (`parseTags`) | "React" and "react" must be the same tag, or filtering by tag would miss links |
+| 2026-10-06 | The form sends raw tag text; the page calls `parseTags` | The form only handles what the user typed; the tag rules live in one tested `lib/` function |
+| 2026-10-06 | New links store `tags: []`; old links have no `tags` field | `tags?` stays optional for old data; the card shows no tag list in either case |

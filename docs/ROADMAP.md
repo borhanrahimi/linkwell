@@ -43,7 +43,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 ## 🔜 v0.4: Organize and find
 
-- [ ] Add tags to links
+- [x] Add tags to links
 - [ ] Filter the list by tag
 - [ ] Search by URL or title
 - [ ] Sort by newest, oldest or title
@@ -97,6 +97,7 @@ Not planned yet, but worth remembering:
 - Import bookmarks from Chrome or Firefox
 - Share a collection of links publicly
 - Dark mode
+- Edit or remove the tags of a saved link
 - Keyboard shortcuts
 
 ## How to use this roadmap
