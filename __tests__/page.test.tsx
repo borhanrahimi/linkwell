@@ -177,6 +177,31 @@ describe("Home page", () => {
 
     expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
   });
+
+  test("shows only links with the clicked tag", () => {
+    render(<Home />);
+    addLink("https://react.dev", "", "react");
+    addLink("https://news.ycombinator.com", "", "news");
+
+    fireEvent.click(screen.getByRole("button", { name: "#react" }));
+
+    expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "news.ycombinator.com" })).toBeNull();
+    expect(screen.getByText("Showing links tagged #react")).toBeDefined();
+  });
+
+  test("shows every link again after Show all", () => {
+    render(<Home />);
+    addLink("https://react.dev", "", "react");
+    addLink("https://news.ycombinator.com", "", "news");
+
+    fireEvent.click(screen.getByRole("button", { name: "#react" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+
+    expect(screen.getByRole("link", { name: "news.ycombinator.com" })).toBeDefined();
+    expect(screen.queryByText("Showing links tagged #react")).toBeNull();
+  });
+
 });
 
   describe("editing a title", () => {

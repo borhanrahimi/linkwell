@@ -10,6 +10,7 @@ import {
   updateTitle,
   getFaviconUrl,
   parseTags,
+  filterByTag,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -226,3 +227,23 @@ describe("getDomain", () => {
       expect(parseTags("   ")).toEqual([]);
     });
   });
+
+
+describe("filterByTag", () => {
+  const react = createLink("https://react.dev", "", ["react", "docs"]);
+  const news = createLink("https://news.ycombinator.com", "", ["news"]);
+  const old = { id: "old", url: "https://old.com", createdAt: "2026-01-01T00:00:00.000Z" };
+
+  test("returns every link when no tag is chosen", () => {
+    expect(filterByTag([react, news, old], null)).toEqual([react, news, old]);
+  });
+
+  test("keeps only links with the chosen tag", () => {
+    expect(filterByTag([react, news, old], "react")).toEqual([react]);
+  });
+
+  test("skips links saved before tags existed", () => {
+    expect(filterByTag([old], "react")).toEqual([]);
+  });
+});
+

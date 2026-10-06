@@ -90,3 +90,10 @@ export function parseTags(input: string): string[] {
     .filter((tag) => tag !== "");
   return [...new Set(tags)];
 }
+
+export function filterByTag(links: Link[], tag: string | null): Link[] {
+  if (!tag){
+    return links;
+  }
+  return links.filter((link) => link.tags?.includes(tag));
+}

@@ -10,9 +10,10 @@ type LinkCardProps = {
   link: Link;
   onDelete: (id: string) => void;
   onEditTitle: (id: string, title: string) => void;
+  onTagClick: (tag: string) => void;
 };
 
-export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps) {
+export default function LinkCard({ link, onDelete, onEditTitle, onTagClick }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
@@ -84,9 +85,15 @@ export default function LinkCard({ link, onDelete, onEditTitle }: LinkCardProps)
           {link.tags && link.tags.length > 0 && (
             <ul aria-label="Tags" className="mt-1 flex flex-wrap gap-1">
               {link.tags.map((tag) => (
-                <li key={tag} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                  #{tag}
-                </li>))}
+                <li key={tag}>
+                  <button
+                    onClick={() => onTagClick(tag)}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    #{tag}
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
         </div>
