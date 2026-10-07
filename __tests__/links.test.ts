@@ -15,6 +15,7 @@ import {
   sortLinks,
   toLink,
 } from "@/lib/links";
+import { check } from "drizzle-orm/mysql-core";
 
 afterEach(() => {
   localStorage.clear();
@@ -329,6 +330,8 @@ describe("toLink", () => {
     title: null,
     tags: ["news"],
     createdAt: new Date("2026-10-06T12:00:00.000Z"),
+    status: null,
+    checkedAt: null,
   };
 
   test("turns the date into an ISO string", () => {
@@ -341,5 +344,16 @@ describe("toLink", () => {
 
   test("keeps the id, url and tags", () => {
     expect(toLink(row)).toMatchObject({ id: "1", url: "https://example.com", tags: ["news"] });
+  });
+
+  test("leaves the status out when the link was never checked", () => {
+    expect(toLink(row).status).toBeUndefined();
+    expect(toLink(row).checkedAt).toBeUndefined();
+  });
+
+  test("keeps the result of the last check", () => {
+    const checked = { ...row, status: "broken" as const, checkedAt: new Date("2026-10-07T08:00:00.000Z") };
+
+    expect(toLink(checked)).toMatchObject({ status: "broken", checkedAt: "2026-10-07T08:00:00.000Z" });
   });
 });

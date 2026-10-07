@@ -135,5 +135,7 @@ export function toLink(row: LinkRow): Link {
     title: row.title ?? undefined,
     tags: row.tags,
     createdAt: row.createdAt.toISOString(),
+    status: row.status ?? undefined,
+    checkedAt: row.checkedAt?.toISOString(),
   };
 }
