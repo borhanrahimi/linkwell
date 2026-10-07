@@ -6,9 +6,9 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.5 in progress).** You can add and delete links, give them an optional title and edit it later. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. Next up: import the links you saved in your browser before v0.5, then finish the backend clean-up. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.5 done, v0.6 next).** You can add and delete links, give them an optional title and edit it later. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. Next up: v0.6, which checks whether your saved links still work. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
 
-> **Where is my data?** Links are stored in a Postgres database hosted on [Neon](https://neon.tech), in the `links` table. Links you saved before v0.5 are still in your browser's `localStorage` (key `linkwell:links`); the app doesn't show them yet, and an import is planned.
+> **Where is my data?** Links are stored in a Postgres database hosted on [Neon](https://neon.tech), in the `links` table. Links saved before v0.5 lived in your browser's `localStorage` (key `linkwell:links`). When the app finds any, it offers to import them; after importing, the browser's copy is deleted.
 >
 > **Favicons:** site icons are loaded from Google's favicon service (`www.google.com/s2/favicons`), so Google sees the *domain* of each saved link (not the full URL) when the icons load.
 
@@ -27,7 +27,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Search by URL or title
 - [x] Sort by newest, oldest or title
 - [x] Links saved in a database, the same on every device
-- [ ] Import links saved in the browser before v0.5
+- [x] Import links saved in the browser before v0.5
 - [ ] Dead-link detection ("keep them alive")
 - [ ] Resurfacing old links ("actually come back to them")
 
@@ -87,7 +87,7 @@ linkwell/
 │   ├── globals.css   # Global styles (Tailwind)
 │   ├── page.tsx      # Home page (Server Component): reads links from the database
 │   └── actions.ts    # Server Actions: save, delete and edit links
-├── components/       # UI components (LinkManager, LinkForm, LinkCard)
+├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner)
 ├── lib/
 │   ├── data.ts       # Database reads and writes (server-only)
 │   └── links.ts      # Pure helpers: creating, filtering, sorting, formatting links

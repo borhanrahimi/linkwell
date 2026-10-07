@@ -51,7 +51,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 **You'll learn:** derived state (computing the visible list from state plus filters, without storing it twice).
 
-## 🔜 v0.5: A real backend
+## ✅ v0.5: A real backend (done)
 
 Moves data from the browser to a server, so links follow you across devices.
 
@@ -59,12 +59,12 @@ Moves data from the browser to a server, so links follow you across devices.
 - [x] Read links in a Server Component, so `page.tsx` no longer needs `"use client"`
 - [x] Add, edit and delete links with Server Actions
 - [x] Move storage to the database (`lib/data.ts`), keeping `lib/links.ts` for pure helpers
-- [ ] Import links saved in `localStorage` before v0.5 into the database
-- [ ] Remove the leftover `localStorage` code (`loadLinks`, `saveLinks`, `STORAGE_KEY`)
+- [x] Import links saved in `localStorage` before v0.5 into the database (a banner offers it once)
+- [x] Remove the leftover `localStorage` writing code (`saveLinks` → `clearSavedLinks`)
 
 **You'll learn:** Server vs. Client Components, Server Actions, databases and migrations, hydration, and faking modules in tests (`vi.mock`).
 
-## v0.6: Keep them alive 🩺
+## 🔜 v0.6: Keep them alive 🩺
 
 - [ ] Fetch each link's page title and description automatically when it's saved
 - [ ] Check whether saved links still work (dead-link detection)

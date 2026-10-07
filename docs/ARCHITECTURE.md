@@ -93,6 +93,8 @@ Because the state already shows each change, actions don't call `refresh()`: the
 
 **Server and browser must render the same thing (hydration):** the server sends finished HTML, then React renders the same components again in the browser and expects identical output. Anything that changes between the two renders causes a hydration error. That's why the server picks `now` once and passes it down, so `timeAgo(link.createdAt, now)` gives the same text on both sides. The exact-date tooltip uses the computer's time zone, which can legitimately differ between server and browser, so `<time>` has `suppressHydrationWarning`. Use that escape hatch only for values like timestamps, never to hide real bugs.
 
+**Importing links from before v0.5:** `ImportBanner` sits at the top of `LinkManager`. After the first render it reads `localStorage` with `loadLinks()` (reading it during render would make the server and browser output differ). If it finds links, it shows a banner. **Import** calls `importLinks`, deletes the browser's copy with `clearSavedLinks()`, and reports the saved links up with `onImported(imported)`, which `LinkManager` adds to its list. **Not now** only hides the banner until the next visit. The buttons are disabled while importing, so a double click can't import twice.
+
 ## 4. Server vs. client components
 
 In the Next.js App Router, components are **Server Components by default**. Add `"use client"` at the top of a file only when it needs:
@@ -108,6 +110,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `app/page.tsx` | Server | `async`; reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
 | `components/LinkManager.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; calls the Server Actions |
+| `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
 
@@ -154,6 +157,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 |---|---|
 | `saveLink(link)` | Returns `"Please paste a link."` for a blank URL, `"You already saved this link!"` for a duplicate (checked against the database), otherwise saves it and returns `null` |
 | `removeLink(id)` | Deletes the link |
+| `importLinks(oldLinks)` | Saves links from the browser's `localStorage`. Gives each a fresh id and `tags: []` if missing; skips blank URLs and links already in the database or earlier in the same batch. Returns the links it saved |
 | `saveTitle(id, title)` | Saves the new title |
 
 **`lib/links.ts`** (pure functions, used on both server and browser):
@@ -171,7 +175,9 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `parseTags(text)` | `"React, news,,react "` → `["react", "news"]`. Splits on commas, trims, lowercases, drops empty tags and duplicates (first one wins) |
 | `timeAgo(iso, now?)` | `"just now"`, `"5 minutes ago"`, `"yesterday"`, `"3 weeks ago"`, `"last year"`… Uses the biggest unit that fits and rounds down. `now` defaults to the current time; the page passes the server's time, tests pass a fixed date |
 | `updateTitle(links, id, title)` | Returns a **new** list where the matching link has the new title (trimmed; blank → `undefined`). The original list is never modified |
-| `loadLinks()`, `saveLinks(links)`, `STORAGE_KEY` | Leftovers from v0.2–v0.4 (`localStorage`). No longer used by the app; kept until old links have been imported into the database |
+| `loadLinks()` | Reads links saved in `localStorage` before v0.5. Returns `[]` if nothing is saved or the data is broken. Used only by `ImportBanner` |
+| `clearSavedLinks()` | Deletes the browser's copy after an import |
+| `STORAGE_KEY` | The old storage key (`linkwell:links`), exported so tests use the exact same value |
 
 **Changing the database:**
 
@@ -211,6 +217,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Never touch the real database in tests.** Replace the module with a fake using `vi.mock("@/app/actions", () => ({ saveLink: vi.fn(async () => null), ... }))` in page tests, and `vi.mock("@/lib/data", ...)` in `actions.test.ts`. Clear the fakes' call records with `vi.clearAllMocks()` in `afterEach`.
 - **Checking that the server was asked:** `expect(saveTitle).toHaveBeenCalledWith("1", "New title")`. To make a fake answer differently for one call: `vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!")`.
 - **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
+- **Browser storage in tests:** tests for the import put old links in with `localStorage.setItem(STORAGE_KEY, JSON.stringify([...]))`, and `afterEach` calls `localStorage.clear()`, so they can't leak into the next test.
 - **Old data:** `Link` fields added later stay optional. Give a test an old-style link (without the field) through `initialLinks` and check it still shows.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
 - **Several matching elements:** `getByRole` fails when more than one element matches (two cards with a `#docs` tag). Use `getAllByRole(...)[0]` when any of them will do.
@@ -271,3 +278,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-07 | Server Actions re-check their input (blank URL, duplicate) | Actions are public endpoints; never trust the browser. Authentication comes in v1.0 |
 | 2026-10-07 | Tests replace `app/actions` and `lib/data` with `vi.mock` fakes | Tests stay fast and never touch the real database |
 | 2026-10-07 | The server passes `now` down to `timeAgo`; `<time>` gets `suppressHydrationWarning` for the tooltip | The relative time must match between server and browser renders (hydration); the tooltip's time zone can legitimately differ |
+| 2026-10-07 | Old `localStorage` links are imported through a banner the user confirms, not automatically | Nothing reaches the database without the user's say; "Not now" keeps the links in the browser |
+| 2026-10-07 | Imported links get fresh ids; duplicates and blank URLs are skipped on the server | Old ids can't clash with database ids; importing twice never creates duplicates; browser data isn't trusted |
+| 2026-10-07 | `saveLinks` replaced by `clearSavedLinks`; `loadLinks` and `STORAGE_KEY` stay for the import | Nothing writes to `localStorage` any more; the import still needs to read and then clear it |
+| 2026-10-07 | `ImportBanner` reads `localStorage` in `useEffect` (with the `set-state-in-effect` lint disable) | `localStorage` doesn't exist on the server; reading it after the first render keeps server and browser output identical |
