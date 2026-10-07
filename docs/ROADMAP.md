@@ -55,7 +55,7 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 Moves data from the browser to a server, so links follow you across devices.
 
-- [ ] Pick a database (for example SQLite or Postgres) and record the decision in `docs/ARCHITECTURE.md`
+- [x] Pick a database and record the decision in `docs/ARCHITECTURE.md` (Postgres on Neon, with Drizzle)
 - [ ] Read links in a Server Component, so `page.tsx` no longer needs `"use client"`
 - [ ] Add, edit and delete links with Server Actions
 - [ ] Rewrite `lib/links.ts` to talk to the database. Components shouldn't need to change.

@@ -205,3 +205,6 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-06 | Sort is the last step of the chain, default `"newest"` | Sorting a smaller list is less work; newest-first matches how links were always shown |
 | 2026-10-06 | Title sort uses `localeCompare(..., "en", { sensitivity: "base" })` on the displayed name | Case doesn't change the order; fixed to English so tests match on every machine; sorts what the user sees |
 | 2026-10-06 | Selected tag pill is a toggle button (`aria-pressed`) with a solid blue style | Users can see which tag is active and that clicking it again turns it off; screen readers announce it as pressed |
+| 2026-10-06 | v0.5 database: **Postgres**, hosted on **Neon** (free tier) | Works locally and on Vercel (v1.0), unlike a SQLite file; the most common web database; "Sign in with Google" libraries (v1.0) store users and sessions in Postgres |
+| 2026-10-06 | Talk to the database with **Drizzle** | Queries are written in TypeScript, so `tsc` catches wrong table or column names; small and close to plain SQL |
+| 2026-10-06 | The connection string lives in `.env.local` as `DATABASE_URL`, never committed | It's a password; `.gitignore` already ignores `.env*`. No `NEXT_PUBLIC_` prefix, so it never reaches the browser |
