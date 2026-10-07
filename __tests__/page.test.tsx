@@ -145,6 +145,17 @@ describe("Home page", () => {
     expect(screen.queryByRole("list", { name: "Tags" })).toBeNull();
   });
 
+  test("shows how long ago a link was saved, counted from the given time", () => {
+    render(
+      <LinkManager
+        initialLinks={[{ id: "1", url: "https://example.com", createdAt: "2020-01-01T12:00:00.000Z" }]}
+        now={new Date("2020-01-04T12:00:00.000Z")}
+      />
+    );
+
+    expect(screen.getByText("3 days ago")).toBeDefined();
+  });
+
   test("shows the links it starts with", () => {
     render(
       <LinkManager

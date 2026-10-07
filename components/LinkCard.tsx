@@ -12,9 +12,10 @@ type LinkCardProps = {
   onEditTitle: (id: string, title: string) => void;
   onTagClick: (tag: string) => void;
   activeTag: string | null;
+  now?: Date;
 };
 
-export default function LinkCard({ link, activeTag, onDelete, onEditTitle, onTagClick }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, onTagClick }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
@@ -80,7 +81,7 @@ export default function LinkCard({ link, activeTag, onDelete, onEditTitle, onTag
           <p className="text-sm text-slate-400">
             Saved{" "}
             <time dateTime={link.createdAt} title={new Date(link.createdAt).toLocaleDateString()}>
-              {timeAgo(link.createdAt)}
+              {timeAgo(link.createdAt, now)}
             </time>
           </p>
           {link.tags && link.tags.length > 0 && (

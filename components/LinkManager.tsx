@@ -9,9 +9,10 @@ import type { Link } from "@/types/link";
 
 type LinkManagerProps = {
   initialLinks: Link[];
+  now?: Date;
 };
 
-export default function LinkManager({ initialLinks }: LinkManagerProps) {
+export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
   const [links, setLinks] = useState(initialLinks);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -95,6 +96,7 @@ export default function LinkManager({ initialLinks }: LinkManagerProps) {
               key={link.id}
               link={link}
               activeTag={activeTag}
+              now={now}
               onDelete={deleteLink}
               onEditTitle={editTitle}
               onTagClick={toggleTag}

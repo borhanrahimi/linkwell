@@ -12,7 +12,7 @@ export default async function Home() {
           Save links. Keep them alive. Actually come back to them.
         </p>
 
-        <LinkManager initialLinks={links} />
+        <LinkManager initialLinks={links} now={new Date()}/>
       </div>
     </main>
   );
