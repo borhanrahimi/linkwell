@@ -15,7 +15,6 @@ import {
   sortLinks,
   toLink,
 } from "@/lib/links";
-import { check } from "drizzle-orm/mysql-core";
 
 afterEach(() => {
   localStorage.clear();

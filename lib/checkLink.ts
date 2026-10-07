@@ -1,6 +1,7 @@
 import type { LinkStatus } from "@/types/link";
 
 const GONE = [404, 410];
+const UNREACHABLE = ["ENOTFOUND", "ECONNREFUSED"];
 
 export async function checkLink(
   url: string,
@@ -17,9 +18,7 @@ export async function checkLink(
     await response.body?.cancel();
     return GONE.includes(response.status) ? "broken" : "ok";
   } catch (error) {
-    if (error instanceof Error && error.name === "TimeoutError") {
-      return "ok";
-    }
-    return "broken";
+    const code = (error as { cause?: { code?: string } }).cause?.code;
+    return code && UNREACHABLE.includes(code) ? "broken" : "ok";
   }
 }

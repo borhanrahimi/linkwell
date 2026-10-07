@@ -4,6 +4,7 @@ import { useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
 import ImportBanner from "@/components/ImportBanner";
+import CheckLinksButton from "@/components/CheckLinksButton";
 import { removeLink, saveLink, saveTitle } from "@/app/actions";
 import { createLink, isDuplicate, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
@@ -75,6 +76,8 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
           <option value="title">Title (A–Z)</option>
         </select>
       </div>
+
+      {links.length > 0 && <CheckLinksButton onChecked={setLinks} />}
       {activeTag && (
         <div className="mt-6 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-2 text-blue-800">
           <span>Showing links tagged #{activeTag}</span>

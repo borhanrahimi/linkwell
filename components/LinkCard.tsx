@@ -69,14 +69,24 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
         {faviconUrl && (
           <Image src={faviconUrl} alt="" width={30} height={30} unoptimized className="shrink-0" />)}
         <div className="min-w-0">
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block truncate font-medium text-blue-600 hover:underline"
-          >
-            {link.title || getDomain(link.url)}
-          </a>
+          <div className="flex min-w-0 items-center gap-2">
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate font-medium text-blue-600 hover:underline"
+            >
+              {link.title || getDomain(link.url)}
+            </a>
+            {link.status === "broken" && (
+              <span
+                title={link.checkedAt && `Checked ${timeAgo(link.checkedAt, now)}`}
+                className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
+              >
+                Broken
+              </span>
+            )}
+          </div>
           <p className="truncate text-sm text-slate-500">{link.url}</p>
           <p className="text-sm text-slate-400">
             Saved{" "}
@@ -92,8 +102,8 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
                     onClick={() => onTagClick(tag)}
                     aria-pressed={tag === activeTag}
                     className={`rounded-full px-2 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 ${tag === activeTag
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700"
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700"
                       }`}
                   >
 

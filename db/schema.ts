@@ -1,4 +1,3 @@
-import { check } from "drizzle-orm/gel-core";
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const links = pgTable("links", {

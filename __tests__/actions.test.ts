@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { importLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
-import { deleteLinkById, getLinks, insertLink, updateLinkTitle } from "@/lib/data";
+import { checkAllLinks, importLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
+import { deleteLinkById, getLinks, insertLink, updateLinkStatus, updateLinkTitle } from "@/lib/data";
+import { checkLink } from "@/lib/checkLink";
 
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
   insertLink: vi.fn(async () => {}),
   deleteLinkById: vi.fn(async () => {}),
   updateLinkTitle: vi.fn(async () => {}),
+  updateLinkStatus: vi.fn(async () => {}),
+}));
+
+vi.mock("@/lib/checkLink", () => ({
+  checkLink: vi.fn(async () => "ok"),
 }));
 
 afterEach(() => {
@@ -82,5 +88,26 @@ describe("importLinks", () => {
 
   test("skips links with an empty url", async () => {
     expect(await importLinks([{ ...old, url: " " }])).toEqual([]);
+  });
+});
+
+describe("checkAllLinks", () => {
+  const dead = { ...link, id: "2", url: "https://dead.example" };
+
+  test("checks every link and saves each result", async () => {
+    vi.mocked(getLinks).mockResolvedValueOnce([link, dead]);
+    vi.mocked(checkLink).mockImplementation(async (url) => (url === dead.url ? "broken" : "ok"));
+
+    await checkAllLinks();
+
+    expect(updateLinkStatus).toHaveBeenCalledWith("1", "ok");
+    expect(updateLinkStatus).toHaveBeenCalledWith("2", "broken");
+  });
+
+  test("returns the links fresh from the database", async () => {
+    const checked = [{ ...link, status: "ok" as const }];
+    vi.mocked(getLinks).mockResolvedValueOnce([link]).mockResolvedValueOnce(checked);
+
+    expect(await checkAllLinks()).toEqual(checked);
   });
 });

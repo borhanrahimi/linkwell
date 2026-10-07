@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { removeLink, saveLink, saveTitle } from "@/app/actions";
+import { checkAllLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
+  checkAllLinks: vi.fn(async () => []),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async () => null),
   removeLink: vi.fn(async () => {}),
@@ -423,5 +424,75 @@ describe("importing links saved in this browser", () => {
 
     expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+  });
+});
+
+describe("checking links", () => {
+  const working = { id: "1", url: "https://working.com", createdAt: "2026-10-01T12:00:00.000Z" };
+  const dead = { id: "2", url: "https://dead.com", createdAt: "2026-10-02T12:00:00.000Z" };
+
+  test("has no Check links button when there are no links", () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    expect(screen.queryByRole("button", { name: "Check links" })).toBeNull();
+  });
+
+  test("checks the links and says how many are broken", async () => {
+    vi.mocked(checkAllLinks).mockResolvedValueOnce([
+      { ...working, status: "ok" },
+      { ...dead, status: "broken" },
+    ]);
+    render(<LinkManager initialLinks={[working, dead]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Check links" }));
+    });
+
+    expect(checkAllLinks).toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toBe("Checked 2 links: 1 broken.");
+  });
+
+  test("says when every link works", async () => {
+    vi.mocked(checkAllLinks).mockResolvedValueOnce([{ ...working, status: "ok" }]);
+    render(<LinkManager initialLinks={[working]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Check links" }));
+    });
+
+    expect(screen.getByRole("status").textContent).toBe("Checked 1 link: all working.");
+  });
+});
+
+describe("broken badge", () => {
+  const base = { id: "1", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" };
+
+  test("shows a Broken badge on a broken link", () => {
+    render(<LinkManager initialLinks={[{ ...base, status: "broken", checkedAt: "2026-10-07T12:00:00.000Z" }]} />);
+
+    expect(screen.getByText("Broken")).toBeDefined();
+  });
+
+  test("shows no badge on a working link", () => {
+    render(<LinkManager initialLinks={[{ ...base, status: "ok" }]} />);
+
+    expect(screen.queryByText("Broken")).toBeNull();
+  });
+
+  test("shows no badge on a link that was never checked", () => {
+    render(<LinkManager initialLinks={[base]} />);
+
+    expect(screen.queryByText("Broken")).toBeNull();
+  });
+
+  test("says when the link was checked", () => {
+    render(
+      <LinkManager
+        initialLinks={[{ ...base, status: "broken", checkedAt: "2020-01-01T12:00:00.000Z" }]}
+        now={new Date("2020-01-03T12:00:00.000Z")}
+      />
+    );
+
+    expect(screen.getByText("Broken").getAttribute("title")).toBe("Checked 2 days ago");
   });
 });
