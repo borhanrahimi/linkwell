@@ -22,3 +22,19 @@ export async function removeLink(id: string) {
 export async function saveTitle(id: string, title: string) {
   await updateLinkTitle(id, title);
 }
+
+export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
+  const saved = await getLinks();
+  const imported: Link[] = [];
+
+  for (const old of oldLinks) {
+    if (!old.url?.trim() || isDuplicate([...saved, ...imported], old.url)) {
+      continue;
+    }
+    const link = { ...old, id: crypto.randomUUID(), tags: old.tags ?? [] };
+    await insertLink(link);
+    imported.push(link);
+  }
+
+  return imported;
+}

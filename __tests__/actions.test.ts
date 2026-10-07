@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { removeLink, saveLink, saveTitle } from "@/app/actions";
+import { importLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
 import { deleteLinkById, getLinks, insertLink, updateLinkTitle } from "@/lib/data";
 
 vi.mock("@/lib/data", () => ({
@@ -47,5 +47,40 @@ describe("saveTitle", () => {
     await saveTitle("1", "New title");
 
     expect(updateLinkTitle).toHaveBeenCalledWith("1", "New title");
+  });
+});
+
+describe("importLinks", () => {
+  const old = { id: "old-1", url: "https://old.com", createdAt: "2026-01-01T00:00:00.000Z" };
+
+  test("saves old links with a new id and returns them", async () => {
+    const imported = await importLinks([old]);
+
+    expect(imported).toHaveLength(1);
+    expect(imported[0]).toMatchObject({ url: "https://old.com", createdAt: old.createdAt });
+    expect(imported[0].id).not.toBe("old-1");
+    expect(insertLink).toHaveBeenCalledWith(imported[0]);
+  });
+
+  test("gives links saved before tags existed an empty tag list", async () => {
+    const imported = await importLinks([old]);
+
+    expect(imported[0].tags).toEqual([]);
+  });
+
+  test("skips links that are already in the database", async () => {
+    vi.mocked(getLinks).mockResolvedValueOnce([link]);
+
+    expect(await importLinks([{ ...old, url: "https://example.com" }])).toEqual([]);
+    expect(insertLink).not.toHaveBeenCalled();
+  });
+
+  test("imports the same url only once", async () => {
+    expect(await importLinks([old, { ...old, id: "old-2" }])).toHaveLength(1);
+    expect(insertLink).toHaveBeenCalledTimes(1);
+  });
+
+  test("skips links with an empty url", async () => {
+    expect(await importLinks([{ ...old, url: " " }])).toEqual([]);
   });
 });

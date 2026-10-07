@@ -3,6 +3,7 @@
 import { useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
+import ImportBanner from "@/components/ImportBanner";
 import { removeLink, saveLink, saveTitle } from "@/app/actions";
 import { createLink, isDuplicate, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
@@ -50,6 +51,8 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
 
   return (
     <>
+      <ImportBanner onImported={(imported) => setLinks((current) => [...imported, ...current])} />
+
       <LinkForm onAdd={addLink} />
 
       <div className="mt-6 flex gap-2">

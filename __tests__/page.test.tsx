@@ -2,8 +2,10 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
 import { removeLink, saveLink, saveTitle } from "@/app/actions";
+import { STORAGE_KEY } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
+  importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async () => null),
   removeLink: vi.fn(async () => {}),
   saveTitle: vi.fn(async () => {}),
@@ -11,6 +13,7 @@ vi.mock("@/app/actions", () => ({
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.clearAllMocks();
 });
 
@@ -380,5 +383,45 @@ describe("saving to the database", () => {
     });
 
     expect(saveTitle).toHaveBeenCalledWith("1", "New title");
+  });
+});
+
+describe("importing links saved in this browser", () => {
+  const old = { id: "old", url: "https://old.com", createdAt: "2026-01-01T00:00:00.000Z" };
+
+  test("offers to import links saved in this browser", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([old]));
+    render(<LinkManager initialLinks={[]} />);
+
+    expect(screen.getByText(/You have 1 link saved in this browser/)).toBeDefined();
+  });
+
+  test("shows nothing when there is nothing to import", () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
+  });
+
+  test("imports the links, shows them and clears the browser's copy", async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([old]));
+    render(<LinkManager initialLinks={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    });
+
+    expect(screen.getByRole("link", { name: "old.com" })).toBeDefined();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
+  });
+
+  test("Not now hides the offer but keeps the links in the browser", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([old]));
+    render(<LinkManager initialLinks={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+    expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 });

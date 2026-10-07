@@ -6,7 +6,7 @@ import {
   getDomain,
   isDuplicate,
   loadLinks,
-  saveLinks,
+  clearSavedLinks,
   updateTitle,
   getFaviconUrl,
   parseTags,
@@ -100,7 +100,7 @@ describe("timeAgo", () => {
   });
 });
 
-describe("loadLinks and saveLinks", () => {
+describe("loadLinks and clearSavedLinks", () => {
   test("returns an empty list when nothing is saved", () => {
     expect(loadLinks()).toEqual([]);
   });
@@ -111,11 +111,20 @@ describe("loadLinks and saveLinks", () => {
       createLink("https.nextjs.org"),
     ];
 
-    saveLinks(links);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
     expect(loadLinks()).toEqual(links);
   });
+
   test("returns an empty list when the saved data is invalid", () => {
     localStorage.setItem(STORAGE_KEY, "invalid json");
+
+    expect(loadLinks()).toEqual([]);
+  });
+
+  test("clearSavedLinks removes the saved links", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([createLink("https://example.com")]));
+
+    clearSavedLinks();
 
     expect(loadLinks()).toEqual([]);
   });

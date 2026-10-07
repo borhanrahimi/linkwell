@@ -44,8 +44,8 @@ export function loadLinks(): Link[] {
   }
 }
 
-export function saveLinks(links: Link[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(links));
+export function clearSavedLinks() {
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 export function getDomain(url: string) {
