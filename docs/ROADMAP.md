@@ -67,8 +67,9 @@ Moves data from the browser to a server, so links follow you across devices.
 ## 🔜 v0.6: Keep them alive 🩺
 
 - [ ] Fetch each link's page title and description automatically when it's saved
-- [ ] Check whether saved links still work (dead-link detection)
-- [ ] Show a "broken" badge on dead links
+- [x] Check whether saved links still work (dead-link detection, with a "Check links" button)
+- [x] Show a "broken" badge on dead links
+- [ ] Check links automatically on a schedule (instead of only with the button)
 - [ ] Offer an archived copy (for example from the Wayback Machine) for dead links
 
 **You'll learn:** server-side fetching, background jobs, and error handling.
@@ -86,6 +87,7 @@ Moves data from the browser to a server, so links follow you across devices.
 - [ ] User accounts (sign up and log in)
 - [ ] Each user sees only their own links (add a `user_id` column)
 - [ ] Every Server Action checks who is asking before reading or changing data
+- [ ] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
 - [ ] Deploy to the web (for example Vercel)
 - [ ] End-to-end tests in a real browser (for example Playwright)
 

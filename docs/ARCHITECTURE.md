@@ -10,7 +10,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` is the only file that fetches other websites |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -93,6 +93,8 @@ Because the state already shows each change, actions don't call `refresh()`: the
 
 **Server and browser must render the same thing (hydration):** the server sends finished HTML, then React renders the same components again in the browser and expects identical output. Anything that changes between the two renders causes a hydration error. That's why the server picks `now` once and passes it down, so `timeAgo(link.createdAt, now)` gives the same text on both sides. The exact-date tooltip uses the computer's time zone, which can legitimately differ between server and browser, so `<time>` has `suppressHydrationWarning`. Use that escape hatch only for values like timestamps, never to hide real bugs.
 
+**Checking links:** `CheckLinksButton` (shown only when there are links) calls the `checkAllLinks` action. The server checks every link with `checkLink`, saves each result with `updateLinkStatus`, and returns the whole list fresh from the database. The button hands it to `onChecked`, which is simply `setLinks`, and shows a summary in a `role="status"` message ("Checked 12 links: 2 broken."). `LinkCard` shows a red **Broken** pill next to the title when `link.status === "broken"`; its tooltip says when it was checked (`timeAgo(checkedAt, now)`).
+
 **Importing links from before v0.5:** `ImportBanner` sits at the top of `LinkManager`. After the first render it reads `localStorage` with `loadLinks()` (reading it during render would make the server and browser output differ). If it finds links, it shows a banner. **Import** calls `importLinks`, deletes the browser's copy with `clearSavedLinks()`, and reports the saved links up with `onImported(imported)`, which `LinkManager` adds to its list. **Not now** only hides the banner until the next visit. The buttons are disabled while importing, so a double click can't import twice.
 
 ## 4. Server vs. client components
@@ -111,6 +113,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
 | `components/LinkManager.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; calls the Server Actions |
 | `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
+| `components/CheckLinksButton.tsx` | Client | Calls `checkAllLinks`, shows "Checking..." while it runs and a summary when it's done |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
 
@@ -130,7 +133,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 |---|---|---|
 | v0.1 | React state in memory | ❌ |
 | v0.2–v0.4 | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
-| **v0.5 (now)** | **Postgres on Neon**, table `links` | ✅ (any device) |
+| **v0.5+ (now)** | **Postgres on Neon**, table `links` | ✅ (any device) |
 
 **The `links` table** (`db/schema.ts`):
 
@@ -141,6 +144,8 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `title` | `text`, can be `null` | `null` = no title (the app uses `undefined`) |
 | `tags` | `text[]`, required, default `{}` | Stored lowercase, trimmed, no duplicates (`parseTags`) |
 | `created_at` | `timestamp with time zone`, required, default `now()` | A real date in the database; an ISO string in the app |
+| `status` | `text` (`"ok"` or `"broken"`), can be `null` | Result of the last link check. `null` = never checked (added in migration `0001`) |
+| `checked_at` | `timestamp with time zone`, can be `null` | When the link was last checked |
 
 **`lib/data.ts`** (server-only, all `async`):
 
@@ -150,6 +155,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `insertLink(link)` | Inserts one link with its own id and `createdAt` |
 | `deleteLinkById(id)` | Deletes the link with that id |
 | `updateLinkTitle(id, title)` | Sets a new title (trimmed; blank → `null`) |
+| `updateLinkStatus(id, status)` | Saves a check result and sets `checked_at` to now |
 
 **`app/actions.ts`** (Server Actions, called by `LinkManager`):
 
@@ -159,13 +165,28 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `removeLink(id)` | Deletes the link |
 | `importLinks(oldLinks)` | Saves links from the browser's `localStorage`. Gives each a fresh id and `tags: []` if missing; skips blank URLs and links already in the database or earlier in the same batch. Returns the links it saved |
 | `saveTitle(id, title)` | Saves the new title |
+| `checkAllLinks()` | Checks every link **at the same time** (`Promise.all`), saves each result, and returns the list fresh from the database |
+
+**`lib/checkLink.ts`** (server-side, talks to the internet):
+
+`checkLink(url, fetchFn = fetch)` visits a URL and returns `"ok"` or `"broken"`. **Only say "broken" when we're sure**: a wrong Broken badge on a working link is worse than a missed one.
+
+| What happens | Verdict |
+|---|---|
+| Not an `http://` or `https://` address | broken |
+| Answer `404` (not found) or `410` (gone) | broken |
+| Error code `ENOTFOUND` (domain doesn't exist) or `ECONNREFUSED` (nothing answers) | broken |
+| Any other answer (`200`, `403` blocked, `5xx` temporary problem…) | ok |
+| Any other error (timeout after 10 s, expired certificate, `UND_ERR_HEADERS_OVERFLOW`…) | ok |
+
+It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away (`response.body?.cancel()`), so it never downloads whole pages. The error code is in `error.cause.code`.
 
 **`lib/links.ts`** (pure functions, used on both server and browser):
 
 | Function | Job |
 |---|---|
 | `createLink(url, title?, tags?)` | Builds a new `Link` with a new id and the current time. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
-| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` title → `undefined` |
+| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` → `undefined` (for `title`, `status`, `checkedAt`) |
 | `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links without a `tags` field never match |
 | `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank |
 | `sortLinks(links, order)` | Returns a **new**, sorted list (copies with `[...links]` first, because `.sort()` changes the array in place). `"newest"` / `"oldest"` compare `createdAt` (ISO strings sort correctly as text). `"title"` sorts A–Z by the name the card shows (title, or domain), ignoring case. Also exports the `SortOrder` type |
@@ -217,6 +238,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Never touch the real database in tests.** Replace the module with a fake using `vi.mock("@/app/actions", () => ({ saveLink: vi.fn(async () => null), ... }))` in page tests, and `vi.mock("@/lib/data", ...)` in `actions.test.ts`. Clear the fakes' call records with `vi.clearAllMocks()` in `afterEach`.
 - **Checking that the server was asked:** `expect(saveTitle).toHaveBeenCalledWith("1", "New title")`. To make a fake answer differently for one call: `vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!")`.
 - **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
+- **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = fetch)`). Tests pass a fake that returns `new Response(null, { status: 404 })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
 - **Browser storage in tests:** tests for the import put old links in with `localStorage.setItem(STORAGE_KEY, JSON.stringify([...]))`, and `afterEach` calls `localStorage.clear()`, so they can't leak into the next test.
 - **Old data:** `Link` fields added later stay optional. Give a test an old-style link (without the field) through `initialLinks` and check it still shows.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
@@ -282,3 +304,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-07 | Imported links get fresh ids; duplicates and blank URLs are skipped on the server | Old ids can't clash with database ids; importing twice never creates duplicates; browser data isn't trusted |
 | 2026-10-07 | `saveLinks` replaced by `clearSavedLinks`; `loadLinks` and `STORAGE_KEY` stay for the import | Nothing writes to `localStorage` any more; the import still needs to read and then clear it |
 | 2026-10-07 | `ImportBanner` reads `localStorage` in `useEffect` (with the `set-state-in-effect` lint disable) | `localStorage` doesn't exist on the server; reading it after the first render keeps server and browser output identical |
+| 2026-10-07 | Dead-link checks live in `lib/checkLink.ts` and take `fetch` as a parameter | Network code is slow and unpredictable; injecting `fetch` lets tests fake every answer, like `now` for `timeAgo` |
+| 2026-10-07 | Only 404, 410, `ENOTFOUND` and `ECONNREFUSED` mean "broken"; everything else counts as working | A false Broken badge would make users stop trusting badges. Found the hard way: `gemini.google.com` sends headers too large for Node's `fetch` (`UND_ERR_HEADERS_OVERFLOW`) but works fine |
+| 2026-10-07 | Use `GET` (not `HEAD`), 10-second timeout, cancel the body | Many servers answer `HEAD` wrongly; the timeout stops one dead server from hanging the check; cancelling avoids downloading pages |
+| 2026-10-07 | `status` and `checked_at` are nullable columns; `status` is `text` with a TypeScript-only enum | `null` honestly means "never checked"; no database enum to migrate if more states are added later |
+| 2026-10-07 | Links are checked with a button, all at the same time (`Promise.all`) | Simplest first version; in parallel the whole check takes about as long as the slowest link. Automatic, scheduled checks come later |
+| 2026-10-07 | The server fetches user-saved URLs, so SSRF protection is required before deploying (v1.0) | While Linkwell only runs locally it's harmless; on the internet, someone could make the server fetch internal addresses |

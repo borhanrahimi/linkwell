@@ -6,7 +6,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.5 done, v0.6 next).** You can add and delete links, give them an optional title and edit it later. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. Next up: v0.6, which checks whether your saved links still work. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.6 in progress).** You can add and delete links, give them an optional title and edit it later. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. The **Check links** button visits every saved link from the server and marks dead ones with a red **Broken** badge (hover it to see when it was checked). A link only counts as broken when the page is gone (404/410), the domain doesn't exist, or nothing answers; slow sites, sites that block robots, and temporary errors count as working. Next up: a link to an archived copy of broken pages. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
 
 > **Where is my data?** Links are stored in a Postgres database hosted on [Neon](https://neon.tech), in the `links` table. Links saved before v0.5 lived in your browser's `localStorage` (key `linkwell:links`). When the app finds any, it offers to import them; after importing, the browser's copy is deleted.
 >
@@ -28,7 +28,8 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Sort by newest, oldest or title
 - [x] Links saved in a database, the same on every device
 - [x] Import links saved in the browser before v0.5
-- [ ] Dead-link detection ("keep them alive")
+- [x] Dead-link detection with a "Check links" button and a Broken badge ("keep them alive")
+- [ ] Archived copies of broken links
 - [ ] Resurfacing old links ("actually come back to them")
 
 ## Tech stack
@@ -86,9 +87,10 @@ linkwell/
 │   ├── layout.tsx    # Root layout wrapping every page
 │   ├── globals.css   # Global styles (Tailwind)
 │   ├── page.tsx      # Home page (Server Component): reads links from the database
-│   └── actions.ts    # Server Actions: save, delete and edit links
-├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner)
+│   └── actions.ts    # Server Actions: save, delete, edit, import and check links
+├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton)
 ├── lib/
+│   ├── checkLink.ts  # Visits a URL and decides if it's "ok" or "broken"
 │   ├── data.ts       # Database reads and writes (server-only)
 │   └── links.ts      # Pure helpers: creating, filtering, sorting, formatting links
 ├── db/               # Database connection and table schema (Drizzle)
