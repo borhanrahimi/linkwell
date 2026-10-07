@@ -4,81 +4,94 @@ This document explains how Linkwell's code is organized, how data moves through 
 
 ## 1. Folder layout
 
-Linkwell follows the "store project files outside of `app`" layout from the Next.js docs. `app/` is only for routing. Everything else lives in shared top-level folders.
+Linkwell follows the "store project files outside of `app`" layout from the Next.js docs. `app/` is only for routing (and the Server Actions its pages use). Everything else lives in shared top-level folders.
 
 | Folder | Holds | Rule of thumb |
 |---|---|---|
-| `app/` | Pages, layouts, route handlers | If it isn't tied to a URL, it doesn't belong here |
-| `components/` | React components | Only UI. Gets data through props, reports user actions through callback props |
-| `lib/` | Plain TypeScript functions | No JSX and no React. Easy to test on its own |
+| `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
+| `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database |
+| `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`) | Server-only. Never imported by a client component |
+| `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
-| `__tests__/` | Automated tests | One test file per module or page (`links.test.ts`, `page.test.tsx`) |
+| `__tests__/` | Automated tests | One test file per module (`links.test.ts`, `actions.test.ts`, `page.test.tsx`) |
 | `docs/` | Project documentation | |
+
+Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, never committed).
 
 ## 2. Layers
 
 The code is split into layers. Each layer may only use the layers **below** it:
 
 ```
- ┌──────────────────────────────┐
- │  app/        (pages)         │  owns state, wires everything together
- ├──────────────────────────────┤
- │  components/ (UI)            │  displays data, emits events
- ├──────────────────────────────┤
- │  lib/        (logic & data)  │  creates, validates, stores links
- ├──────────────────────────────┤
- │  types/      (shapes)        │  describes what a Link is
- └──────────────────────────────┘
+ ┌──────────────────────────────────────────┐
+ │  app/page.tsx      (Server Component)    │  loads links, renders the page
+ │  app/actions.ts    (Server Actions)      │  the browser's doorway to the server
+ ├──────────────────────────────────────────┤
+ │  components/       (Client Components)   │  state, filters, forms, cards
+ ├──────────────────────────────────────────┤
+ │  lib/data.ts       (server-only)         │  reads and writes the database
+ │  lib/links.ts      (pure functions)      │  creates, validates, filters, formats
+ ├──────────────────────────────────────────┤
+ │  db/               (server-only)         │  connection + table schema
+ ├──────────────────────────────────────────┤
+ │  types/            (shapes)              │  describes what a Link is
+ └──────────────────────────────────────────┘
 ```
 
 - ✅ `app/page.tsx` imports from `components/`, `lib/`, `types/`
-- ✅ `components/LinkCard.tsx` imports from `types/`
+- ✅ `components/LinkManager.tsx` imports from `components/`, `lib/links.ts`, `types/`, and the Server Actions in `app/actions.ts`
+- ❌ A client component must never import `lib/data.ts` or `db/`. Both start with `import "server-only"`, so the build fails if one does
 - ❌ `lib/` must never import from `components/` or `app/`
 - ❌ `types/` imports nothing
 
-Why: when dependencies only point downward, you can change the UI without touching the logic. You can also swap where data is stored (memory → localStorage → database) without touching the UI.
+Why: when dependencies only point downward, you can change the UI without touching the logic, and change where data is stored (memory → localStorage → Postgres) without touching the UI.
 
 ## 3. Data flow
 
-**Data flows down, events flow up.**
+**Data flows down, events flow up, and the server saves.**
 
 ```
-       localStorage ◀──── saveLinks(updated) ─────────┐
-            │                                         │
-  loadLinks() on first render (useEffect)             │
-            ▼                                         │
-         page.tsx                                     │
-   state: links: Link[]                               │
-      ┌─────┴───────────────┐                         │
-      │ props: onAdd        │ props: link, onDelete,  │
-      │                     │        onEditTitle      │
-      ▼                     ▼                         │
-  LinkForm             LinkCard × N                   │
-      │                     │                         │
- onAdd(url, title,     onDelete(id)                   │
-       tags)           onEditTitle(id, title)         │
-      │                     │                         │
-      └──────────┐ ┌────────┘                         │
-                 ▼ ▼                                  │
-         page.tsx computes `updated` list ────────────┤
-                 │                                    │
-                 ▼                                    │
-         setLinks(updated) → React re-renders         │
+  Postgres (Neon)
+     │   ▲
+     │   └──────── insertLink / deleteLinkById / updateLinkTitle (lib/data.ts)
+     │                         ▲
+  getLinks()                   │
+     │                  app/actions.ts  (saveLink, removeLink, saveTitle)
+     ▼                         ▲
+  app/page.tsx  (server)       │  called like normal async functions
+     │ props: initialLinks, now│
+     ▼                         │
+  LinkManager  (client) ───────┘
+   state: links, activeTag, query, sortOrder
+      ┌─────┴───────────────┐
+      │ props: onAdd        │ props: link, activeTag, now,
+      │                     │        onDelete, onEditTitle, onTagClick
+      ▼                     ▼
+  LinkForm             LinkCard × N
 ```
 
-1. `page.tsx` owns the list of links (the **single source of truth** while the page is open).
-2. When the page opens, it loads saved links from storage once.
-3. It passes data and callback functions down to children as props.
-4. Children never change the list directly. They call the callback.
-5. The page computes the new list once, then hands that same value to both `setLinks` (screen) and `saveLinks` (storage).
+1. On every request, `app/page.tsx` runs on the server, reads all links with `getLinks()`, and passes them to `LinkManager` as `initialLinks`, together with `now` (the server's current time).
+2. `LinkManager` copies them into state (`useState(initialLinks)`). While the page is open, that state is what the screen shows.
+3. It passes data and callback functions down to `LinkForm` and `LinkCard`. Children never change the list directly. They call a callback.
+4. Each callback updates the state **and** calls a Server Action, which writes to Postgres:
+   - **Add** waits for the server first (`await saveLink(link)`), and only shows the link if the server returns `null`. If it returns an error message (for example a duplicate), the link is never shown.
+   - **Delete and edit** update the screen first, then `await removeLink(id)` / `await saveTitle(id, title)`. They feel instant and rarely fail.
+5. The browser creates the new link with `createLink` (id and `createdAt` included) and sends the **whole link** to `saveLink`. The database stores that same id, so the screen and the database always agree, and deleting a link right after adding it works without reloading.
 
-**When a child needs an answer back:** `onAdd(url, title, tags)` returns `null` when the link was saved, or an error message (a string) when it wasn't, for example a duplicate. The page decides (it owns the list), and the form shows the message and keeps the input so the user can fix it (it owns the inputs). Use this pattern when the parent has to accept or reject what a child sends up.
+Because the state already shows each change, actions don't call `refresh()`: the next page load reads the database again anyway.
 
-**Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). The page turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
+**Use the updater form after `await`.** Inside an `async` handler, `links` may be out of date by the time the code runs, so always write `setLinks((current) => …)`.
 
-**Derived state: store the facts, compute the rest:** the page stores four things in state: `links` (every link), `activeTag` (the tag the user clicked, or `null`), `query` (the text in the search box) and `sortOrder` (`"newest"`, `"oldest"` or `"title"`). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder)`. Each step takes a list and returns a new one, so they chain: first the tag, then the search inside it, then the order. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and the page's `toggleTag` decides. Clicking the selected tag again clears the filter (`setActiveTag((current) => current === tag ? null : tag)`, the updater form of `setState`, because the new value depends on the old one). The card also gets `activeTag`, only to highlight the selected pill and set `aria-pressed`.
+**When a child needs an answer back:** `onAdd(url, title, tags)` returns a Promise of `null` when the link was saved, or an error message (a string) when it wasn't. `LinkManager` decides, and the form shows the message and keeps the input so the user can fix it (it owns the inputs). `saveLink` uses the same pattern between server and browser.
 
-**Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting, editing), so it lives in their shared parent, `page.tsx`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The page only hears about an edit when the user presses Save. Cancel just throws the draft away.
+**Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). `LinkManager` turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
+
+**Derived state: store the facts, compute the rest:** `LinkManager` stores four things in state: `links` (every link), `activeTag` (the tag the user clicked, or `null`), `query` (the text in the search box) and `sortOrder` (`"newest"`, `"oldest"` or `"title"`). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder)`. Each step takes a list and returns a new one, so they chain: first the tag, then the search inside it, then the order. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and `toggleTag` decides. Clicking the selected tag again clears the filter (`setActiveTag((current) => current === tag ? null : tag)`). The card also gets `activeTag`, only to highlight the selected pill and set `aria-pressed`.
+
+**Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links and the filters are needed by the form, the search row and the cards, so they live in their shared parent, `LinkManager`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The list only hears about an edit when the user presses Save. Cancel just throws the draft away.
+
+**Server and browser must render the same thing (hydration):** the server sends finished HTML, then React renders the same components again in the browser and expects identical output. Anything that changes between the two renders causes a hydration error. That's why the server picks `now` once and passes it down, so `timeAgo(link.createdAt, now)` gives the same text on both sides. The exact-date tooltip uses the computer's time zone, which can legitimately differ between server and browser, so `<time>` has `suppressHydrationWarning`. Use that escape hatch only for values like timestamps, never to hide real bugs.
 
 ## 4. Server vs. client components
 
@@ -92,47 +105,84 @@ Anything a client component imports becomes client code as well, so you don't ne
 
 | File | Type | Why |
 |---|---|---|
-| `app/page.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; loads from `localStorage` in `useEffect` |
+| `app/page.tsx` | Server | `async`; reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
+| `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
+| `components/LinkManager.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; calls the Server Actions |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
 
-**Goal:** keep `"use client"` as low in the tree as possible. Once links are stored on a server (see the roadmap), `page.tsx` can become a Server Component that loads data, with only the interactive parts as client components.
+**Keep `"use client"` as low in the tree as possible.** The page fetches data on the server and hands it to one client component that handles everything interactive.
+
+**Props from server to client** must be serializable: plain objects, arrays, strings, numbers, and `Date`s are fine. Functions are not, except Server Actions.
+
+**Server Actions are public.** Next.js turns each one into an address that anyone on the internet can send a request to, skipping your form. So every action **checks its input again on the server**, even if the browser already checked (`saveLink` re-checks for an empty URL and for duplicates). In v1.0, every action must also check *who* is asking.
+
+**Fresh data on every request:** `getLinks()` calls `await connection()` first. Without it, Next.js could render the page once at build time and serve that frozen copy forever. `next build` should show the home page as `ƒ (Dynamic)`.
 
 ## 5. Data storage
 
-Storage will change over time, so all reading and writing of links goes through **one module in `lib/`**. Components and pages never call `localStorage` or a database directly.
+All reading and writing of links goes through **`lib/data.ts`**. Components and pages never query the database directly.
 
 | Stage | Where links live | Survives refresh? |
 |---|---|---|
 | v0.1 | React state in memory | ❌ |
-| **v0.2–v0.4 (now)** | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
-| v0.5 | Database on the server | ✅ (any device) |
+| v0.2–v0.4 | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
+| **v0.5 (now)** | **Postgres on Neon**, table `links` | ✅ (any device) |
 
-Each time the storage changes, only the `lib/` module should need to change.
+**The `links` table** (`db/schema.ts`):
 
-**Today that module is `lib/links.ts`:**
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid`, primary key | Sent by the browser (`crypto.randomUUID()`); the database makes one if it's missing |
+| `url` | `text`, required | |
+| `title` | `text`, can be `null` | `null` = no title (the app uses `undefined`) |
+| `tags` | `text[]`, required, default `{}` | Stored lowercase, trimmed, no duplicates (`parseTags`) |
+| `created_at` | `timestamp with time zone`, required, default `now()` | A real date in the database; an ISO string in the app |
+
+**`lib/data.ts`** (server-only, all `async`):
 
 | Function | Job |
 |---|---|
-| `createLink(url, title?, tags?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
-| `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links saved before tags existed (no `tags` field) never match |
-| `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank. Links without a title are matched by URL only |
+| `getLinks()` | All links, newest first, converted to `Link` with `toLink`. Calls `connection()` so pages using it render at request time |
+| `insertLink(link)` | Inserts one link with its own id and `createdAt` |
+| `deleteLinkById(id)` | Deletes the link with that id |
+| `updateLinkTitle(id, title)` | Sets a new title (trimmed; blank → `null`) |
+
+**`app/actions.ts`** (Server Actions, called by `LinkManager`):
+
+| Action | Job |
+|---|---|
+| `saveLink(link)` | Returns `"Please paste a link."` for a blank URL, `"You already saved this link!"` for a duplicate (checked against the database), otherwise saves it and returns `null` |
+| `removeLink(id)` | Deletes the link |
+| `saveTitle(id, title)` | Saves the new title |
+
+**`lib/links.ts`** (pure functions, used on both server and browser):
+
+| Function | Job |
+|---|---|
+| `createLink(url, title?, tags?)` | Builds a new `Link` with a new id and the current time. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
+| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` title → `undefined` |
+| `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links without a `tags` field never match |
+| `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank |
 | `sortLinks(links, order)` | Returns a **new**, sorted list (copies with `[...links]` first, because `.sort()` changes the array in place). `"newest"` / `"oldest"` compare `createdAt` (ISO strings sort correctly as text). `"title"` sorts A–Z by the name the card shows (title, or domain), ignoring case. Also exports the `SortOrder` type |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
-| `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL, and the card then shows no icon |
+| `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
 | `parseTags(text)` | `"React, news,,react "` → `["react", "news"]`. Splits on commas, trims, lowercases, drops empty tags and duplicates (first one wins) |
-| `loadLinks()` | Reads and parses saved links. Returns `[]` if nothing is saved or the data is broken |
-| `saveLinks(links)` | Writes the whole list as JSON |
-| `timeAgo(iso, now?)` | `"just now"`, `"5 minutes ago"`, `"yesterday"`, `"3 weeks ago"`, `"last year"`… Uses the biggest unit that fits and rounds down. `now` defaults to the current time; tests pass a fixed date |
-| `updateTitle(links, id, title)` | Returns a **new** list where the matching link has the new title (trimmed; blank → `undefined`). Other links are returned unchanged, and the original list is never modified |
-| `STORAGE_KEY` | The storage key, exported so tests use the exact same value |
+| `timeAgo(iso, now?)` | `"just now"`, `"5 minutes ago"`, `"yesterday"`, `"3 weeks ago"`, `"last year"`… Uses the biggest unit that fits and rounds down. `now` defaults to the current time; the page passes the server's time, tests pass a fixed date |
+| `updateTitle(links, id, title)` | Returns a **new** list where the matching link has the new title (trimmed; blank → `undefined`). The original list is never modified |
+| `loadLinks()`, `saveLinks(links)`, `STORAGE_KEY` | Leftovers from v0.2–v0.4 (`localStorage`). No longer used by the app; kept until old links have been imported into the database |
 
-**Rules for storage:**
+**Changing the database:**
 
-- **Load once, after the first render, in `useEffect`.** Next.js renders pages on the server first, where `localStorage` doesn't exist, so it can't be read during render or in `useState(...)`.
-- **Save inside the event handlers** (`addLink`, `deleteLink`, `editTitle`), **not in an effect** that watches `links`. Such an effect would run with the empty starting list before loading finishes, and could wipe saved links.
-- The load effect needs `// eslint-disable-next-line react-hooks/set-state-in-effect`. The extra render it warns about is harmless here, and the code is temporary until v0.5. Any other lint disable needs a comment explaining why.
+1. Edit `db/schema.ts`.
+2. `npx drizzle-kit generate --name <what_changed>` writes a new numbered SQL file in `drizzle/`. Read it.
+3. `npx drizzle-kit migrate` applies it to Neon (it prints nothing on success; check **Tables** in the Neon dashboard).
+4. Commit the schema change and the migration together.
+
+Never edit a migration that has already been applied. Make a new one instead.
+
+**Secrets:** `DATABASE_URL` lives only in `.env.local` (ignored by Git). It has no `NEXT_PUBLIC_` prefix, so Next.js never sends it to the browser. `drizzle.config.ts` loads it with `loadEnvConfig` from `@next/env`, because `drizzle-kit` runs outside Next.js.
 
 ## 6. Conventions
 
@@ -142,12 +192,13 @@ Each time the storage changes, only the `lib/` module should need to change.
 - **Imports:** use the `@/` alias (`@/types/link`), not long relative paths (`../../types/link`).
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
-- **IDs and dates:** link IDs come from `crypto.randomUUID()`. Dates are stored as ISO strings (`toISOString()`) and formatted only for display. The card shows a relative date (`timeAgo`) inside `<time dateTime={iso}>`, with the exact date (`toLocaleDateString()`) as a hover tooltip.
+- **IDs and dates:** link IDs come from `crypto.randomUUID()`. In the app, dates are ISO strings (`toISOString()`); in the database they're `timestamp with time zone`, and `toLink` / `insertLink` convert between the two. Dates are formatted only for display. The card shows a relative date (`timeAgo(createdAt, now)`) inside `<time dateTime={iso}>`, with the exact date (`toLocaleDateString()`) as a hover tooltip.
 - **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`), or check before using them (`link.tags && link.tags.length > 0`).
 - **Never change state in place.** Functions like `updateTitle` build a new array (`map`) and new objects (`{ ...link, title }`). React only re-renders when it gets a new value.
 - **Images:** use `<Image>` from `next/image` with `width` and `height`. For tiny remote images like favicons (under 1 KB), add `unoptimized`: there's nothing to gain from resizing them, and it means we don't need `remotePatterns` in `next.config.ts`.
 - **Accessible names:** every input needs a name: a visible `<label>`, a `placeholder`, or `aria-label` when there's no visible label (the edit box uses `aria-label="Title"`). Lists without a heading get `aria-label` too (the tag list uses `aria-label="Tags"`). Decorative images, like favicons next to a title that already names the site, get `alt=""` so screen readers skip them.
 - **Parsing URLs:** use `new URL(...)` inside `try/catch` and fall back to the original text. Old saved data may not be a valid URL, and that must never crash the page.
+- **Database code:** files that touch the database start with `import "server-only"`. Always put a `.where(...)` on `update` and `delete` queries; without one, they change every row.
 - **Auto-imports:** check the imports at the top of a file after accepting an autocomplete suggestion. VS Code has added `import { get } from "http"` and `import { title } from "process"` by mistake.
 
 ## 7. Testing
@@ -156,7 +207,11 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 
 - **`lib/` functions** get unit tests: call the function, check the result.
 - **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class. If a test can't find an element by role and name, a screen reader probably can't either. Fix the markup, not the test.
-- **Old saved data:** when a new field is added to `Link`, add a test that saves an old-style link with `saveLinks` (without the field) and checks the page still shows it.
+- **Server Components** (`async` ones like `app/page.tsx`) can't be rendered in tests. Test the client component they render instead: `render(<LinkManager initialLinks={[...]} />)`.
+- **Never touch the real database in tests.** Replace the module with a fake using `vi.mock("@/app/actions", () => ({ saveLink: vi.fn(async () => null), ... }))` in page tests, and `vi.mock("@/lib/data", ...)` in `actions.test.ts`. Clear the fakes' call records with `vi.clearAllMocks()` in `afterEach`.
+- **Checking that the server was asked:** `expect(saveTitle).toHaveBeenCalledWith("1", "New title")`. To make a fake answer differently for one call: `vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!")`.
+- **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
+- **Old data:** `Link` fields added later stay optional. Give a test an old-style link (without the field) through `initialLinks` and check it still shows.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
 - **Several matching elements:** `getByRole` fails when more than one element matches (two cards with a `#docs` tag). Use `getAllByRole(...)[0]` when any of them will do.
 - **Search box:** an `<input type="search">` has the role `searchbox`; find it with `getByRole("searchbox", { name: "Search links" })`.
@@ -164,10 +219,8 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - Every new feature comes with tests. Every bug fix gets a test that would have caught the bug.
 - `npm run check` (types + lint + tests) must pass before committing.
 - **Write the test first** when you can: watch it fail (🔴), then write the code (🟢). A test that never failed hasn't proven anything.
-- **Time-dependent functions take `now` as a parameter** (with a default), so tests pass a fixed date and give the same result every day. Don't read the clock inside logic you want to test.
-- **Never copy values like storage keys into tests.** Import them (`STORAGE_KEY`), so a typo can't make a test pass for the wrong reason.
-- **Storage in tests:** clear `localStorage` in `afterEach`, so saved links can't leak into the next test.
-- **Simulating a page refresh:** call `cleanup()`, then `render(<Home />)` again. React state is gone, and only `localStorage` survives.
+- **Time-dependent code takes `now` as a parameter** (with a default), so tests pass a fixed date and give the same result every day. Pick dates far from today (for example 2020), so a test can't pass by accident because the real clock gives the same answer.
+- **Never copy values like storage keys or error messages from one module into another's code.** Import shared values, so a typo can't make a test pass for the wrong reason.
 
 ## 8. Decision log
 
@@ -208,3 +261,13 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-06 | v0.5 database: **Postgres**, hosted on **Neon** (free tier) | Works locally and on Vercel (v1.0), unlike a SQLite file; the most common web database; "Sign in with Google" libraries (v1.0) store users and sessions in Postgres |
 | 2026-10-06 | Talk to the database with **Drizzle** | Queries are written in TypeScript, so `tsc` catches wrong table or column names; small and close to plain SQL |
 | 2026-10-06 | The connection string lives in `.env.local` as `DATABASE_URL`, never committed | It's a password; `.gitignore` already ignores `.env*`. No `NEXT_PUBLIC_` prefix, so it never reaches the browser |
+| 2026-10-06 | Install `server-only` and import it in `db/index.ts` and `lib/data.ts` | The build fails if a client component ever imports database code, so the connection string can never leak into the browser |
+| 2026-10-06 | Split the page: `app/page.tsx` (Server Component, reads the database) + `components/LinkManager.tsx` (Client Component, everything interactive) | Data loads on the server before the page is sent; only the interactive part ships JavaScript |
+| 2026-10-06 | Database reads live in `lib/data.ts`, pure helpers stay in `lib/links.ts` | Tests import `lib/links.ts` directly; if it imported the database, every test would try to connect |
+| 2026-10-06 | `getLinks()` calls `await connection()` | Without Cache Components, a page with no request-time APIs may be prerendered at build time; this keeps the list fresh on every request |
+| 2026-10-07 | Mutations go through Server Actions in `app/actions.ts`, which call `lib/data.ts` | The official doorway from browser to server; client components can't import server-only code |
+| 2026-10-07 | `LinkManager` keeps local state and calls the actions, instead of reloading from the server after each change | The screen updates instantly (delete/edit) or right after the server says yes (add); no `refresh()` needed |
+| 2026-10-07 | The browser creates the id and `createdAt`, and sends the whole link to `saveLink` | The screen and the database share the same id, so a just-added link can be edited or deleted right away |
+| 2026-10-07 | Server Actions re-check their input (blank URL, duplicate) | Actions are public endpoints; never trust the browser. Authentication comes in v1.0 |
+| 2026-10-07 | Tests replace `app/actions` and `lib/data` with `vi.mock` fakes | Tests stay fast and never touch the real database |
+| 2026-10-07 | The server passes `now` down to `timeAgo`; `<time>` gets `suppressHydrationWarning` for the tooltip | The relative time must match between server and browser renders (hydration); the tooltip's time zone can legitimately differ |

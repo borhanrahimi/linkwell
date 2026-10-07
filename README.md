@@ -6,9 +6,9 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.4 done, v0.5 next).** You can add and delete links, give them an optional title and edit it later, and they're saved in your browser, so they survive a refresh. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. Links don't sync between devices yet. Next up: a real backend, so your links follow you across devices. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.5 in progress).** You can add and delete links, give them an optional title and edit it later. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. Next up: import the links you saved in your browser before v0.5, then finish the backend clean-up. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
 
-> **Where is my data?** Links are stored in your browser's `localStorage` under the key `linkwell:links`. They stay on this computer and in this browser only. Clearing your browser's site data deletes them.
+> **Where is my data?** Links are stored in a Postgres database hosted on [Neon](https://neon.tech), in the `links` table. Links you saved before v0.5 are still in your browser's `localStorage` (key `linkwell:links`); the app doesn't show them yet, and an import is planned.
 >
 > **Favicons:** site icons are loaded from Google's favicon service (`www.google.com/s2/favicons`), so Google sees the *domain* of each saved link (not the full URL) when the icons load.
 
@@ -26,7 +26,8 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Filter by tag
 - [x] Search by URL or title
 - [x] Sort by newest, oldest or title
-- [ ] Sync across devices (a real backend)
+- [x] Links saved in a database, the same on every device
+- [ ] Import links saved in the browser before v0.5
 - [ ] Dead-link detection ("keep them alive")
 - [ ] Resurfacing old links ("actually come back to them")
 
@@ -38,18 +39,27 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 | [React](https://react.dev) | 19 | UI components |
 | [TypeScript](https://www.typescriptlang.org) | 5 | Type safety |
 | [Tailwind CSS](https://tailwindcss.com) | 4 | Styling |
+| [Postgres](https://www.postgresql.org) on [Neon](https://neon.tech) | 18 | Database (free tier) |
+| [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit | 0.45 / 0.31 | Database queries in TypeScript, and migrations |
 | [ESLint](https://eslint.org) | 9 | Linting |
 | [Vitest](https://vitest.dev) + [Testing Library](https://testing-library.com) | 5 / 16 | Automated tests |
 
 ## Getting started
 
-**Prerequisites:** [Node.js](https://nodejs.org) 22.12 or newer (required by Vitest).
+**Prerequisites:** [Node.js](https://nodejs.org) 22.12 or newer (required by Vitest), and a free [Neon](https://neon.tech) account.
 
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Start the dev server
+# 2. Create a Neon project, copy its connection string, and put it in .env.local:
+#    DATABASE_URL="postgresql://..."
+#    (.env.local is ignored by Git. Never commit it.)
+
+# 3. Create the tables in your database
+npx drizzle-kit migrate
+
+# 4. Start the dev server
 npm run dev
 ```
 
@@ -65,21 +75,28 @@ Then open [http://localhost:3000](http://localhost:3000).
 | `npm run lint` | Checks the code with ESLint |
 | `npm test` | Runs the tests in watch mode (re-runs on every save) |
 | `npm run check` | Type-check + lint + tests, once. **Run before every commit.** |
+| `npx drizzle-kit generate --name <change>` | Writes a new SQL migration in `drizzle/` after you change `db/schema.ts` |
+| `npx drizzle-kit migrate` | Applies new migrations to the database in `DATABASE_URL` |
 
 ## Project structure
 
 ```
 linkwell/
-├── app/            # Routes only: pages and layouts (Next.js App Router)
-│   ├── layout.tsx  # Root layout wrapping every page
-│   ├── globals.css # Global styles (Tailwind)
-│   └── page.tsx    # Home page: holds the links state, composes components
-├── components/     # Reusable UI components (LinkForm, LinkCard)
-├── lib/            # Non-UI logic: creating, formatting, saving and loading links
+├── app/              # Routes: pages, layouts and Server Actions (Next.js App Router)
+│   ├── layout.tsx    # Root layout wrapping every page
+│   ├── globals.css   # Global styles (Tailwind)
+│   ├── page.tsx      # Home page (Server Component): reads links from the database
+│   └── actions.ts    # Server Actions: save, delete and edit links
+├── components/       # UI components (LinkManager, LinkForm, LinkCard)
+├── lib/
+│   ├── data.ts       # Database reads and writes (server-only)
+│   └── links.ts      # Pure helpers: creating, filtering, sorting, formatting links
+├── db/               # Database connection and table schema (Drizzle)
+├── drizzle/          # Generated SQL migrations (committed)
 ├── types/          # Shared TypeScript types (Link)
 ├── __tests__/      # Automated tests (Vitest)
 ├── docs/           # Architecture and roadmap
-└── public/         # Static files served as-is (empty for now)
+└── public/           # Static files served as-is (empty for now)
 ```
 
 For how these pieces fit together and the rules for where new code goes, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

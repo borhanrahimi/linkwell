@@ -56,11 +56,13 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 Moves data from the browser to a server, so links follow you across devices.
 
 - [x] Pick a database and record the decision in `docs/ARCHITECTURE.md` (Postgres on Neon, with Drizzle)
-- [ ] Read links in a Server Component, so `page.tsx` no longer needs `"use client"`
-- [ ] Add, edit and delete links with Server Actions
-- [ ] Rewrite `lib/links.ts` to talk to the database. Components shouldn't need to change.
+- [x] Read links in a Server Component, so `page.tsx` no longer needs `"use client"`
+- [x] Add, edit and delete links with Server Actions
+- [x] Move storage to the database (`lib/data.ts`), keeping `lib/links.ts` for pure helpers
+- [ ] Import links saved in `localStorage` before v0.5 into the database
+- [ ] Remove the leftover `localStorage` code (`loadLinks`, `saveLinks`, `STORAGE_KEY`)
 
-**You'll learn:** Server vs. Client Components, Server Actions, and databases.
+**You'll learn:** Server vs. Client Components, Server Actions, databases and migrations, hydration, and faking modules in tests (`vi.mock`).
 
 ## v0.6: Keep them alive 🩺
 
@@ -82,7 +84,8 @@ Moves data from the browser to a server, so links follow you across devices.
 ## v1.0: Ready for other people
 
 - [ ] User accounts (sign up and log in)
-- [ ] Each user sees only their own links
+- [ ] Each user sees only their own links (add a `user_id` column)
+- [ ] Every Server Action checks who is asking before reading or changing data
 - [ ] Deploy to the web (for example Vercel)
 - [ ] End-to-end tests in a real browser (for example Playwright)
 
