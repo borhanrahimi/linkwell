@@ -86,18 +86,27 @@ export default function Home() {
             </button>
           </div>
         )}
-        {links.length > 0 && visibleLinks.length === 0 && (
-          <p className="text-slate-400">No links match your search.</p>
+        {links.length === 0 && (
+          <p className="mt-6 text-slate-400">No links yet. Add your first one above.</p>
         )}
-        <ul className="mt-6 space-y-3">
-          {links.length === 0 && (
-            <p className="text-slate-400">No links yet. Add your first one above.</p>
-          )}
-          {visibleLinks.map((link) => (
-            <LinkCard key={link.id} link={link} onDelete={deleteLink} onEditTitle={editTitle} activeTag={activeTag} onTagClick={toggleTag}
-            />
-          ))}
-        </ul>
+        {links.length > 0 && visibleLinks.length === 0 && (
+          <p className="mt-6 text-slate-400">No links match your search.</p>
+        )}
+
+        {visibleLinks.length > 0 && (
+          <ul className="mt-6 space-y-3">
+            {visibleLinks.map((link) => (
+              <LinkCard
+                key={link.id}
+                link={link}
+                activeTag={activeTag}
+                onDelete={deleteLink}
+                onEditTitle={editTitle}
+                onTagClick={toggleTag}
+              />
+            ))}
+          </ul>
+        )}
       </div>
     </main>
   );
