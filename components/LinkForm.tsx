@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 type LinkFormProps = {
-  onAdd: (url: string, title: string, tags: string) => string | null;
+  onAdd: (url: string, title: string, tags: string) => Promise<string | null>;
 };
 
 export default function LinkForm({ onAdd }: LinkFormProps) {
@@ -19,11 +19,11 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
     }
   }, [error]);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
 
-    const message = onAdd(url.trim(), title, tags);
+    const message = await onAdd(url.trim(), title, tags);
     if (message) {
       setError(message);
       return;

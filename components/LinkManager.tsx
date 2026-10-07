@@ -3,6 +3,7 @@
 import { useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
+import { removeLink, saveLink, saveTitle } from "@/app/actions";
 import { createLink, isDuplicate, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -17,13 +18,18 @@ export default function LinkManager({ initialLinks }: LinkManagerProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const visibleLinks = sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder);
 
-  function addLink(url: string, title: string, tags: string) {
+  async function addLink(url: string, title: string, tags: string) {
     if (isDuplicate(links, url)) {
       return "You already saved this link!";
     }
 
-    const updated = [createLink(url, title, parseTags(tags)), ...links];
-    setLinks(updated);
+    const link = createLink(url, title, parseTags(tags));
+    const error = await saveLink(link);
+    if (error) {
+      return error;
+    }
+
+    setLinks((current) => [link, ...current]);
     return null;
   }
 
@@ -31,14 +37,14 @@ export default function LinkManager({ initialLinks }: LinkManagerProps) {
     setActiveTag((current) => (current === tag ? null : tag));
   }
 
-  function deleteLink(id: string) {
-    const updated = links.filter((link) => link.id !== id);
-    setLinks(updated);
+  async function deleteLink(id: string) {
+    setLinks((current) => current.filter((link) => link.id !== id));
+    await removeLink(id);
   }
 
-  function editTitle(id: string, title: string) {
-    const updated = updateTitle(links, id, title);
-    setLinks(updated);
+  async function editTitle(id: string, title: string) {
+    setLinks((current) => updateTitle(current, id, title));
+    await saveTitle(id, title);
   }
 
   return (

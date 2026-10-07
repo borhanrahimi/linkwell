@@ -1,13 +1,20 @@
-import { afterEach, describe, expect, test } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
+import { removeLink, saveLink, saveTitle } from "@/app/actions";
 
+vi.mock("@/app/actions", () => ({
+  saveLink: vi.fn(async () => null),
+  removeLink: vi.fn(async () => {}),
+  saveTitle: vi.fn(async () => {}),
+}));
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
-function addLink(url: string, title = "", tags = "") {
+async function addLink(url: string, title = "", tags = "") {
   fireEvent.change(screen.getByPlaceholderText("Paste a link..."), {
     target: { value: url },
   });
@@ -17,14 +24,16 @@ function addLink(url: string, title = "", tags = "") {
   fireEvent.change(screen.getByPlaceholderText("Tags, comma separated"), {
     target: { value: tags },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  });
 }
 
 
-test("clears the tags box after saving", () => {
+test("clears the tags box after saving", async () => {
   render(<LinkManager initialLinks={[]} />);
 
-  addLink("https://example.com", "", "react");
+  await addLink("https://example.com", "", "react");
 
   expect(screen.getByPlaceholderText("Tags, comma separated")).toHaveProperty("value", "");
 });
@@ -38,76 +47,76 @@ describe("Home page", () => {
     expect(screen.getByText("No links yet. Add your first one above.")).toBeDefined();
   });
 
-  test("adds a link to the list", () => {
+  test("adds a link to the list", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com");
+    await addLink("https://example.com");
 
     expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
     expect(screen.queryByText("No links yet. Add your first one above.")).toBeNull();
   });
 
-  test("ignores an empty link", () => {
+  test("ignores an empty link", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("   ");
+    await addLink("   ");
 
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 
 
 
-  test("deletes a link", () => {
+  test("deletes a link", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://example.com");
+    await addLink("https://example.com");
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
 
     expect(screen.queryByRole("link", { name: "example.com" })).toBeNull();
   });
 
-  test("the link opens the full url", () => {
+  test("the link opens the full url", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com/some/page", "My favourite site");
+    await addLink("https://example.com/some/page", "My favourite site");
 
     const link = screen.getByRole("link", { name: "My favourite site" });
     expect(link.getAttribute("href")).toBe("https://example.com/some/page");
   });
 
-  test("shows the title when one is given", () => {
+  test("shows the title when one is given", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com", "My favourite site");
+    await addLink("https://example.com", "My favourite site");
 
     expect(screen.getByRole("link", { name: "My favourite site" })).toBeDefined();
   });
 
 
-  test("does not save the same link twice", () => {
+  test("does not save the same link twice", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com");
-    addLink("https://example.com");
+    await addLink("https://example.com");
+    await addLink("https://example.com");
 
     expect(screen.getByText("You already saved this link!")).toBeDefined();
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
-  test("keeps the typed link after a duplicate, so it can be fixed", () => {
+  test("keeps the typed link after a duplicate, so it can be fixed", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com");
-    addLink("https://example.com");
+    await addLink("https://example.com");
+    await addLink("https://example.com");
 
     const input = screen.getByPlaceholderText("Paste a link...") as HTMLInputElement;
     expect(input.value).toBe("https://example.com");
   });
 
-  test("hides the error when the link is changed", () => {
+  test("hides the error when the link is changed", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://example.com");
-    addLink("https://example.com");
+    await addLink("https://example.com");
+    await addLink("https://example.com");
     expect(screen.getByRole("alert")).toBeDefined();
 
     fireEvent.change(screen.getByPlaceholderText("Paste a link..."), {
@@ -116,10 +125,10 @@ describe("Home page", () => {
 
     expect(screen.queryByRole("alert")).toBeNull();
   });
-  test("shows tags on the card", () => {
+  test("shows tags on the card", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com", "", "react, news");
+    await addLink("https://example.com", "", "react, news");
 
     const tags = screen.getByRole("list", { name: "Tags" });
     expect(within(tags).getAllByRole("listitem").map((tag) => tag.textContent)).toEqual([
@@ -128,10 +137,10 @@ describe("Home page", () => {
     ]);
   });
 
-  test("shows no tag list for a link without tags", () => {
+  test("shows no tag list for a link without tags", async () => {
     render(<LinkManager initialLinks={[]} />);
 
-    addLink("https://example.com");
+    await addLink("https://example.com");
 
     expect(screen.queryByRole("list", { name: "Tags" })).toBeNull();
   });
@@ -146,10 +155,10 @@ describe("Home page", () => {
     expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
   });
 
-  test("shows only links with the clicked tag", () => {
+  test("shows only links with the clicked tag", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev", "", "react");
-    addLink("https://news.ycombinator.com", "", "news");
+    await addLink("https://react.dev", "", "react");
+    await addLink("https://news.ycombinator.com", "", "news");
 
     fireEvent.click(screen.getByRole("button", { name: "#react" }));
 
@@ -158,10 +167,10 @@ describe("Home page", () => {
     expect(screen.getByText("Showing links tagged #react")).toBeDefined();
   });
 
-  test("shows every link again after Show all", () => {
+  test("shows every link again after Show all", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev", "", "react");
-    addLink("https://news.ycombinator.com", "", "news");
+    await addLink("https://react.dev", "", "react");
+    await addLink("https://news.ycombinator.com", "", "news");
 
     fireEvent.click(screen.getByRole("button", { name: "#react" }));
     fireEvent.click(screen.getByRole("button", { name: "Show all" }));
@@ -171,10 +180,10 @@ describe("Home page", () => {
   });
 
 
-  test("shows only links that match the search", () => {
+  test("shows only links that match the search", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev", "React docs");
-    addLink("https://news.ycombinator.com");
+    await addLink("https://react.dev", "React docs");
+    await addLink("https://news.ycombinator.com");
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
       target: { value: "react" },
@@ -184,9 +193,9 @@ describe("Home page", () => {
     expect(screen.queryByRole("link", { name: "news.ycombinator.com" })).toBeNull();
   });
 
-  test("shows a message when nothing matches the search", () => {
+  test("shows a message when nothing matches the search", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev");
+    await addLink("https://react.dev");
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
       target: { value: "vue" },
@@ -196,11 +205,11 @@ describe("Home page", () => {
     expect(screen.queryByText("No links yet. Add your first one above.")).toBeNull();
   });
 
-  test("searches only inside the chosen tag", () => {
+  test("searches only inside the chosen tag", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev", "", "docs");
-    addLink("https://vuejs.org", "", "docs");
-    addLink("https://reactjs.org/blog", "", "news");
+    await addLink("https://react.dev", "", "docs");
+    await addLink("https://vuejs.org", "", "docs");
+    await addLink("https://reactjs.org/blog", "", "news");
 
     fireEvent.click(screen.getAllByRole("button", { name: "#docs" })[0]);
     fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
@@ -211,10 +220,10 @@ describe("Home page", () => {
     expect(screen.queryByRole("link", { name: "vuejs.org" })).toBeNull();
     expect(screen.queryByRole("link", { name: "reactjs.org" })).toBeNull();
   });
-  test("clicking the chosen tag again shows every link", () => {
+  test("clicking the chosen tag again shows every link", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev", "", "react");
-    addLink("https://news.ycombinator.com", "", "news");
+    await addLink("https://react.dev", "", "react");
+    await addLink("https://news.ycombinator.com", "", "news");
 
     fireEvent.click(screen.getByRole("button", { name: "#react" }));
     fireEvent.click(screen.getByRole("button", { name: "#react" }));
@@ -223,9 +232,9 @@ describe("Home page", () => {
     expect(screen.queryByText("Showing links tagged #react")).toBeNull();
   });
 
-  test("marks the chosen tag as pressed", () => {
+  test("marks the chosen tag as pressed", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://react.dev", "", "react, docs");
+    await addLink("https://react.dev", "", "react, docs");
 
     fireEvent.click(screen.getByRole("button", { name: "#react" }));
 
@@ -235,10 +244,10 @@ describe("Home page", () => {
 
 
 
-  test("shows the newest link first", () => {
+  test("shows the newest link first", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://first.com");
-    addLink("https://second.com");
+    await addLink("https://first.com");
+    await addLink("https://second.com");
 
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
       "second.com",
@@ -246,11 +255,11 @@ describe("Home page", () => {
     ]);
   });
 
-  test("sorts links by title", () => {
+  test("sorts links by title", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://zebra.com");
-    addLink("https://apple.com");
-    addLink("https://mango.com");
+    await addLink("https://zebra.com");
+    await addLink("https://apple.com");
+    await addLink("https://mango.com");
 
     fireEvent.change(screen.getByRole("combobox", { name: "Sort links" }), {
       target: { value: "title" },
@@ -272,9 +281,9 @@ describe("editing a title", () => {
     });
   }
 
-  test("changes the title of a link", () => {
+  test("changes the title of a link", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://example.com", "Old title");
+    await addLink("https://example.com", "Old title");
 
     editTitle("New title");
     fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
@@ -284,9 +293,9 @@ describe("editing a title", () => {
   });
 
 
-  test("falls back to the domain when the title is cleared", () => {
+  test("falls back to the domain when the title is cleared", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://example.com", "Old title");
+    await addLink("https://example.com", "Old title");
 
     editTitle("");
     fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
@@ -294,9 +303,9 @@ describe("editing a title", () => {
     expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
   });
 
-  test("cancel keeps the old title", () => {
+  test("cancel keeps the old title", async () => {
     render(<LinkManager initialLinks={[]} />);
-    addLink("https://example.com", "Old title");
+    await addLink("https://example.com", "Old title");
 
     editTitle("New title");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -305,12 +314,60 @@ describe("editing a title", () => {
   });
 });
 
-test("shows the site's favicon next to a link", () => {
+test("shows the site's favicon next to a link", async () => {
   render(<LinkManager initialLinks={[]} />);
-  addLink("https://example.com");
+  await addLink("https://example.com");
 
   const icon = document.querySelector("img");
   expect(icon?.getAttribute("src")).toBe(
     "https://www.google.com/s2/favicons?domain=example.com&sz=32"
   );
+});
+
+describe("saving to the database", () => {
+  const saved = { id: "1", url: "https://example.com", title: "Old title", createdAt: "2026-10-01T12:00:00.000Z" };
+
+  test("sends a new link to the server", async () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    await addLink("https://example.com", "Example", "React, news");
+
+    expect(saveLink).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com", title: "Example", tags: ["react", "news"] })
+    );
+  });
+
+  test("shows the server's error and does not add the link", async () => {
+    vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!");
+    render(<LinkManager initialLinks={[]} />);
+
+    await addLink("https://example.com");
+
+    expect(screen.getByRole("alert").textContent).toBe("You already saved this link!");
+    expect(screen.queryByRole("link", { name: "example.com" })).toBeNull();
+  });
+
+  test("tells the server to delete a link", async () => {
+    render(<LinkManager initialLinks={[saved]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    });
+
+    expect(removeLink).toHaveBeenCalledWith("1");
+  });
+
+  test("sends an edited title to the server", async () => {
+    render(<LinkManager initialLinks={[saved]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
+      target: { value: "New title" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    });
+
+    expect(saveTitle).toHaveBeenCalledWith("1", "New title");
+  });
 });
