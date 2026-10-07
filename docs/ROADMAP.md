@@ -41,16 +41,17 @@ Links used to disappear when you reloaded the page. Now they're saved in the bro
 
 **You'll learn:** form validation, editing state, and small pure functions in `lib/`.
 
-## 🔜 v0.4: Organize and find
+## ✅ v0.4: Organize and find (done)
 
 - [x] Add tags to links
 - [x] Filter the list by tag
 - [x] Search by URL or title
-- [ ] Sort by newest, oldest or title
+- [x] Sort by newest, oldest or title
+- [x] Click the selected tag again to clear the filter
 
 **You'll learn:** derived state (computing the visible list from state plus filters, without storing it twice).
 
-## v0.5: A real backend
+## 🔜 v0.5: A real backend
 
 Moves data from the browser to a server, so links follow you across devices.
 

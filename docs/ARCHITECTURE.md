@@ -76,7 +76,7 @@ Why: when dependencies only point downward, you can change the UI without touchi
 
 **Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). The page turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
 
-**Derived state: store the facts, compute the rest:** the page stores three things in state: `links` (every link), `activeTag` (the tag the user clicked, or `null`) and `query` (the text in the search box). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `searchLinks(filterByTag(links, activeTag), query)`. Each filter takes a list and returns a smaller one, so they chain: first the tag, then the search inside it. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and the page passes `setActiveTag` straight in.
+**Derived state: store the facts, compute the rest:** the page stores four things in state: `links` (every link), `activeTag` (the tag the user clicked, or `null`), `query` (the text in the search box) and `sortOrder` (`"newest"`, `"oldest"` or `"title"`). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder)`. Each step takes a list and returns a new one, so they chain: first the tag, then the search inside it, then the order. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and the page's `toggleTag` decides. Clicking the selected tag again clears the filter (`setActiveTag((current) => current === tag ? null : tag)`, the updater form of `setState`, because the new value depends on the old one). The card also gets `activeTag`, only to highlight the selected pill and set `aria-pressed`.
 
 **Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links is needed by both the form (adding) and the cards (deleting, editing), so it lives in their shared parent, `page.tsx`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The page only hears about an edit when the user presses Save. Cancel just throws the draft away.
 
@@ -92,9 +92,9 @@ Anything a client component imports becomes client code as well, so you don't ne
 
 | File | Type | Why |
 |---|---|---|
-| `app/page.tsx` | Client | Holds `useState` for links, loads from `localStorage` in `useEffect` |
+| `app/page.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; loads from `localStorage` in `useEffect` |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
-| `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel |
+| `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
 
 **Goal:** keep `"use client"` as low in the tree as possible. Once links are stored on a server (see the roadmap), `page.tsx` can become a Server Component that loads data, with only the interactive parts as client components.
 
@@ -105,7 +105,7 @@ Storage will change over time, so all reading and writing of links goes through 
 | Stage | Where links live | Survives refresh? |
 |---|---|---|
 | v0.1 | React state in memory | ❌ |
-| **v0.2 (now)** | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
+| **v0.2–v0.4 (now)** | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
 | v0.5 | Database on the server | ✅ (any device) |
 
 Each time the storage changes, only the `lib/` module should need to change.
@@ -117,6 +117,7 @@ Each time the storage changes, only the `lib/` module should need to change.
 | `createLink(url, title?, tags?)` | Builds a new `Link`. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
 | `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links saved before tags existed (no `tags` field) never match |
 | `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank. Links without a title are matched by URL only |
+| `sortLinks(links, order)` | Returns a **new**, sorted list (copies with `[...links]` first, because `.sort()` changes the array in place). `"newest"` / `"oldest"` compare `createdAt` (ISO strings sort correctly as text). `"title"` sorts A–Z by the name the card shows (title, or domain), ignoring case. Also exports the `SortOrder` type |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
 | `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL, and the card then shows no icon |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
@@ -198,6 +199,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-06 | The form sends raw tag text; the page calls `parseTags` | The form only handles what the user typed; the tag rules live in one tested `lib/` function |
 | 2026-10-06 | New links store `tags: []`; old links have no `tags` field | `tags?` stays optional for old data; the card shows no tag list in either case |
 | 2026-10-06 | The visible list is derived (`filterByTag(links, activeTag)`), not stored in state | One source of truth; add/delete/edit can't forget to update a second list |
-| 2026-10-06 | One active tag at a time, cleared with "Show all" | Simplest filter that's useful; combining tags can come later if needed |
+| 2026-10-06 | One active tag at a time, cleared with "Show all" or by clicking it again | Simplest filter that's useful; combining tags can come later if needed |
 | 2026-10-06 | Search matches URL and title only (not tags), as you type, with a plain `includes` | Tags already have their own filter; `includes` is simple and fast enough for a personal list. No search button or debounce needed |
 | 2026-10-06 | Search runs inside the active tag filter (`searchLinks(filterByTag(...))`) | Filters combine instead of replacing each other, which is what users expect |
+| 2026-10-06 | Sort is the last step of the chain, default `"newest"` | Sorting a smaller list is less work; newest-first matches how links were always shown |
+| 2026-10-06 | Title sort uses `localeCompare(..., "en", { sensitivity: "base" })` on the displayed name | Case doesn't change the order; fixed to English so tests match on every machine; sorts what the user sees |
+| 2026-10-06 | Selected tag pill is a toggle button (`aria-pressed`) with a solid blue style | Users can see which tag is active and that clicking it again turns it off; screen readers announce it as pressed |
