@@ -12,6 +12,7 @@ import {
   parseTags,
   filterByTag,
   searchLinks,
+  sortLinks,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -133,107 +134,110 @@ describe("getDomain", () => {
   });
 });
 
-  describe("isDuplicate", () => {
-    const links = [createLink("https://example.com/page")];
+describe("isDuplicate", () => {
+  const links = [createLink("https://example.com/page")];
 
-    test("is false when the list is empty", () => {
-      expect(isDuplicate([], "https://example.com/page")).toBe(false);
-    });
-
-    test("is true when the url is already saved", () => {
-      expect(isDuplicate(links, "https://example.com/page")).toBe(true);
-    });
-
-    test("is false for a different url", () => {
-      expect(isDuplicate(links, "https://example.com/other")).toBe(false);
-    });
-
-    test("ignores uppercase letters in the domain", () => {
-      expect(isDuplicate(links, "https://EXAMPLE.com/page")).toBe(true);
-    });
-
-    test("treats a domain with and without a trailing slash as the same", () => {
-      const saved = [createLink("https://example.com")];
-
-      expect(isDuplicate(saved, "https://example.com/")).toBe(true);
-    });
+  test("is false when the list is empty", () => {
+    expect(isDuplicate([], "https://example.com/page")).toBe(false);
   });
 
-  describe("updateTitle", () => {
-    const first = createLink("https://example.com", "Old title");
-    const second = createLink("https://nextjs.org", "Next.js");
-
-    test("changes the title of the matching link", () => {
-      const updated = updateTitle([first, second], first.id, "New title");
-
-      expect(updated[0].title).toBe("New title");
-    });
-
-    test("leaves the other links alone", () => {
-      const updated = updateTitle([first, second], first.id, "New title");
-
-      expect(updated[1]).toBe(second);
-    });
-
-    test("does not change the original list", () => {
-      updateTitle([first, second], first.id, "New title");
-
-      expect(first.title).toBe("Old title");
-    });
-
-    test("trims spaces around the title", () => {
-      const updated = updateTitle([first], first.id, "  New title  ");
-
-      expect(updated[0].title).toBe("New title");
-    });
-
-    test("removes the title when it is empty", () => {
-      const updated = updateTitle([first], first.id, "   ");
-
-      expect(updated[0].title).toBeUndefined();
-    });
+  test("is true when the url is already saved", () => {
+    expect(isDuplicate(links, "https://example.com/page")).toBe(true);
   });
 
-  describe("getFaviconUrl", () => {
-    test("returns a favicon address for the link's domain", () => {
-      expect(getFaviconUrl("https://nextjs.org/docs")).toBe(
-        "https://www.google.com/s2/favicons?domain=nextjs.org&sz=32"
-      );
-    });
-
-    test("returns null when the URL is invalid", () => {
-      expect(getFaviconUrl("not a url")).toBeNull();
-    });
+  test("is false for a different url", () => {
+    expect(isDuplicate(links, "https://example.com/other")).toBe(false);
   });
 
-  describe("parseTags", () => {
-    test("splits text on commas", () => {
-      expect(parseTags("news,react,css")).toEqual(["news", "react", "css"]);
-    });
-
-    test("trims spaces and lowercases each tag", () => {
-      expect(parseTags("  News , React ")).toEqual(["news", "react"]);
-    });
-
-    test("skips empty tags", () => {
-      expect(parseTags("news,, ,react,")).toEqual(["news", "react"]);
-    });
-
-    test("removes duplicate tags", () => {
-      expect(parseTags("react, React, news")).toEqual(["react", "news"]);
-    });
-
-    test("returns an empty list for empty text", () => {
-      expect(parseTags("")).toEqual([]);
-      expect(parseTags("   ")).toEqual([]);
-    });
+  test("ignores uppercase letters in the domain", () => {
+    expect(isDuplicate(links, "https://EXAMPLE.com/page")).toBe(true);
   });
 
+  test("treats a domain with and without a trailing slash as the same", () => {
+    const saved = [createLink("https://example.com")];
+
+    expect(isDuplicate(saved, "https://example.com/")).toBe(true);
+  });
+});
+
+describe("updateTitle", () => {
+  const first = createLink("https://example.com", "Old title");
+  const second = createLink("https://nextjs.org", "Next.js");
+
+  test("changes the title of the matching link", () => {
+    const updated = updateTitle([first, second], first.id, "New title");
+
+    expect(updated[0].title).toBe("New title");
+  });
+
+  test("leaves the other links alone", () => {
+    const updated = updateTitle([first, second], first.id, "New title");
+
+    expect(updated[1]).toBe(second);
+  });
+
+  test("does not change the original list", () => {
+    updateTitle([first, second], first.id, "New title");
+
+    expect(first.title).toBe("Old title");
+  });
+
+  test("trims spaces around the title", () => {
+    const updated = updateTitle([first], first.id, "  New title  ");
+
+    expect(updated[0].title).toBe("New title");
+  });
+
+  test("removes the title when it is empty", () => {
+    const updated = updateTitle([first], first.id, "   ");
+
+    expect(updated[0].title).toBeUndefined();
+  });
+});
+
+describe("getFaviconUrl", () => {
+  test("returns a favicon address for the link's domain", () => {
+    expect(getFaviconUrl("https://nextjs.org/docs")).toBe(
+      "https://www.google.com/s2/favicons?domain=nextjs.org&sz=32"
+    );
+  });
+
+  test("returns null when the URL is invalid", () => {
+    expect(getFaviconUrl("not a url")).toBeNull();
+  });
+});
+
+describe("parseTags", () => {
+  test("splits text on commas", () => {
+    expect(parseTags("news,react,css")).toEqual(["news", "react", "css"]);
+  });
+
+  test("trims spaces and lowercases each tag", () => {
+    expect(parseTags("  News , React ")).toEqual(["news", "react"]);
+  });
+
+  test("skips empty tags", () => {
+    expect(parseTags("news,, ,react,")).toEqual(["news", "react"]);
+  });
+
+  test("removes duplicate tags", () => {
+    expect(parseTags("react, React, news")).toEqual(["react", "news"]);
+  });
+
+  test("returns an empty list for empty text", () => {
+    expect(parseTags("")).toEqual([]);
+    expect(parseTags("   ")).toEqual([]);
+  });
+});
 
 describe("filterByTag", () => {
   const react = createLink("https://react.dev", "", ["react", "docs"]);
   const news = createLink("https://news.ycombinator.com", "", ["news"]);
-  const old = { id: "old", url: "https://old.com", createdAt: "2026-01-01T00:00:00.000Z" };
+  const old = {
+    id: "old",
+    url: "https://old.com",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
 
   test("returns every link when no tag is chosen", () => {
     expect(filterByTag([react, news, old], null)).toEqual([react, news, old]);
@@ -247,7 +251,6 @@ describe("filterByTag", () => {
     expect(filterByTag([old], "react")).toEqual([]);
   });
 });
-
 
 describe("searchLinks", () => {
   const react = createLink("https://react.dev", "React docs");
@@ -270,3 +273,41 @@ describe("searchLinks", () => {
   });
 });
 
+describe("sortLinks", () => {
+  const first = {
+    id: "1",
+    url: "https://zebra.com",
+    createdAt: "2026-10-01T12:00:00.000Z",
+  };
+  const second = {
+    id: "2",
+    url: "https://apple.com",
+    title: "Banana",
+    createdAt: "2026-10-02T12:00:00.000Z",
+  };
+  const third = {
+    id: "3",
+    url: "https://cherry.com",
+    title: "apple pie",
+    createdAt: "2026-10-03T12:00:00.000Z",
+  };
+  const links = [second, third, first];
+
+  test("puts the newest link first", () => {
+    expect(sortLinks(links, "newest")).toEqual([third, second, first]);
+  });
+
+  test("puts the oldest link first", () => {
+    expect(sortLinks(links, "oldest")).toEqual([first, second, third]);
+  });
+
+  test("sorts by title A to Z, ignoring case, using the domain when there's no title", () => {
+    expect(sortLinks(links, "title")).toEqual([third, second, first]);
+  });
+
+  test("does not change the original list", () => {
+    sortLinks(links, "oldest");
+
+    expect(links).toEqual([second, third, first]);
+  });
+});

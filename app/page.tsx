@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
-import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle, parseTags, filterByTag, searchLinks } from "@/lib/links";
+import { createLink, isDuplicate, loadLinks, saveLinks, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
 
 export default function Home() {
   const [links, setLinks] = useState<Link[]>([]);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const visibleLinks = searchLinks(filterByTag(links, activeTag), query);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const visibleLinks = sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder);
 
 
   useEffect(() => {
@@ -49,17 +50,30 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-slate-900">Linkwell</h1>
         <p className="mt-1 text-slate-500">
           Save links. Keep them alive. Actually come back to them.
+        </p>
+
+        <LinkForm onAdd={addLink} />
+
+        <div className="mt-6 flex gap-2">
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search links..."
             aria-label="Search links"
-            className="mt-6 w-full rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
           />
-
-        </p>
-        <LinkForm onAdd={addLink} />
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+            aria-label="Sort links"
+            className="rounded border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="title">Title (A–Z)</option>
+          </select>
+        </div>
         {activeTag && (
           <div className="mt-6 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-2 text-blue-800">
             <span>Showing links tagged #{activeTag}</span>

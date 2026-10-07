@@ -243,65 +243,93 @@ describe("Home page", () => {
     expect(screen.queryByRole("link", { name: "vuejs.org" })).toBeNull();
     expect(screen.queryByRole("link", { name: "reactjs.org" })).toBeNull();
   });
+
+  test("shows the newest link first", () => {
+    render(<Home />);
+    addLink("https://first.com");
+    addLink("https://second.com");
+
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "second.com",
+      "first.com",
+    ]);
+  });
+
+  test("sorts links by title", () => {
+    render(<Home />);
+    addLink("https://zebra.com");
+    addLink("https://apple.com");
+    addLink("https://mango.com");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort links" }), {
+      target: { value: "title" },
+    });
+
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "apple.com",
+      "mango.com",
+      "zebra.com",
+    ]);
+  });
 });
 
-  describe("editing a title", () => {
-    function editTitle(newTitle: string) {
-      fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-      fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
-        target: { value: newTitle },
-      });
-    }
-
-    test("changes the title of a link", () => {
-      render(<Home />);
-      addLink("https://example.com", "Old title");
-
-      editTitle("New title");
-      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
-
-      expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
-      expect(screen.queryByRole("link", { name: "Old title" })).toBeNull();
+describe("editing a title", () => {
+  function editTitle(newTitle: string) {
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
+      target: { value: newTitle },
     });
+  }
 
-    test("keeps the new title after a page refresh", () => {
-      render(<Home />);
-      addLink("https://example.com", "Old title");
-      editTitle("New title");
-      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
-
-      cleanup();
-      render(<Home />);
-      expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
-    });
-
-    test("falls back to the domain when the title is cleared", () => {
-      render(<Home />);
-      addLink("https://example.com", "Old title");
-
-      editTitle("");
-      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
-
-      expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
-    });
-
-    test("cancel keeps the old title", () => {
-      render(<Home />);
-      addLink("https://example.com", "Old title");
-
-      editTitle("New title");
-      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-
-      expect(screen.getByRole("link", { name: "Old title" })).toBeDefined();
-    });
-  });
-
-  test("shows the site's favicon next to a link", () => {
+  test("changes the title of a link", () => {
     render(<Home />);
-    addLink("https://example.com");
+    addLink("https://example.com", "Old title");
 
-    const icon = document.querySelector("img");
-    expect(icon?.getAttribute("src")).toBe(
-      "https://www.google.com/s2/favicons?domain=example.com&sz=32"
-    );
+    editTitle("New title");
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Old title" })).toBeNull();
   });
+
+  test("keeps the new title after a page refresh", () => {
+    render(<Home />);
+    addLink("https://example.com", "Old title");
+    editTitle("New title");
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    cleanup();
+    render(<Home />);
+    expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
+  });
+
+  test("falls back to the domain when the title is cleared", () => {
+    render(<Home />);
+    addLink("https://example.com", "Old title");
+
+    editTitle("");
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+
+    expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
+  });
+
+  test("cancel keeps the old title", () => {
+    render(<Home />);
+    addLink("https://example.com", "Old title");
+
+    editTitle("New title");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("link", { name: "Old title" })).toBeDefined();
+  });
+});
+
+test("shows the site's favicon next to a link", () => {
+  render(<Home />);
+  addLink("https://example.com");
+
+  const icon = document.querySelector("img");
+  expect(icon?.getAttribute("src")).toBe(
+    "https://www.google.com/s2/favicons?domain=example.com&sz=32"
+  );
+});

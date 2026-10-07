@@ -110,3 +110,19 @@ export function searchLinks(links: Link[], query: string): Link[] {
       link.title?.toLowerCase().includes(text)
   );
 }
+
+
+export type SortOrder = "newest" | "oldest" | "title";
+
+export function sortLinks(links: Link[], order: SortOrder): Link[] {
+  const sorted = [...links];
+  if (order === "title") {
+    return sorted.sort((a, b) =>
+      (a.title || getDomain(a.url)).localeCompare(b.title || getDomain(b.url), "en", {
+        sensitivity: "base",
+      })
+    );
+  }
+  sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return order === "oldest" ? sorted : sorted.reverse();
+}
