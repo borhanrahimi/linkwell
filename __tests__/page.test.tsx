@@ -243,6 +243,29 @@ describe("Home page", () => {
     expect(screen.queryByRole("link", { name: "vuejs.org" })).toBeNull();
     expect(screen.queryByRole("link", { name: "reactjs.org" })).toBeNull();
   });
+  test("clicking the chosen tag again shows every link", () => {
+    render(<Home />);
+    addLink("https://react.dev", "", "react");
+    addLink("https://news.ycombinator.com", "", "news");
+
+    fireEvent.click(screen.getByRole("button", { name: "#react" }));
+    fireEvent.click(screen.getByRole("button", { name: "#react" }));
+
+    expect(screen.getByRole("link", { name: "news.ycombinator.com" })).toBeDefined();
+    expect(screen.queryByText("Showing links tagged #react")).toBeNull();
+  });
+
+  test("marks the chosen tag as pressed", () => {
+    render(<Home />);
+    addLink("https://react.dev", "", "react, docs");
+
+    fireEvent.click(screen.getByRole("button", { name: "#react" }));
+
+    expect(screen.getByRole("button", { name: "#react", pressed: true })).toBeDefined();
+    expect(screen.getByRole("button", { name: "#docs", pressed: false })).toBeDefined();
+  });
+
+
 
   test("shows the newest link first", () => {
     render(<Home />);

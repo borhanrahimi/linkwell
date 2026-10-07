@@ -31,7 +31,9 @@ export default function Home() {
     return null;
   }
 
-
+  function toggleTag(tag: string) {
+    setActiveTag((current) => (current === tag ? null : tag));
+  }
   function deleteLink(id: string) {
     const updated = links.filter((link) => link.id !== id);
     setLinks(updated);
@@ -92,7 +94,7 @@ export default function Home() {
             <p className="text-slate-400">No links yet. Add your first one above.</p>
           )}
           {visibleLinks.map((link) => (
-            <LinkCard key={link.id} link={link} onDelete={deleteLink} onEditTitle={editTitle} onTagClick={setActiveTag}
+            <LinkCard key={link.id} link={link} onDelete={deleteLink} onEditTitle={editTitle} activeTag={activeTag} onTagClick={toggleTag}
             />
           ))}
         </ul>

@@ -11,9 +11,10 @@ type LinkCardProps = {
   onDelete: (id: string) => void;
   onEditTitle: (id: string, title: string) => void;
   onTagClick: (tag: string) => void;
+  activeTag: string | null;
 };
 
-export default function LinkCard({ link, onDelete, onEditTitle, onTagClick }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, onDelete, onEditTitle, onTagClick }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
@@ -78,8 +79,8 @@ export default function LinkCard({ link, onDelete, onEditTitle, onTagClick }: Li
           <p className="truncate text-sm text-slate-500">{link.url}</p>
           <p className="text-sm text-slate-400">
             Saved{" "}
-            <time dateTime = {link.createdAt} title={new Date(link.createdAt).toLocaleDateString()}>
-            {timeAgo(link.createdAt)}
+            <time dateTime={link.createdAt} title={new Date(link.createdAt).toLocaleDateString()}>
+              {timeAgo(link.createdAt)}
             </time>
           </p>
           {link.tags && link.tags.length > 0 && (
@@ -88,8 +89,13 @@ export default function LinkCard({ link, onDelete, onEditTitle, onTagClick }: Li
                 <li key={tag}>
                   <button
                     onClick={() => onTagClick(tag)}
-                    className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    aria-pressed={tag === activeTag}
+                    className={`rounded-full px-2 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 ${tag === activeTag
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700"
+                      }`}
                   >
+
                     #{tag}
                   </button>
                 </li>
