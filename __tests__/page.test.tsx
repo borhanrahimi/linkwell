@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { loadLinks, saveLinks } from "@/lib/links";
-import Home from "@/app/page";
+import LinkManager from "@/components/LinkManager";
+
 
 afterEach(() => {
   cleanup();
-  localStorage.clear();
 });
 
 function addLink(url: string, title = "", tags = "") {
@@ -21,16 +20,9 @@ function addLink(url: string, title = "", tags = "") {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
 
-test("saves tags with a new link", () => {
-  render(<Home />);
-
-  addLink("https://example.com", "", "React, news");
-
-  expect(loadLinks()[0].tags).toEqual(["react", "news"]);
-});
 
 test("clears the tags box after saving", () => {
-  render(<Home />);
+  render(<LinkManager initialLinks={[]} />);
 
   addLink("https://example.com", "", "react");
 
@@ -41,13 +33,13 @@ test("clears the tags box after saving", () => {
 
 describe("Home page", () => {
   test("shows a message when there are no links", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     expect(screen.getByText("No links yet. Add your first one above.")).toBeDefined();
   });
 
   test("adds a link to the list", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com");
 
@@ -56,35 +48,17 @@ describe("Home page", () => {
   });
 
   test("ignores an empty link", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("   ");
 
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
   });
 
-  test("keeps links after a page refresh", () => {
-    render(<Home />);
-    addLink("https://example.com");
 
-    cleanup();
-    render(<Home />);
-    expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
-  });
-
-  test("keeps a deleted link removed after a page refresh", () => {
-    render(<Home />);
-    addLink("https://example.com");
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-
-    cleanup();
-    render(<Home />);
-    expect(screen.queryByRole("link", { name: "example.com" })).toBeNull();
-  });
 
   test("deletes a link", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://example.com");
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
@@ -93,7 +67,7 @@ describe("Home page", () => {
   });
 
   test("the link opens the full url", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com/some/page", "My favourite site");
 
@@ -102,24 +76,16 @@ describe("Home page", () => {
   });
 
   test("shows the title when one is given", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com", "My favourite site");
 
     expect(screen.getByRole("link", { name: "My favourite site" })).toBeDefined();
   });
 
-  test("keeps the title after a page refresh", () => {
-    render(<Home />);
-    addLink("https://example.com", "My favourite site");
-
-    cleanup();
-    render(<Home />);
-    expect(screen.getByRole("link", { name: "My favourite site" })).toBeDefined();
-  });
 
   test("does not save the same link twice", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com");
     addLink("https://example.com");
@@ -129,7 +95,7 @@ describe("Home page", () => {
   });
 
   test("keeps the typed link after a duplicate, so it can be fixed", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com");
     addLink("https://example.com");
@@ -139,7 +105,7 @@ describe("Home page", () => {
   });
 
   test("hides the error when the link is changed", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://example.com");
     addLink("https://example.com");
     expect(screen.getByRole("alert")).toBeDefined();
@@ -151,7 +117,7 @@ describe("Home page", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
   test("shows tags on the card", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com", "", "react, news");
 
@@ -163,23 +129,25 @@ describe("Home page", () => {
   });
 
   test("shows no tag list for a link without tags", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
 
     addLink("https://example.com");
 
     expect(screen.queryByRole("list", { name: "Tags" })).toBeNull();
   });
 
-  test("still shows links saved before tags existed", () => {
-    saveLinks([{ id: "old", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" }]);
-
-    render(<Home />);
+  test("shows the links it starts with", () => {
+    render(
+      <LinkManager
+        initialLinks={[{ id: "1", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" }]}
+      />
+    );
 
     expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
   });
 
   test("shows only links with the clicked tag", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev", "", "react");
     addLink("https://news.ycombinator.com", "", "news");
 
@@ -191,7 +159,7 @@ describe("Home page", () => {
   });
 
   test("shows every link again after Show all", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev", "", "react");
     addLink("https://news.ycombinator.com", "", "news");
 
@@ -204,7 +172,7 @@ describe("Home page", () => {
 
 
   test("shows only links that match the search", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev", "React docs");
     addLink("https://news.ycombinator.com");
 
@@ -217,7 +185,7 @@ describe("Home page", () => {
   });
 
   test("shows a message when nothing matches the search", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev");
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), {
@@ -229,7 +197,7 @@ describe("Home page", () => {
   });
 
   test("searches only inside the chosen tag", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev", "", "docs");
     addLink("https://vuejs.org", "", "docs");
     addLink("https://reactjs.org/blog", "", "news");
@@ -244,7 +212,7 @@ describe("Home page", () => {
     expect(screen.queryByRole("link", { name: "reactjs.org" })).toBeNull();
   });
   test("clicking the chosen tag again shows every link", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev", "", "react");
     addLink("https://news.ycombinator.com", "", "news");
 
@@ -256,7 +224,7 @@ describe("Home page", () => {
   });
 
   test("marks the chosen tag as pressed", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://react.dev", "", "react, docs");
 
     fireEvent.click(screen.getByRole("button", { name: "#react" }));
@@ -268,7 +236,7 @@ describe("Home page", () => {
 
 
   test("shows the newest link first", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://first.com");
     addLink("https://second.com");
 
@@ -279,7 +247,7 @@ describe("Home page", () => {
   });
 
   test("sorts links by title", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://zebra.com");
     addLink("https://apple.com");
     addLink("https://mango.com");
@@ -305,7 +273,7 @@ describe("editing a title", () => {
   }
 
   test("changes the title of a link", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://example.com", "Old title");
 
     editTitle("New title");
@@ -315,19 +283,9 @@ describe("editing a title", () => {
     expect(screen.queryByRole("link", { name: "Old title" })).toBeNull();
   });
 
-  test("keeps the new title after a page refresh", () => {
-    render(<Home />);
-    addLink("https://example.com", "Old title");
-    editTitle("New title");
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
-
-    cleanup();
-    render(<Home />);
-    expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
-  });
 
   test("falls back to the domain when the title is cleared", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://example.com", "Old title");
 
     editTitle("");
@@ -337,7 +295,7 @@ describe("editing a title", () => {
   });
 
   test("cancel keeps the old title", () => {
-    render(<Home />);
+    render(<LinkManager initialLinks={[]} />);
     addLink("https://example.com", "Old title");
 
     editTitle("New title");
@@ -348,7 +306,7 @@ describe("editing a title", () => {
 });
 
 test("shows the site's favicon next to a link", () => {
-  render(<Home />);
+  render(<LinkManager initialLinks={[]} />);
   addLink("https://example.com");
 
   const icon = document.querySelector("img");

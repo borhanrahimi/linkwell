@@ -13,6 +13,7 @@ import {
   filterByTag,
   searchLinks,
   sortLinks,
+  toLink,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -309,5 +310,27 @@ describe("sortLinks", () => {
     sortLinks(links, "oldest");
 
     expect(links).toEqual([second, third, first]);
+  });
+});
+
+describe("toLink", () => {
+  const row = {
+    id: "1",
+    url: "https://example.com",
+    title: null,
+    tags: ["news"],
+    createdAt: new Date("2026-10-06T12:00:00.000Z"),
+  };
+
+  test("turns the date into an ISO string", () => {
+    expect(toLink(row).createdAt).toBe("2026-10-06T12:00:00.000Z");
+  });
+
+  test("turns an empty title into undefined", () => {
+    expect(toLink(row).title).toBeUndefined();
+  });
+
+  test("keeps the id, url and tags", () => {
+    expect(toLink(row)).toMatchObject({ id: "1", url: "https://example.com", tags: ["news"] });
   });
 });

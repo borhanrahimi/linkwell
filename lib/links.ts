@@ -1,4 +1,5 @@
 import type { Link } from "@/types/link";
+import type { LinkRow } from "@/db/schema";
 
 export const STORAGE_KEY = "linkwell:links";
 
@@ -125,4 +126,14 @@ export function sortLinks(links: Link[], order: SortOrder): Link[] {
   }
   sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return order === "oldest" ? sorted : sorted.reverse();
+}
+
+export function toLink(row: LinkRow): Link {
+  return {
+    id: row.id,
+    url: row.url,
+    title: row.title ?? undefined,
+    tags: row.tags,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
