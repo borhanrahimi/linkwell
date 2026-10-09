@@ -6,17 +6,20 @@ import LinkCard from "@/components/LinkCard";
 import ImportBanner from "@/components/ImportBanner";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import Rediscover from "@/components/Rediscover";
-import { removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import FolderBar from "@/components/FolderBar";
+import { createFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
 import { createLink, isDuplicate, pickRediscover, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
-import type { Link } from "@/types/link";
+import type { Folder, Link } from "@/types/link";
 
 type LinkManagerProps = {
   initialLinks: Link[];
+  initialFolders?: Folder[];
   now?: Date;
 };
 
-export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
+export default function LinkManager({ initialLinks, initialFolders = [], now }: LinkManagerProps) {
   const [links, setLinks] = useState(initialLinks);
+  const [folders, setFolders] = useState(initialFolders);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
@@ -61,6 +64,15 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
     await saveReadStatus(id, !link.readAt);
   }
 
+  async function addFolder(name: string) {
+    const result = await createFolder(name);
+    if (typeof result === "string") {
+      return result;
+    }
+    setFolders((current) => [...current, result]);
+    return null;
+  }
+
   return (
     <>
       <ImportBanner onImported={(imported) => setLinks((current) => [...imported, ...current])} />
@@ -69,6 +81,8 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
 
       {now && <Rediscover links={rediscover} now={now} />}
 
+
+      <FolderBar folders={folders} onCreate={addFolder} />
 
       <div className="mt-6 flex gap-2">
         <input

@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { checkAllLinks, createFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
+  createFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
   removeLink: vi.fn(async () => { }),
@@ -575,5 +576,54 @@ describe("rediscover", () => {
     });
 
     expect(screen.queryByRole("region", { name: "Rediscover" })).toBeNull();
+  });
+});
+
+describe("folders", () => {
+  function createFolderNamed(name: string) {
+    fireEvent.click(screen.getByRole("button", { name: "+ New folder" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Folder name" }), {
+      target: { value: name },
+    });
+    return act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    });
+  }
+
+  test("shows the folders it starts with", () => {
+    render(<LinkManager initialLinks={[]} initialFolders={[{ id: "f1", name: "Work" }]} />);
+
+    const list = screen.getByRole("list", { name: "Folders" });
+    expect(within(list).getByText("📁 Work")).toBeDefined();
+  });
+
+  test("creates a new folder", async () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    await createFolderNamed("Recipes");
+
+    expect(createFolder).toHaveBeenCalledWith("Recipes");
+    expect(within(screen.getByRole("list", { name: "Folders" })).getByText("📁 Recipes")).toBeDefined();
+    expect(screen.queryByRole("textbox", { name: "Folder name" })).toBeNull();
+  });
+
+  test("shows the server's error and keeps the form open", async () => {
+    vi.mocked(createFolder).mockResolvedValueOnce('You already have a folder called "Work".');
+    render(<LinkManager initialLinks={[]} initialFolders={[{ id: "f1", name: "Work" }]} />);
+
+    await createFolderNamed("Work");
+
+    expect(screen.getByRole("alert").textContent).toBe('You already have a folder called "Work".');
+    expect(screen.getByRole("textbox", { name: "Folder name" })).toBeDefined();
+  });
+
+  test("Cancel closes the form without creating anything", () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "+ New folder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("textbox", { name: "Folder name" })).toBeNull();
+    expect(createFolder).not.toHaveBeenCalled();
   });
 });

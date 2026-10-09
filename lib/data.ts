@@ -1,10 +1,10 @@
 import "server-only";
 import { connection } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { links } from "@/db/schema";
-import { toLink } from "@/lib/links";
-import type { Link, LinkStatus } from "@/types/link";
+import { folders, links } from "@/db/schema";
+import { toFolder, toLink } from "@/lib/links";
+import type { Folder, Link, LinkStatus } from "@/types/link";
 
 export async function getLinks(): Promise<Link[]> {
   await connection();
@@ -42,4 +42,14 @@ export async function updateLinkStatus(id: string, status: LinkStatus) {
 
 export async function updateLinkReadAt(id: string, readAt: Date | null) {
   await db.update(links).set({ readAt }).where(eq(links.id, id));
+}
+
+export async function getFolders(): Promise<Folder[]> {
+  const rows = await db.select().from(folders).orderBy(asc(folders.createdAt));
+  return rows.map(toFolder);
+}
+
+export async function insertFolder(name: string): Promise<Folder> {
+  const [row] = await db.insert(folders).values({ name }).returning();
+  return toFolder(row);
 }

@@ -1,9 +1,8 @@
 import LinkManager from "@/components/LinkManager";
-import { getLinks } from "@/lib/data";
+import { getFolders, getLinks } from "@/lib/data";
 
 export default async function Home() {
-  const links = await getLinks();
-
+  const [links, folders] = await Promise.all([getLinks(), getFolders()]);
   return (
     <main className="min-h-screen bg-slate-50 p-8">
       <div className="mx-auto max-w-2xl">
@@ -12,7 +11,7 @@ export default async function Home() {
           Save links. Keep them alive. Actually come back to them.
         </p>
 
-        <LinkManager initialLinks={links} now={new Date()}/>
+        <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} />
       </div>
     </main>
   );

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, importLinks, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { deleteLinkById, getLinks, insertLink, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
+import { checkAllLinks, createFolder, importLinks, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 
@@ -11,6 +11,8 @@ vi.mock("@/lib/data", () => ({
   updateLinkTitle: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
+  getFolders: vi.fn(async () => []),
+  insertFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
 }));
 
 vi.mock("@/lib/checkLink", () => ({
@@ -141,5 +143,24 @@ describe("saveReadStatus", () => {
     await saveReadStatus("1", false);
 
     expect(updateLinkReadAt).toHaveBeenCalledWith("1", null);
+  });
+});
+
+describe("createFolder", () => {
+  test("creates a folder with a trimmed name", async () => {
+    expect(await createFolder("  Work  ")).toEqual({ id: "f1", name: "Work" });
+    expect(insertFolder).toHaveBeenCalledWith("Work");
+  });
+
+  test("refuses an empty name", async () => {
+    expect(await createFolder("   ")).toBe("Please give the folder a name.");
+    expect(insertFolder).not.toHaveBeenCalled();
+  });
+
+  test("refuses a name that already exists, ignoring case", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Work" }]);
+
+    expect(await createFolder("work")).toBe('You already have a folder called "work".');
+    expect(insertFolder).not.toHaveBeenCalled();
   });
 });

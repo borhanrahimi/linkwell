@@ -3,6 +3,8 @@
 import {
   deleteLinkById,
   getLinks,
+  getFolders,
+  insertFolder,
   insertLink,
   updateLinkStatus,
   updateLinkTitle,
@@ -11,7 +13,7 @@ import {
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { isDuplicate } from "@/lib/links";
-import type { Link } from "@/types/link";
+import type { Folder, Link } from "@/types/link";
 
 export async function saveLink(link: Link): Promise<Link | string> {
   if (!link.url.trim()) {
@@ -64,4 +66,17 @@ export async function checkAllLinks(): Promise<Link[]> {
   );
 
   return getLinks();
+}
+
+
+export async function createFolder(name: string): Promise<Folder | string> {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return "Please give the folder a name.";
+  }
+  const existing = await getFolders();
+  if (existing.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())) {
+    return `You already have a folder called "${trimmed}".`;
+  }
+  return insertFolder(trimmed);
 }
