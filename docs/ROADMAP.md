@@ -77,11 +77,22 @@ Scheduled (automatic) link checks moved to v1.0: they need the app to be deploye
 
 ## 🔜 v0.7: Actually come back to them 🔁
 
-- [ ] "Read later" vs. "done" status for each link
+- [x] "Read later" vs. "done" status for each link (Mark read / Mark unread)
 - [ ] A "rediscover" section that brings back old unread links
 - [ ] Weekly digest of forgotten links (email or in-app)
 
 **You'll learn:** scheduled jobs and product thinking around habits.
+
+## v0.8: Folders 📁
+
+Each link lives in one folder ("where it belongs"); tags stay for "what it's about".
+
+- [ ] A `folders` table, and a `folder_id` column on links that points to it (a foreign key)
+- [ ] Create, rename and delete folders (decide what happens to a deleted folder's links: `ON DELETE`)
+- [ ] Move a link into a folder (and out again)
+- [ ] Show one folder at a time, working together with the tag filter, search and sort
+
+**You'll learn:** relationships between tables, foreign keys, and joins.
 
 ## v1.0: Ready for other people
 
@@ -95,6 +106,17 @@ Scheduled (automatic) link checks moved to v1.0: they need the app to be deploye
 
 **You'll learn:** authentication, deployment, and testing.
 
+## v1.1: A new look ✨
+
+Redesign after launch: it's mostly styling, so the data, Server Actions and tests barely change (tests find elements by role and name, not by CSS class).
+
+- [ ] Bento grid layout: cards in a CSS Grid with different tile sizes (for example bigger tiles for rediscover and broken links), working on phone and desktop
+- [ ] Glassmorphism cards: frosted glass (`backdrop-blur`, see-through backgrounds, light borders) over a gradient background
+- [ ] Check text contrast on glass cards so everything stays readable and accessible
+- [ ] Dark mode
+
+**You'll learn:** CSS Grid, responsive design, visual design, and accessible colour contrast.
+
 ---
 
 ## Later / ideas
@@ -104,7 +126,6 @@ Not planned yet, but worth remembering:
 - Browser extension to save the current tab
 - Import bookmarks from Chrome or Firefox
 - Share a collection of links publicly
-- Dark mode
 - Edit or remove the tags of a saved link
 - Keyboard shortcuts
 - Fetch each page's description (and maybe a preview image) when it's saved
