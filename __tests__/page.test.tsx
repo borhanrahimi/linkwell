@@ -7,7 +7,7 @@ import { STORAGE_KEY } from "@/lib/links";
 vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
   importLinks: vi.fn(async (links) => links),
-  saveLink: vi.fn(async () => null),
+  saveLink: vi.fn(async (link) => link),
   removeLink: vi.fn(async () => { }),
   saveTitle: vi.fn(async () => { }),
 }));
@@ -350,6 +350,15 @@ describe("saving to the database", () => {
     expect(saveLink).toHaveBeenCalledWith(
       expect.objectContaining({ url: "https://example.com", title: "Example", tags: ["react", "news"] })
     );
+  });
+
+  test("shows the title the server found", async () => {
+    vi.mocked(saveLink).mockImplementationOnce(async (link) => ({ ...link, title: "Example Domain" }));
+    render(<LinkManager initialLinks={[]} />);
+
+    await addLink("https://example.com");
+
+    expect(screen.getByRole("link", { name: "Example Domain" })).toBeDefined();
   });
 
   test("shows the server's error and does not add the link", async () => {

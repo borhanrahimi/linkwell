@@ -27,12 +27,12 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
     }
 
     const link = createLink(url, title, parseTags(tags));
-    const error = await saveLink(link);
-    if (error) {
-      return error;
+    const result = await saveLink(link);
+    if (typeof result === "string") {
+      return result;
     }
 
-    setLinks((current) => [link, ...current]);
+    setLinks((current) => [result, ...current]);
     return null;
   }
 

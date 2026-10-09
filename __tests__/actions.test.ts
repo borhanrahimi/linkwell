@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { checkAllLinks, importLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
 import { deleteLinkById, getLinks, insertLink, updateLinkStatus, updateLinkTitle } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
+import { fetchTitle } from "@/lib/fetchTitle";
 
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
@@ -15,6 +16,10 @@ vi.mock("@/lib/checkLink", () => ({
   checkLink: vi.fn(async () => "ok"),
 }));
 
+vi.mock("@/lib/fetchTitle", () => ({
+  fetchTitle: vi.fn(async () => undefined),
+}));
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -23,8 +28,20 @@ const link = { id: "1", url: "https://example.com", tags: [], createdAt: "2026-1
 
 describe("saveLink", () => {
   test("saves a new link", async () => {
-    expect(await saveLink(link)).toBeNull();
+    expect(await saveLink(link)).toEqual(link);
     expect(insertLink).toHaveBeenCalledWith(link);
+  });
+
+  test("fills in the page's title when none was given", async () => {
+    vi.mocked(fetchTitle).mockResolvedValueOnce("Example Domain");
+
+    expect(await saveLink(link)).toEqual({ ...link, title: "Example Domain" });
+    expect(insertLink).toHaveBeenCalledWith({ ...link, title: "Example Domain" });
+  });
+
+  test("keeps the title the user typed", async () => {
+    expect(await saveLink({ ...link, title: "My title" })).toMatchObject({ title: "My title" });
+    expect(fetchTitle).not.toHaveBeenCalled();
   });
 
   test("refuses a link that is already saved", async () => {

@@ -8,18 +8,20 @@ import {
   updateLinkTitle,
 } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
+import { fetchTitle } from "@/lib/fetchTitle";
 import { isDuplicate } from "@/lib/links";
 import type { Link } from "@/types/link";
 
-export async function saveLink(link: Link): Promise<string | null> {
+export async function saveLink(link: Link): Promise<Link | string> {
   if (!link.url.trim()) {
     return "Please paste a link.";
   }
   if (isDuplicate(await getLinks(), link.url)) {
     return "You already saved this link!";
   }
-  await insertLink(link);
-  return null;
+  const saved = { ...link, title: link.title ?? (await fetchTitle(link.url)) };
+  await insertLink(saved);
+  return saved;
 }
 
 export async function removeLink(id: string) {
