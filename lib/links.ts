@@ -1,5 +1,5 @@
-import type { Link } from "@/types/link";
-import type { LinkRow } from "@/db/schema";
+import type { Folder, Link } from "@/types/link";
+import type { FolderRow, LinkRow } from "@/db/schema";
 
 export const STORAGE_KEY = "linkwell:links";
 
@@ -165,5 +165,10 @@ export function toLink(row: LinkRow): Link {
     status: row.status ?? undefined,
     checkedAt: row.checkedAt?.toISOString(),
     readAt: row.readAt?.toISOString(),
+    folderId: row.folderId ?? undefined,
   };
+}
+
+export function toFolder(row: FolderRow): Folder {
+  return { id: row.id, name: row.name };
 }

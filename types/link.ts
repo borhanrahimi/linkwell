@@ -9,4 +9,10 @@ export type Link = {
   status?: LinkStatus;
   checkedAt?: string;
   readAt?: string;
+  folderId?: string;
+};
+
+export type Folder = {
+  id: string;
+  name: string;
 };

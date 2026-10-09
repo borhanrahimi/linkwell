@@ -17,6 +17,7 @@ import {
   getArchiveUrl,
   setReadAt,
   pickRediscover,
+  toFolder,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -125,7 +126,10 @@ describe("loadLinks and clearSavedLinks", () => {
   });
 
   test("clearSavedLinks removes the saved links", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([createLink("https://example.com")]));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([createLink("https://example.com")])
+    );
 
     clearSavedLinks();
 
@@ -335,6 +339,7 @@ describe("toLink", () => {
     status: null,
     checkedAt: null,
     readAt: null,
+    folderId: null,
   };
 
   test("turns the date into an ISO string", () => {
@@ -346,7 +351,11 @@ describe("toLink", () => {
   });
 
   test("keeps the id, url and tags", () => {
-    expect(toLink(row)).toMatchObject({ id: "1", url: "https://example.com", tags: ["news"] });
+    expect(toLink(row)).toMatchObject({
+      id: "1",
+      url: "https://example.com",
+      tags: ["news"],
+    });
   });
 
   test("leaves the status out when the link was never checked", () => {
@@ -355,14 +364,28 @@ describe("toLink", () => {
   });
 
   test("keeps the result of the last check", () => {
-    const checked = { ...row, status: "broken" as const, checkedAt: new Date("2026-10-07T08:00:00.000Z") };
+    const checked = {
+      ...row,
+      status: "broken" as const,
+      checkedAt: new Date("2026-10-07T08:00:00.000Z"),
+    };
 
-    expect(toLink(checked)).toMatchObject({ status: "broken", checkedAt: "2026-10-07T08:00:00.000Z" });
+    expect(toLink(checked)).toMatchObject({
+      status: "broken",
+      checkedAt: "2026-10-07T08:00:00.000Z",
+    });
+  });
+
+  test("keeps the folder, or leaves it out when the link has none", () => {
+    expect(toLink(row).folderId).toBeUndefined();
+    expect(toLink({ ...row, folderId: "f1" }).folderId).toBe("f1");
   });
 
   test("keeps when the link was read, or leaves it out", () => {
     expect(toLink(row).readAt).toBeUndefined();
-    expect(toLink({ ...row, readAt: new Date("2026-10-08T09:00:00.000Z") }).readAt).toBe("2026-10-08T09:00:00.000Z");
+    expect(
+      toLink({ ...row, readAt: new Date("2026-10-08T09:00:00.000Z") }).readAt
+    ).toBe("2026-10-08T09:00:00.000Z");
   });
 });
 
@@ -379,7 +402,11 @@ describe("setReadAt", () => {
   const second = createLink("https://nextjs.org");
 
   test("marks the matching link as read and leaves the others alone", () => {
-    const updated = setReadAt([first, second], first.id, "2026-10-09T10:00:00.000Z");
+    const updated = setReadAt(
+      [first, second],
+      first.id,
+      "2026-10-09T10:00:00.000Z"
+    );
 
     expect(updated[0].readAt).toBe("2026-10-09T10:00:00.000Z");
     expect(updated[1]).toBe(second);
@@ -394,7 +421,11 @@ describe("setReadAt", () => {
 
 describe("pickRediscover", () => {
   const now = new Date("2026-10-20T12:00:00.000Z");
-  const saved = (id: string, createdAt: string) => ({ id, url: `https://${id}.com`, createdAt });
+  const saved = (id: string, createdAt: string) => ({
+    id,
+    url: `https://${id}.com`,
+    createdAt,
+  });
 
   test("picks unread links saved more than a week ago, oldest first", () => {
     const old = saved("old", "2026-10-01T12:00:00.000Z");
@@ -405,20 +436,40 @@ describe("pickRediscover", () => {
   });
 
   test("skips links that were already read", () => {
-    const read = { ...saved("read", "2026-09-01T12:00:00.000Z"), readAt: "2026-09-02T12:00:00.000Z" };
+    const read = {
+      ...saved("read", "2026-09-01T12:00:00.000Z"),
+      readAt: "2026-09-02T12:00:00.000Z",
+    };
 
     expect(pickRediscover([read], now)).toEqual([]);
   });
 
   test("skips broken links", () => {
-    const broken = { ...saved("broken", "2026-09-01T12:00:00.000Z"), status: "broken" as const };
+    const broken = {
+      ...saved("broken", "2026-09-01T12:00:00.000Z"),
+      status: "broken" as const,
+    };
 
     expect(pickRediscover([broken], now)).toEqual([]);
   });
 
   test("picks at most three links", () => {
-    const links = ["a", "b", "c", "d"].map((id) => saved(id, "2026-09-01T12:00:00.000Z"));
+    const links = ["a", "b", "c", "d"].map((id) =>
+      saved(id, "2026-09-01T12:00:00.000Z")
+    );
 
     expect(pickRediscover(links, now)).toHaveLength(3);
+  });
+});
+
+describe("toFolder", () => {
+  test("keeps the id and name", () => {
+    const row = {
+      id: "f1",
+      name: "Work",
+      createdAt: new Date("2026-10-09T12:00:00.000Z"),
+    };
+
+    expect(toFolder(row)).toEqual({ id: "f1", name: "Work" });
   });
 });
