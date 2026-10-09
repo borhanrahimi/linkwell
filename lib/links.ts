@@ -79,6 +79,14 @@ export function updateTitle(links: Link[], id: string, title: string): Link[] {
   );
 }
 
+export function setReadAt(
+  links: Link[],
+  id: string,
+  readAt: string | undefined
+): Link[] {
+  return links.map((link) => (link.id === id ? { ...link, readAt } : link));
+}
+
 export function getFaviconUrl(url: string) {
   try {
     const domain = new URL(url).hostname;
@@ -146,5 +154,6 @@ export function toLink(row: LinkRow): Link {
     createdAt: row.createdAt.toISOString(),
     status: row.status ?? undefined,
     checkedAt: row.checkedAt?.toISOString(),
+    readAt: row.readAt?.toISOString(),
   };
 }

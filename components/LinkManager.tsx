@@ -5,8 +5,8 @@ import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
 import ImportBanner from "@/components/ImportBanner";
 import CheckLinksButton from "@/components/CheckLinksButton";
-import { removeLink, saveLink, saveTitle } from "@/app/actions";
-import { createLink, isDuplicate, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
+import { removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { createLink, isDuplicate, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
 
 type LinkManagerProps = {
@@ -48,6 +48,15 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
   async function editTitle(id: string, title: string) {
     setLinks((current) => updateTitle(current, id, title));
     await saveTitle(id, title);
+  }
+  async function toggleRead(id: string) {
+    const link = links.find((l) => l.id === id);
+    if (!link) {
+      return;
+    }
+    const readAt = link.readAt ? undefined : new Date().toISOString();
+    setLinks((current) => setReadAt(current, id, readAt));
+    await saveReadStatus(id, !link.readAt);
   }
 
   return (
@@ -105,6 +114,7 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
               now={now}
               onDelete={deleteLink}
               onEditTitle={editTitle}
+              onToggleRead={toggleRead}
               onTagClick={toggleTag}
             />
           ))}

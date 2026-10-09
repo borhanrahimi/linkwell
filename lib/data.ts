@@ -39,3 +39,7 @@ export async function updateLinkStatus(id: string, status: LinkStatus) {
     .set({ status, checkedAt: new Date() })
     .where(eq(links.id, id));
 }
+
+export async function updateLinkReadAt(id: string, readAt: Date | null) {
+  await db.update(links).set({ readAt }).where(eq(links.id, id));
+}

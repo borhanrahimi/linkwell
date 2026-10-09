@@ -8,4 +8,5 @@ export type Link = {
   createdAt: string;
   status?: LinkStatus;
   checkedAt?: string;
+  readAt?: string;
 };

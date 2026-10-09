@@ -10,12 +10,13 @@ type LinkCardProps = {
   link: Link;
   onDelete: (id: string) => void;
   onEditTitle: (id: string, title: string) => void;
+  onToggleRead: (id: string) => void;
   onTagClick: (tag: string) => void;
   activeTag: string | null;
   now?: Date;
 };
 
-export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, onTagClick }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, onTagClick, onToggleRead }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
@@ -64,7 +65,9 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
     );
   }
   return (
-    <li className="flex items-center justify-between rounded-lg bg-white p-4 shadow-sm">
+    <li
+      className={`flex items-center justify-between rounded-lg bg-white p-4 shadow-sm ${link.readAt ? "opacity-60" : ""}`}
+    >
       <div className="flex min-w-0 items-center gap-3">
         {faviconUrl && (
           <Image src={faviconUrl} alt="" width={30} height={30} unoptimized className="shrink-0" />)}
@@ -126,6 +129,9 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
         </div>
       </div>
       <div className="ml-4 flex shrink-0 gap-3">
+        <button onClick={() => onToggleRead(link.id)} className="text-sm text-slate-400 hover:text-green-700">
+          {link.readAt ? "Mark unread" : "Mark read"}
+        </button>
         <button onClick={startEditing} className="text-sm text-slate-400 hover:text-blue-600">
           Edit
         </button>

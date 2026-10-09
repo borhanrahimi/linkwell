@@ -6,6 +6,7 @@ import {
   insertLink,
   updateLinkStatus,
   updateLinkTitle,
+  updateLinkReadAt,
 } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
@@ -30,6 +31,10 @@ export async function removeLink(id: string) {
 
 export async function saveTitle(id: string, title: string) {
   await updateLinkTitle(id, title);
+}
+
+export async function saveReadStatus(id: string, read: boolean) {
+  await updateLinkReadAt(id, read ? new Date() : null);
 }
 
 export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
