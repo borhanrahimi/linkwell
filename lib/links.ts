@@ -87,6 +87,16 @@ export function setReadAt(
   return links.map((link) => (link.id === id ? { ...link, readAt } : link));
 }
 
+const WEEK = 7 * 24 * 60 * 60 * 1000;
+
+export function pickRediscover(links: Link[], now: Date, count = 3): Link[] {
+  return links
+    .filter((link) => !link.readAt && link.status !== "broken")
+    .filter((link) => now.getTime() - new Date(link.createdAt).getTime() > WEEK)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    .slice(0, count);
+}
+
 export function getFaviconUrl(url: string) {
   try {
     const domain = new URL(url).hostname;

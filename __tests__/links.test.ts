@@ -16,6 +16,7 @@ import {
   toLink,
   getArchiveUrl,
   setReadAt,
+  pickRediscover,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -388,5 +389,36 @@ describe("setReadAt", () => {
     const read = { ...first, readAt: "2026-10-09T10:00:00.000Z" };
 
     expect(setReadAt([read], first.id, undefined)[0].readAt).toBeUndefined();
+  });
+});
+
+describe("pickRediscover", () => {
+  const now = new Date("2026-10-20T12:00:00.000Z");
+  const saved = (id: string, createdAt: string) => ({ id, url: `https://${id}.com`, createdAt });
+
+  test("picks unread links saved more than a week ago, oldest first", () => {
+    const old = saved("old", "2026-10-01T12:00:00.000Z");
+    const older = saved("older", "2026-09-01T12:00:00.000Z");
+    const recent = saved("recent", "2026-10-18T12:00:00.000Z");
+
+    expect(pickRediscover([old, recent, older], now)).toEqual([older, old]);
+  });
+
+  test("skips links that were already read", () => {
+    const read = { ...saved("read", "2026-09-01T12:00:00.000Z"), readAt: "2026-09-02T12:00:00.000Z" };
+
+    expect(pickRediscover([read], now)).toEqual([]);
+  });
+
+  test("skips broken links", () => {
+    const broken = { ...saved("broken", "2026-09-01T12:00:00.000Z"), status: "broken" as const };
+
+    expect(pickRediscover([broken], now)).toEqual([]);
+  });
+
+  test("picks at most three links", () => {
+    const links = ["a", "b", "c", "d"].map((id) => saved(id, "2026-09-01T12:00:00.000Z"));
+
+    expect(pickRediscover(links, now)).toHaveLength(3);
   });
 });

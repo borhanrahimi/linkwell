@@ -5,8 +5,9 @@ import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
 import ImportBanner from "@/components/ImportBanner";
 import CheckLinksButton from "@/components/CheckLinksButton";
+import Rediscover from "@/components/Rediscover";
 import { removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { createLink, isDuplicate, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
+import { createLink, isDuplicate, pickRediscover, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
 
 type LinkManagerProps = {
@@ -20,6 +21,7 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
   const [query, setQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const visibleLinks = sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder);
+  const rediscover = now ? pickRediscover(links, now) : [];
 
   async function addLink(url: string, title: string, tags: string) {
     if (isDuplicate(links, url)) {
@@ -64,6 +66,9 @@ export default function LinkManager({ initialLinks, now }: LinkManagerProps) {
       <ImportBanner onImported={(imported) => setLinks((current) => [...imported, ...current])} />
 
       <LinkForm onAdd={addLink} />
+
+      {now && <Rediscover links={rediscover} now={now} />}
+
 
       <div className="mt-6 flex gap-2">
         <input

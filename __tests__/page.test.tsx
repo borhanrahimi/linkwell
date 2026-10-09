@@ -546,3 +546,34 @@ describe("read and unread", () => {
     expect(saveReadStatus).toHaveBeenCalledWith("1", false);
   });
 });
+
+describe("rediscover", () => {
+  const now = new Date("2026-10-20T12:00:00.000Z");
+  const old = { id: "1", url: "https://old.com", title: "Old article", createdAt: "2026-09-29T12:00:00.000Z" };
+  const recent = { id: "2", url: "https://recent.com", createdAt: "2026-10-19T12:00:00.000Z" };
+
+  test("brings back an old unread link", () => {
+    render(<LinkManager initialLinks={[old, recent]} now={now} />);
+
+    const section = screen.getByRole("region", { name: "Rediscover" });
+    expect(within(section).getByRole("link", { name: "Old article" })).toBeDefined();
+    expect(within(section).getByText("saved 3 weeks ago")).toBeDefined();
+    expect(within(section).queryByRole("link", { name: "recent.com" })).toBeNull();
+  });
+
+  test("is hidden when there is nothing to rediscover", () => {
+    render(<LinkManager initialLinks={[recent]} now={now} />);
+
+    expect(screen.queryByRole("region", { name: "Rediscover" })).toBeNull();
+  });
+
+  test("lets go of a link once it is marked as read", async () => {
+    render(<LinkManager initialLinks={[old]} now={now} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
+    });
+
+    expect(screen.queryByRole("region", { name: "Rediscover" })).toBeNull();
+  });
+});
