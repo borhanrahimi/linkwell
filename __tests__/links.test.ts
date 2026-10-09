@@ -15,6 +15,7 @@ import {
   sortLinks,
   toLink,
   getArchiveUrl,
+  setReadAt,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -332,6 +333,7 @@ describe("toLink", () => {
     createdAt: new Date("2026-10-06T12:00:00.000Z"),
     status: null,
     checkedAt: null,
+    readAt: null,
   };
 
   test("turns the date into an ISO string", () => {
@@ -356,6 +358,11 @@ describe("toLink", () => {
 
     expect(toLink(checked)).toMatchObject({ status: "broken", checkedAt: "2026-10-07T08:00:00.000Z" });
   });
+
+  test("keeps when the link was read, or leaves it out", () => {
+    expect(toLink(row).readAt).toBeUndefined();
+    expect(toLink({ ...row, readAt: new Date("2026-10-08T09:00:00.000Z") }).readAt).toBe("2026-10-08T09:00:00.000Z");
+  });
 });
 
 describe("getArchiveUrl", () => {
@@ -363,5 +370,23 @@ describe("getArchiveUrl", () => {
     expect(getArchiveUrl("https://example.com/old-post")).toBe(
       "https://web.archive.org/web/https://example.com/old-post"
     );
+  });
+});
+
+describe("setReadAt", () => {
+  const first = createLink("https://example.com");
+  const second = createLink("https://nextjs.org");
+
+  test("marks the matching link as read and leaves the others alone", () => {
+    const updated = setReadAt([first, second], first.id, "2026-10-09T10:00:00.000Z");
+
+    expect(updated[0].readAt).toBe("2026-10-09T10:00:00.000Z");
+    expect(updated[1]).toBe(second);
+  });
+
+  test("marks a link as unread again", () => {
+    const read = { ...first, readAt: "2026-10-09T10:00:00.000Z" };
+
+    expect(setReadAt([read], first.id, undefined)[0].readAt).toBeUndefined();
   });
 });

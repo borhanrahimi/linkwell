@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, importLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
-import { deleteLinkById, getLinks, insertLink, updateLinkStatus, updateLinkTitle } from "@/lib/data";
+import { checkAllLinks, importLinks, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { deleteLinkById, getLinks, insertLink, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 
@@ -10,6 +10,7 @@ vi.mock("@/lib/data", () => ({
   deleteLinkById: vi.fn(async () => {}),
   updateLinkTitle: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
+  updateLinkReadAt: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/checkLink", () => ({
@@ -126,5 +127,19 @@ describe("checkAllLinks", () => {
     vi.mocked(getLinks).mockResolvedValueOnce([link]).mockResolvedValueOnce(checked);
 
     expect(await checkAllLinks()).toEqual(checked);
+  });
+});
+
+describe("saveReadStatus", () => {
+  test("saves the time when a link is marked as read", async () => {
+    await saveReadStatus("1", true);
+
+    expect(updateLinkReadAt).toHaveBeenCalledWith("1", expect.any(Date));
+  });
+
+  test("clears the time when a link is marked as unread", async () => {
+    await saveReadStatus("1", false);
+
+    expect(updateLinkReadAt).toHaveBeenCalledWith("1", null);
   });
 });

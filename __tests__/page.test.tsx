@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, removeLink, saveLink, saveTitle } from "@/app/actions";
+import { checkAllLinks, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
@@ -10,6 +10,7 @@ vi.mock("@/app/actions", () => ({
   saveLink: vi.fn(async (link) => link),
   removeLink: vi.fn(async () => { }),
   saveTitle: vi.fn(async () => { }),
+  saveReadStatus: vi.fn(async () => {}),
 }));
 
 afterEach(() => {
@@ -517,5 +518,31 @@ describe("broken badge", () => {
     );
 
     expect(screen.getByText("Broken").getAttribute("title")).toBe("Checked 2 days ago");
+  });
+});
+
+describe("read and unread", () => {
+  const unread = { id: "1", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" };
+
+  test("marks a link as read", async () => {
+    render(<LinkManager initialLinks={[unread]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
+    });
+
+    expect(screen.getByRole("button", { name: "Mark unread" })).toBeDefined();
+    expect(saveReadStatus).toHaveBeenCalledWith("1", true);
+  });
+
+  test("marks a read link as unread again", async () => {
+    render(<LinkManager initialLinks={[{ ...unread, readAt: "2026-10-08T09:00:00.000Z" }]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mark unread" }));
+    });
+
+    expect(screen.getByRole("button", { name: "Mark read" })).toBeDefined();
+    expect(saveReadStatus).toHaveBeenCalledWith("1", false);
   });
 });

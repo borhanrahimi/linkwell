@@ -1,5 +1,4 @@
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { read } from "fs";
 
 export const links = pgTable("links", {
   id: uuid("id").primaryKey().defaultRandom(),
