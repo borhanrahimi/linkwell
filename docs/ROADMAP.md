@@ -75,15 +75,16 @@ Moves data from the browser to a server, so links follow you across devices.
 
 Scheduled (automatic) link checks moved to v1.0: they need the app to be deployed, so something can wake it up every day.
 
-## 🔜 v0.7: Actually come back to them 🔁
+## ✅ v0.7: Actually come back to them 🔁 (done)
 
 - [x] "Read later" vs. "done" status for each link (Mark read / Mark unread)
-- [ ] A "rediscover" section that brings back old unread links
-- [ ] Weekly digest of forgotten links (email or in-app)
+- [x] A "rediscover" section that brings back old unread links (unread, saved more than a week ago, not broken, oldest first, at most 3)
 
-**You'll learn:** scheduled jobs and product thinking around habits.
+**You'll learn:** derived state from dates, deterministic choices that render the same on server and browser, and product thinking around habits.
 
-## v0.8: Folders 📁
+The weekly email digest is now optional (see Later / ideas): Rediscover already brings old links back whenever you open the app.
+
+## 🔜 v0.8: Folders 📁
 
 Each link lives in one folder ("where it belongs"); tags stay for "what it's about".
 
@@ -146,6 +147,7 @@ Not planned yet, but worth remembering:
 - Fetch each page's description (and maybe a preview image) when it's saved
 - Share to Linkwell from your phone: make the site an installable app (PWA) so it appears in the phone's Share menu
 - Notes on a link: "why I saved this" (nice to have)
+- Optional: a weekly email digest of forgotten links (needs the deployed app, accounts, a schedule and an email service)
 
 ## How to use this roadmap
 

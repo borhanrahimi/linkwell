@@ -6,7 +6,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.6 done, v0.7 next).** You can add and delete links, give them an optional title and edit it later. If you leave the title empty, Linkwell reads it from the page itself. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. The **Check links** button visits every saved link from the server and marks dead ones with a red **Broken** badge (hover it to see when it was checked). A link only counts as broken when the page is gone (404/410), the domain doesn't exist, or nothing answers; slow sites, sites that block robots, and temporary errors count as working. Broken links get a **View archived copy** link to the Wayback Machine. Next up: v0.7, which brings old links back to you. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v0.7 done, v0.8 next).** You can add and delete links, give them an optional title and edit it later. If you leave the title empty, Linkwell reads it from the page itself. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. The **Check links** button visits every saved link from the server and marks dead ones with a red **Broken** badge (hover it to see when it was checked). A link only counts as broken when the page is gone (404/410), the domain doesn't exist, or nothing answers; slow sites, sites that block robots, and temporary errors count as working. Broken links get a **View archived copy** link to the Wayback Machine. Mark links as read when you're done with them (read links fade out). A violet **Rediscover** box at the top brings back up to three links you saved more than a week ago and still haven't read. Next up: v0.8, folders. There are no user accounts yet, so anyone who can open the app sees the same links. See the [roadmap](docs/ROADMAP.md).
 
 > **Where is my data?** Links are stored in a Postgres database hosted on [Neon](https://neon.tech), in the `links` table. Links saved before v0.5 lived in your browser's `localStorage` (key `linkwell:links`). When the app finds any, it offers to import them; after importing, the browser's copy is deleted.
 >
@@ -31,7 +31,9 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Dead-link detection with a "Check links" button and a Broken badge ("keep them alive")
 - [x] Archived copies of broken links (Wayback Machine)
 - [x] Page titles filled in automatically
-- [ ] Resurfacing old links ("actually come back to them")
+- [x] Read / unread status for each link
+- [x] Rediscover old unread links ("actually come back to them")
+- [ ] Folders
 
 ## Tech stack
 
@@ -89,7 +91,7 @@ linkwell/
 │   ├── globals.css   # Global styles (Tailwind)
 │   ├── page.tsx      # Home page (Server Component): reads links from the database
 │   └── actions.ts    # Server Actions: save, delete, edit, import and check links
-├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton)
+├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton, Rediscover)
 ├── lib/
 │   ├── checkLink.ts  # Visits a URL and decides if it's "ok" or "broken"
 │   ├── fetchTitle.ts # Reads a page's <title> when a link is saved without one

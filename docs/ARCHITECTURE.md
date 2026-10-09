@@ -95,6 +95,10 @@ Because the state already shows each change, actions don't call `refresh()`: the
 
 **Checking links:** `CheckLinksButton` (shown only when there are links) calls the `checkAllLinks` action. The server checks every link with `checkLink`, saves each result with `updateLinkStatus`, and returns the whole list fresh from the database. The button hands it to `onChecked`, which is simply `setLinks`, and shows a summary in a `role="status"` message ("Checked 12 links: 2 broken."). `LinkCard` shows a red **Broken** pill next to the title when `link.status === "broken"`; its tooltip says when it was checked (`timeAgo(checkedAt, now)`). Broken cards also get a **View archived copy** link (`getArchiveUrl`), which opens the Wayback Machine in a new tab.
 
+**Read and unread:** each card has a **Mark read** / **Mark unread** button (`onToggleRead`). `LinkManager.toggleRead` updates the screen first with `setReadAt` (read cards get `opacity-60`), then calls `saveReadStatus(id, read)`. The browser only says read or not; the server picks the time.
+
+**Rediscover:** `LinkManager` computes `const rediscover = now ? pickRediscover(links, now) : []` on every render (derived state, like `visibleLinks`) and shows `<Rediscover>` right under the form. Marking a link as read removes it from the box automatically. It only runs when the server's `now` is passed in, because "more than a week ago" depends on the clock, and server and browser must agree (hydration). Tests that don't pass `now` don't see the box.
+
 **Importing links from before v0.5:** `ImportBanner` sits at the top of `LinkManager`. After the first render it reads `localStorage` with `loadLinks()` (reading it during render would make the server and browser output differ). If it finds links, it shows a banner. **Import** calls `importLinks`, deletes the browser's copy with `clearSavedLinks()`, and reports the saved links up with `onImported(imported)`, which `LinkManager` adds to its list. **Not now** only hides the banner until the next visit. The buttons are disabled while importing, so a double click can't import twice.
 
 ## 4. Server vs. client components
@@ -114,6 +118,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/LinkManager.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; calls the Server Actions |
 | `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
 | `components/CheckLinksButton.tsx` | Client | Calls `checkAllLinks`, shows "Checking..." while it runs and a summary when it's done |
+| `components/Rediscover.tsx` | Client (imported by `LinkManager`) | No state: shows the links it's given in a named `<section>`. Has no `"use client"` of its own |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
 
@@ -146,6 +151,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `created_at` | `timestamp with time zone`, required, default `now()` | A real date in the database; an ISO string in the app |
 | `status` | `text` (`"ok"` or `"broken"`), can be `null` | Result of the last link check. `null` = never checked (added in migration `0001`) |
 | `checked_at` | `timestamp with time zone`, can be `null` | When the link was last checked |
+| `read_at` | `timestamp with time zone`, can be `null` | `null` = still to read; a date = read, and when (migration `0002`) |
 
 **`lib/data.ts`** (server-only, all `async`):
 
@@ -156,6 +162,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `deleteLinkById(id)` | Deletes the link with that id |
 | `updateLinkTitle(id, title)` | Sets a new title (trimmed; blank → `null`) |
 | `updateLinkStatus(id, status)` | Saves a check result and sets `checked_at` to now |
+| `updateLinkReadAt(id, readAt)` | Sets `read_at` to a date (read) or `null` (unread) |
 
 **`app/actions.ts`** (Server Actions, called by `LinkManager`):
 
@@ -165,6 +172,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `removeLink(id)` | Deletes the link |
 | `importLinks(oldLinks)` | Saves links from the browser's `localStorage`. Gives each a fresh id and `tags: []` if missing; skips blank URLs and links already in the database or earlier in the same batch. Returns the links it saved |
 | `saveTitle(id, title)` | Saves the new title |
+| `saveReadStatus(id, read)` | `true` → `read_at` = now (the server's time, never the browser's); `false` → `null` |
 | `checkAllLinks()` | Checks every link **at the same time** (`Promise.all`), saves each result, and returns the list fresh from the database |
 
 **`lib/checkLink.ts`** (server-side, talks to the internet):
@@ -193,10 +201,12 @@ It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away
 | Function | Job |
 |---|---|
 | `createLink(url, title?, tags?)` | Builds a new `Link` with a new id and the current time. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
-| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` → `undefined` (for `title`, `status`, `checkedAt`) |
+| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` → `undefined` (for `title`, `status`, `checkedAt`, `readAt`) |
 | `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links without a `tags` field never match |
 | `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank |
 | `sortLinks(links, order)` | Returns a **new**, sorted list (copies with `[...links]` first, because `.sort()` changes the array in place). `"newest"` / `"oldest"` compare `createdAt` (ISO strings sort correctly as text). `"title"` sorts A–Z by the name the card shows (title, or domain), ignoring case. Also exports the `SortOrder` type |
+| `setReadAt(links, id, readAt)` | Returns a **new** list where the matching link has the new `readAt` (a date, or `undefined` for unread) |
+| `pickRediscover(links, now, count = 3)` | Unread, not broken links saved more than a week before `now`, oldest first, at most `count`. Deterministic (no randomness), so server and browser pick the same links |
 | `getArchiveUrl(url)` | `https://web.archive.org/web/<url>`: the Wayback Machine jumps to its newest saved copy of the page, or says it has none |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
 | `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL |
@@ -247,6 +257,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Checking that the server was asked:** `expect(saveTitle).toHaveBeenCalledWith("1", "New title")`. To make a fake answer differently for one call: `vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!")`.
 - **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
 - **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = fetch)`, `fetchTitle(url, fetchFn = fetch)`). Tests pass a fake that returns `new Response(null, { status: 404 })` or `new Response("<title>Hi</title>", { headers: { "content-type": "text/html" } })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
+- **Looking inside one area:** when the same link appears twice (in Rediscover and in the list), find the area first and search inside it: `within(screen.getByRole("region", { name: "Rediscover" }))`. A `<section>` becomes a `region` once it has a name (`aria-labelledby` pointing to its heading).
 - **Browser storage in tests:** tests for the import put old links in with `localStorage.setItem(STORAGE_KEY, JSON.stringify([...]))`, and `afterEach` calls `localStorage.clear()`, so they can't leak into the next test.
 - **Old data:** `Link` fields added later stay optional. Give a test an old-style link (without the field) through `initialLinks` and check it still shows.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
@@ -323,3 +334,8 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-08 | `fetchTitle` uses a regex on the HTML, a 5-second timeout, and never throws | Reading one `<title>` doesn't need an HTML parser library; saving shouldn't feel slow; a failed fetch just means "no title" |
 | 2026-10-08 | `saveLink` returns `Link \| string` instead of `string \| null` | The browser needs the server's final version of the link (with the fetched title) to show it |
 | 2026-10-08 | Scheduled link checks moved from v0.6 to v1.0 | Something has to wake the app up on a schedule, which needs a deployed app (for example Vercel Cron); locally nothing runs while the laptop is closed |
+| 2026-10-09 | Read status is a `read_at` timestamp, not a true/false column | Same cost, but also records *when*, which Rediscover and future stats can use |
+| 2026-10-09 | The server sets `read_at`; the browser only sends `read: true/false` | Never trust times sent by the browser |
+| 2026-10-09 | Read links fade (`opacity-60`) instead of disappearing | You can still find them; unread links stand out |
+| 2026-10-09 | Rediscover picks unread, not-broken links older than a week, oldest first, at most 3 | Random picks would differ between server and browser renders (hydration error); oldest first is fair and predictable |
+| 2026-10-09 | The weekly email digest is optional and moved to Later / ideas | Rediscover already covers "come back to them" inside the app; email needs deployment, accounts, a schedule and an email service |
