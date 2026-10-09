@@ -119,16 +119,33 @@ Redesign after launch: it's mostly styling, so the data, Server Actions and test
 
 ---
 
+## 🔭 Long-term vision: Linkwell goes social
+
+Not a milestone yet: a direction for after v1.1. Linkwell stays a **private** tool first; sharing is always something you choose, never the default. Builds on folders (v0.8) and accounts (v1.0).
+
+1. **Share a folder publicly:** one public link to a folder, readable by anyone, nothing else social yet (the natural first step)
+2. **Collaborative folders:** share a folder with a friend who can add links too
+3. **Public profiles:** a page like `/@username` with your name, photo and the folders you chose to make public (folders become boards, like on Pinterest)
+4. **Follow people and a feed:** follow someone, and see the newest public links from people you follow
+5. **Likes and "save to my Linkwell":** like a link, or copy someone's link into one of your own folders
+6. **Discover page:** popular public folders and links
+7. **Safety:** report and remove spam or harmful links, block users. Needed before strangers can see each other's content
+
+**You'll learn:** dynamic routes (`app/[username]/page.tsx`), permissions (who may see what), many-to-many tables (`follows`), feeds and pagination, unique constraints (no double likes), and the product side of running a community.
+
+---
+
 ## Later / ideas
 
 Not planned yet, but worth remembering:
 
 - Browser extension to save the current tab
 - Import bookmarks from Chrome or Firefox
-- Share a collection of links publicly
 - Edit or remove the tags of a saved link
 - Keyboard shortcuts
 - Fetch each page's description (and maybe a preview image) when it's saved
+- Share to Linkwell from your phone: make the site an installable app (PWA) so it appears in the phone's Share menu
+- Notes on a link: "why I saved this" (nice to have)
 
 ## How to use this roadmap
 
