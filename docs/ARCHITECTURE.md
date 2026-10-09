@@ -10,7 +10,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` is the only file that fetches other websites |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -75,7 +75,7 @@ Why: when dependencies only point downward, you can change the UI without touchi
 2. `LinkManager` copies them into state (`useState(initialLinks)`). While the page is open, that state is what the screen shows.
 3. It passes data and callback functions down to `LinkForm` and `LinkCard`. Children never change the list directly. They call a callback.
 4. Each callback updates the state **and** calls a Server Action, which writes to Postgres:
-   - **Add** waits for the server first (`await saveLink(link)`), and only shows the link if the server returns `null`. If it returns an error message (for example a duplicate), the link is never shown.
+   - **Add** waits for the server first (`await saveLink(link)`). The server answers with either an error message (a string, for example a duplicate) or the **saved link**, possibly with a title it fetched from the page. Only the saved link is shown, so the card always matches the database.
    - **Delete and edit** update the screen first, then `await removeLink(id)` / `await saveTitle(id, title)`. They feel instant and rarely fail.
 5. The browser creates the new link with `createLink` (id and `createdAt` included) and sends the **whole link** to `saveLink`. The database stores that same id, so the screen and the database always agree, and deleting a link right after adding it works without reloading.
 
@@ -83,7 +83,7 @@ Because the state already shows each change, actions don't call `refresh()`: the
 
 **Use the updater form after `await`.** Inside an `async` handler, `links` may be out of date by the time the code runs, so always write `setLinks((current) => …)`.
 
-**When a child needs an answer back:** `onAdd(url, title, tags)` returns a Promise of `null` when the link was saved, or an error message (a string) when it wasn't. `LinkManager` decides, and the form shows the message and keeps the input so the user can fix it (it owns the inputs). `saveLink` uses the same pattern between server and browser.
+**When a child needs an answer back:** `onAdd(url, title, tags)` returns a Promise of `null` when the link was saved, or an error message (a string) when it wasn't. `LinkManager` decides, and the form shows the message and keeps the input so the user can fix it (it owns the inputs). Between server and browser, `saveLink` returns `Link | string`, and `LinkManager` tells them apart with `typeof result === "string"` (TypeScript then knows the other case is a `Link`).
 
 **Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). `LinkManager` turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
 
@@ -93,7 +93,7 @@ Because the state already shows each change, actions don't call `refresh()`: the
 
 **Server and browser must render the same thing (hydration):** the server sends finished HTML, then React renders the same components again in the browser and expects identical output. Anything that changes between the two renders causes a hydration error. That's why the server picks `now` once and passes it down, so `timeAgo(link.createdAt, now)` gives the same text on both sides. The exact-date tooltip uses the computer's time zone, which can legitimately differ between server and browser, so `<time>` has `suppressHydrationWarning`. Use that escape hatch only for values like timestamps, never to hide real bugs.
 
-**Checking links:** `CheckLinksButton` (shown only when there are links) calls the `checkAllLinks` action. The server checks every link with `checkLink`, saves each result with `updateLinkStatus`, and returns the whole list fresh from the database. The button hands it to `onChecked`, which is simply `setLinks`, and shows a summary in a `role="status"` message ("Checked 12 links: 2 broken."). `LinkCard` shows a red **Broken** pill next to the title when `link.status === "broken"`; its tooltip says when it was checked (`timeAgo(checkedAt, now)`).
+**Checking links:** `CheckLinksButton` (shown only when there are links) calls the `checkAllLinks` action. The server checks every link with `checkLink`, saves each result with `updateLinkStatus`, and returns the whole list fresh from the database. The button hands it to `onChecked`, which is simply `setLinks`, and shows a summary in a `role="status"` message ("Checked 12 links: 2 broken."). `LinkCard` shows a red **Broken** pill next to the title when `link.status === "broken"`; its tooltip says when it was checked (`timeAgo(checkedAt, now)`). Broken cards also get a **View archived copy** link (`getArchiveUrl`), which opens the Wayback Machine in a new tab.
 
 **Importing links from before v0.5:** `ImportBanner` sits at the top of `LinkManager`. After the first render it reads `localStorage` with `loadLinks()` (reading it during render would make the server and browser output differ). If it finds links, it shows a banner. **Import** calls `importLinks`, deletes the browser's copy with `clearSavedLinks()`, and reports the saved links up with `onImported(imported)`, which `LinkManager` adds to its list. **Not now** only hides the banner until the next visit. The buttons are disabled while importing, so a double click can't import twice.
 
@@ -161,7 +161,7 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 
 | Action | Job |
 |---|---|
-| `saveLink(link)` | Returns `"Please paste a link."` for a blank URL, `"You already saved this link!"` for a duplicate (checked against the database), otherwise saves it and returns `null` |
+| `saveLink(link)` | Returns `"Please paste a link."` for a blank URL, `"You already saved this link!"` for a duplicate (checked against the database). Otherwise fills in the title with `fetchTitle` if none was typed (`link.title ?? await fetchTitle(url)`), saves it, and returns the saved link |
 | `removeLink(id)` | Deletes the link |
 | `importLinks(oldLinks)` | Saves links from the browser's `localStorage`. Gives each a fresh id and `tags: []` if missing; skips blank URLs and links already in the database or earlier in the same batch. Returns the links it saved |
 | `saveTitle(id, title)` | Saves the new title |
@@ -181,6 +181,13 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 
 It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away (`response.body?.cancel()`), so it never downloads whole pages. The error code is in `error.cause.code`.
 
+**`lib/fetchTitle.ts`** (server-side, talks to the internet):
+
+| Function | Job |
+|---|---|
+| `readTitle(html)` | Pure: finds `<title>…</title>` (any case, with attributes), turns common HTML codes like `&amp;` back into characters, squashes spaces and line breaks, cuts at 200 characters. Returns `undefined` if there's no title or it's empty |
+| `fetchTitle(url, fetchFn = fetch)` | Downloads the page (only `http(s)`, 5-second timeout) and returns `readTitle` of it. Returns `undefined` for anything that isn't an OK HTML page (404, PDF…) or when the site can't be reached. Never throws |
+
 **`lib/links.ts`** (pure functions, used on both server and browser):
 
 | Function | Job |
@@ -190,6 +197,7 @@ It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away
 | `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links without a `tags` field never match |
 | `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank |
 | `sortLinks(links, order)` | Returns a **new**, sorted list (copies with `[...links]` first, because `.sort()` changes the array in place). `"newest"` / `"oldest"` compare `createdAt` (ISO strings sort correctly as text). `"title"` sorts A–Z by the name the card shows (title, or domain), ignoring case. Also exports the `SortOrder` type |
+| `getArchiveUrl(url)` | `https://web.archive.org/web/<url>`: the Wayback Machine jumps to its newest saved copy of the page, or says it has none |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
 | `getFaviconUrl(url)` | Address of the site's icon from Google's favicon service (`?domain=…&sz=32`). Returns `null` if it isn't a valid URL |
 | `isDuplicate(links, url)` | `true` if the URL is already in the list. Compares normalized URLs (via `new URL().href`), so `https://EXAMPLE.com` matches `https://example.com/` |
@@ -238,7 +246,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Never touch the real database in tests.** Replace the module with a fake using `vi.mock("@/app/actions", () => ({ saveLink: vi.fn(async () => null), ... }))` in page tests, and `vi.mock("@/lib/data", ...)` in `actions.test.ts`. Clear the fakes' call records with `vi.clearAllMocks()` in `afterEach`.
 - **Checking that the server was asked:** `expect(saveTitle).toHaveBeenCalledWith("1", "New title")`. To make a fake answer differently for one call: `vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!")`.
 - **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
-- **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = fetch)`). Tests pass a fake that returns `new Response(null, { status: 404 })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
+- **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = fetch)`, `fetchTitle(url, fetchFn = fetch)`). Tests pass a fake that returns `new Response(null, { status: 404 })` or `new Response("<title>Hi</title>", { headers: { "content-type": "text/html" } })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
 - **Browser storage in tests:** tests for the import put old links in with `localStorage.setItem(STORAGE_KEY, JSON.stringify([...]))`, and `afterEach` calls `localStorage.clear()`, so they can't leak into the next test.
 - **Old data:** `Link` fields added later stay optional. Give a test an old-style link (without the field) through `initialLinks` and check it still shows.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
@@ -310,3 +318,8 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-07 | `status` and `checked_at` are nullable columns; `status` is `text` with a TypeScript-only enum | `null` honestly means "never checked"; no database enum to migrate if more states are added later |
 | 2026-10-07 | Links are checked with a button, all at the same time (`Promise.all`) | Simplest first version; in parallel the whole check takes about as long as the slowest link. Automatic, scheduled checks come later |
 | 2026-10-07 | The server fetches user-saved URLs, so SSRF protection is required before deploying (v1.0) | While Linkwell only runs locally it's harmless; on the internet, someone could make the server fetch internal addresses |
+| 2026-10-08 | Archived copies use `https://web.archive.org/web/<url>` as a plain link, without calling the Wayback API | The Wayback Machine redirects to its newest copy by itself; no server code, no waiting, nothing to store |
+| 2026-10-08 | Titles are fetched on the server while saving, only when the user typed none; a typed title always wins | The user's own title is better than the page's; fetching once at save time keeps the card fast afterwards |
+| 2026-10-08 | `fetchTitle` uses a regex on the HTML, a 5-second timeout, and never throws | Reading one `<title>` doesn't need an HTML parser library; saving shouldn't feel slow; a failed fetch just means "no title" |
+| 2026-10-08 | `saveLink` returns `Link \| string` instead of `string \| null` | The browser needs the server's final version of the link (with the fetched title) to show it |
+| 2026-10-08 | Scheduled link checks moved from v0.6 to v1.0 | Something has to wake the app up on a schedule, which needs a deployed app (for example Vercel Cron); locally nothing runs while the laptop is closed |

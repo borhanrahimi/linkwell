@@ -64,17 +64,18 @@ Moves data from the browser to a server, so links follow you across devices.
 
 **You'll learn:** Server vs. Client Components, Server Actions, databases and migrations, hydration, and faking modules in tests (`vi.mock`).
 
-## 🔜 v0.6: Keep them alive 🩺
+## ✅ v0.6: Keep them alive 🩺 (done)
 
-- [ ] Fetch each link's page title and description automatically when it's saved
+- [x] Fetch each link's page title automatically when it's saved without one
 - [x] Check whether saved links still work (dead-link detection, with a "Check links" button)
 - [x] Show a "broken" badge on dead links
-- [ ] Check links automatically on a schedule (instead of only with the button)
-- [ ] Offer an archived copy (for example from the Wayback Machine) for dead links
+- [x] Offer an archived copy (from the Wayback Machine) for dead links
 
-**You'll learn:** server-side fetching, background jobs, and error handling.
+**You'll learn:** server-side fetching, timeouts, error handling, schema changes, and faking the network in tests.
 
-## v0.7: Actually come back to them 🔁
+Scheduled (automatic) link checks moved to v1.0: they need the app to be deployed, so something can wake it up every day.
+
+## 🔜 v0.7: Actually come back to them 🔁
 
 - [ ] "Read later" vs. "done" status for each link
 - [ ] A "rediscover" section that brings back old unread links
@@ -89,6 +90,7 @@ Moves data from the browser to a server, so links follow you across devices.
 - [ ] Every Server Action checks who is asking before reading or changing data
 - [ ] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
 - [ ] Deploy to the web (for example Vercel)
+- [ ] Check links automatically on a schedule (for example Vercel Cron), instead of only with the button
 - [ ] End-to-end tests in a real browser (for example Playwright)
 
 **You'll learn:** authentication, deployment, and testing.
@@ -105,6 +107,7 @@ Not planned yet, but worth remembering:
 - Dark mode
 - Edit or remove the tags of a saved link
 - Keyboard shortcuts
+- Fetch each page's description (and maybe a preview image) when it's saved
 
 ## How to use this roadmap
 
