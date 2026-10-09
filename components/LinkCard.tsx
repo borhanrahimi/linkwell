@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { Link } from "@/types/link";
-import { getDomain, getFaviconUrl, timeAgo } from "@/lib/links";
+import { getArchiveUrl, getDomain, getFaviconUrl, timeAgo } from "@/lib/links";
 
 
 type LinkCardProps = {
@@ -88,6 +88,16 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
             )}
           </div>
           <p className="truncate text-sm text-slate-500">{link.url}</p>
+          {link.status === "broken" && (
+            <a
+              href={getArchiveUrl(link.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-amber-700 hover:underline"
+            >
+              View archived copy
+            </a>
+          )}
           <p className="text-sm text-slate-400">
             Saved{" "}
             <time dateTime={link.createdAt} title={new Date(link.createdAt).toLocaleDateString()}>

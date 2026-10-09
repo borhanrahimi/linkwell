@@ -3,7 +3,11 @@ import type { LinkRow } from "@/db/schema";
 
 export const STORAGE_KEY = "linkwell:links";
 
-export function createLink(url: string, title?: string, tags: string[] = []): Link {
+export function createLink(
+  url: string,
+  title?: string,
+  tags: string[] = []
+): Link {
   return {
     id: crypto.randomUUID(),
     url,
@@ -83,6 +87,9 @@ export function getFaviconUrl(url: string) {
     return null;
   }
 }
+export function getArchiveUrl(url: string) {
+  return `https://web.archive.org/web/${url}`;
+}
 
 export function parseTags(input: string): string[] {
   const tags = input
@@ -93,12 +100,11 @@ export function parseTags(input: string): string[] {
 }
 
 export function filterByTag(links: Link[], tag: string | null): Link[] {
-  if (!tag){
+  if (!tag) {
     return links;
   }
   return links.filter((link) => link.tags?.includes(tag));
 }
-
 
 export function searchLinks(links: Link[], query: string): Link[] {
   const text = query.trim().toLowerCase();
@@ -112,16 +118,19 @@ export function searchLinks(links: Link[], query: string): Link[] {
   );
 }
 
-
 export type SortOrder = "newest" | "oldest" | "title";
 
 export function sortLinks(links: Link[], order: SortOrder): Link[] {
   const sorted = [...links];
   if (order === "title") {
     return sorted.sort((a, b) =>
-      (a.title || getDomain(a.url)).localeCompare(b.title || getDomain(b.url), "en", {
-        sensitivity: "base",
-      })
+      (a.title || getDomain(a.url)).localeCompare(
+        b.title || getDomain(b.url),
+        "en",
+        {
+          sensitivity: "base",
+        }
+      )
     );
   }
   sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));

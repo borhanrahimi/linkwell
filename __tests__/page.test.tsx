@@ -8,8 +8,8 @@ vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async () => null),
-  removeLink: vi.fn(async () => {}),
-  saveTitle: vi.fn(async () => {}),
+  removeLink: vi.fn(async () => { }),
+  saveTitle: vi.fn(async () => { }),
 }));
 
 afterEach(() => {
@@ -484,6 +484,20 @@ describe("broken badge", () => {
 
     expect(screen.queryByText("Broken")).toBeNull();
   });
+  test("offers an archived copy of a broken link", () => {
+    render(<LinkManager initialLinks={[{ ...base, status: "broken" }]} />);
+
+    const archive = screen.getByRole("link", { name: "View archived copy" });
+    expect(archive.getAttribute("href")).toBe("https://web.archive.org/web/https://example.com");
+  });
+
+  test("offers no archived copy for a working link", () => {
+    render(<LinkManager initialLinks={[{ ...base, status: "ok" }]} />);
+
+    expect(screen.queryByRole("link", { name: "View archived copy" })).toBeNull();
+  });
+
+
 
   test("says when the link was checked", () => {
     render(

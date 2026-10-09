@@ -14,6 +14,7 @@ import {
   searchLinks,
   sortLinks,
   toLink,
+  getArchiveUrl,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -354,5 +355,13 @@ describe("toLink", () => {
     const checked = { ...row, status: "broken" as const, checkedAt: new Date("2026-10-07T08:00:00.000Z") };
 
     expect(toLink(checked)).toMatchObject({ status: "broken", checkedAt: "2026-10-07T08:00:00.000Z" });
+  });
+});
+
+describe("getArchiveUrl", () => {
+  test("points to the Wayback Machine's latest copy of the page", () => {
+    expect(getArchiveUrl("https://example.com/old-post")).toBe(
+      "https://web.archive.org/web/https://example.com/old-post"
+    );
   });
 });
