@@ -6,6 +6,7 @@ import {
   getFolders,
   insertFolder,
   insertLink,
+  updateLinkFolder,
   updateLinkStatus,
   updateLinkTitle,
   updateLinkReadAt,
@@ -37,6 +38,10 @@ export async function saveTitle(id: string, title: string) {
 
 export async function saveReadStatus(id: string, read: boolean) {
   await updateLinkReadAt(id, read ? new Date() : null);
+}
+
+export async function moveToFolder(id: string, folderId: string | null) {
+  await updateLinkFolder(id, folderId);
 }
 
 export async function importLinks(oldLinks: Link[]): Promise<Link[]> {

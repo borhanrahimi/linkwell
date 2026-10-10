@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, importLinks, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
+import { checkAllLinks, createFolder, importLinks, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 
@@ -11,6 +11,7 @@ vi.mock("@/lib/data", () => ({
   updateLinkTitle: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
+  updateLinkFolder: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
   insertFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
 }));
@@ -162,5 +163,19 @@ describe("createFolder", () => {
 
     expect(await createFolder("work")).toBe('You already have a folder called "work".');
     expect(insertFolder).not.toHaveBeenCalled();
+  });
+});
+
+describe("moveToFolder", () => {
+  test("puts the link into the folder", async () => {
+    await moveToFolder("1", "f1");
+
+    expect(updateLinkFolder).toHaveBeenCalledWith("1", "f1");
+  });
+
+  test("takes the link out of any folder", async () => {
+    await moveToFolder("1", null);
+
+    expect(updateLinkFolder).toHaveBeenCalledWith("1", null);
   });
 });

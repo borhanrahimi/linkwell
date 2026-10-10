@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { checkAllLinks, createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
   createFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
+  moveToFolder: vi.fn(async () => {}),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
   removeLink: vi.fn(async () => { }),
@@ -625,5 +626,38 @@ describe("folders", () => {
 
     expect(screen.queryByRole("textbox", { name: "Folder name" })).toBeNull();
     expect(createFolder).not.toHaveBeenCalled();
+  });
+});
+
+describe("moving links into folders", () => {
+  const link = { id: "1", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" };
+  const work = { id: "f1", name: "Work" };
+
+  test("has no folder picker when there are no folders", () => {
+    render(<LinkManager initialLinks={[link]} />);
+
+    expect(screen.queryByRole("combobox", { name: "Folder" })).toBeNull();
+  });
+
+  test("moves a link into a folder", async () => {
+    render(<LinkManager initialLinks={[link]} initialFolders={[work]} />);
+
+    await act(async () => {
+      fireEvent.change(screen.getByRole("combobox", { name: "Folder" }), { target: { value: "f1" } });
+    });
+
+    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveProperty("value", "f1");
+    expect(moveToFolder).toHaveBeenCalledWith("1", "f1");
+  });
+
+  test("takes a link out of its folder", async () => {
+    render(<LinkManager initialLinks={[{ ...link, folderId: "f1" }]} initialFolders={[work]} />);
+
+    await act(async () => {
+      fireEvent.change(screen.getByRole("combobox", { name: "Folder" }), { target: { value: "" } });
+    });
+
+    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveProperty("value", "");
+    expect(moveToFolder).toHaveBeenCalledWith("1", null);
   });
 });

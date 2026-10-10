@@ -86,6 +86,13 @@ export function setReadAt(
 ): Link[] {
   return links.map((link) => (link.id === id ? { ...link, readAt } : link));
 }
+export function setFolder(
+  links: Link[],
+  id: string,
+  folderId: string | undefined
+): Link[] {
+  return links.map((link) => (link.id === id ? { ...link, folderId } : link));
+}
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 

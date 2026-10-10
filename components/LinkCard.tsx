@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { Link } from "@/types/link";
+import type { Folder ,Link } from "@/types/link";
 import { getArchiveUrl, getDomain, getFaviconUrl, timeAgo } from "@/lib/links";
 
 
@@ -11,12 +11,14 @@ type LinkCardProps = {
   onDelete: (id: string) => void;
   onEditTitle: (id: string, title: string) => void;
   onToggleRead: (id: string) => void;
+  onMove: (id: string, folderId: string | undefined) => void;
+  folders: Folder[];
   onTagClick: (tag: string) => void;
   activeTag: string | null;
   now?: Date;
 };
 
-export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, onTagClick, onToggleRead }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, now, folders, onDelete, onEditTitle, onMove, onTagClick, onToggleRead }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
@@ -103,7 +105,11 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
           )}
           <p className="text-sm text-slate-400">
             Saved{" "}
-            <time dateTime={link.createdAt} title={new Date(link.createdAt).toLocaleDateString()}>
+            <time
+              dateTime={link.createdAt}
+              title={new Date(link.createdAt).toLocaleDateString()}
+              suppressHydrationWarning
+            >
               {timeAgo(link.createdAt, now)}
             </time>
           </p>
@@ -125,6 +131,21 @@ export default function LinkCard({ link, activeTag, now, onDelete, onEditTitle, 
                 </li>
               ))}
             </ul>
+          )}
+                    {folders.length > 0 && (
+            <select
+              value={link.folderId ?? ""}
+              onChange={(e) => onMove(link.id, e.target.value || undefined)}
+              aria-label="Folder"
+              className="mt-2 rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            >
+              <option value="">No folder</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  📁 {folder.name}
+                </option>
+              ))}
+            </select>
           )}
         </div>
       </div>

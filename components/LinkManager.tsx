@@ -7,8 +7,8 @@ import ImportBanner from "@/components/ImportBanner";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
-import { createFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { createLink, isDuplicate, pickRediscover, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
+import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { createLink, isDuplicate, pickRediscover, setFolder, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Folder, Link } from "@/types/link";
 
 type LinkManagerProps = {
@@ -62,6 +62,11 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     const readAt = link.readAt ? undefined : new Date().toISOString();
     setLinks((current) => setReadAt(current, id, readAt));
     await saveReadStatus(id, !link.readAt);
+  }
+
+  async function moveLink(id: string, folderId: string | undefined) {
+    setLinks((current) => setFolder(current, id, folderId));
+    await moveToFolder(id, folderId ?? null);
   }
 
   async function addFolder(name: string) {
@@ -134,6 +139,8 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
               onDelete={deleteLink}
               onEditTitle={editTitle}
               onToggleRead={toggleRead}
+              folders={folders}
+              onMove={moveLink}
               onTagClick={toggleTag}
             />
           ))}

@@ -18,6 +18,7 @@ import {
   setReadAt,
   pickRediscover,
   toFolder,
+  setFolder,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -471,5 +472,23 @@ describe("toFolder", () => {
     };
 
     expect(toFolder(row)).toEqual({ id: "f1", name: "Work" });
+  });
+});
+
+describe("setFolder", () => {
+  const first = createLink("https://example.com");
+  const second = createLink("https://nextjs.org");
+
+  test("puts the matching link into a folder and leaves the others alone", () => {
+    const updated = setFolder([first, second], first.id, "f1");
+
+    expect(updated[0].folderId).toBe("f1");
+    expect(updated[1]).toBe(second);
+  });
+
+  test("takes a link out of its folder", () => {
+    const inFolder = { ...first, folderId: "f1" };
+
+    expect(setFolder([inFolder], first.id, undefined)[0].folderId).toBeUndefined();
   });
 });

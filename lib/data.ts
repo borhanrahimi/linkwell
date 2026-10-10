@@ -44,6 +44,10 @@ export async function updateLinkReadAt(id: string, readAt: Date | null) {
   await db.update(links).set({ readAt }).where(eq(links.id, id));
 }
 
+export async function updateLinkFolder(id: string, folderId: string | null) {
+  await db.update(links).set({ folderId }).where(eq(links.id, id));
+}
+
 export async function getFolders(): Promise<Folder[]> {
   const rows = await db.select().from(folders).orderBy(asc(folders.createdAt));
   return rows.map(toFolder);
