@@ -20,6 +20,7 @@ import {
   toFolder,
   setFolder,
   filterByFolder,
+  clearFolder,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -504,5 +505,17 @@ describe("filterByFolder", () => {
 
   test("keeps only the links in the chosen folder", () => {
     expect(filterByFolder([work, loose], "f1")).toEqual([work]);
+  });
+});
+
+describe("clearFolder", () => {
+  test("takes every link out of the deleted folder and leaves others alone", () => {
+    const inWork = { ...createLink("https://github.com"), folderId: "f1" };
+    const inRecipes = { ...createLink("https://pasta.com"), folderId: "f2" };
+
+    const updated = clearFolder([inWork, inRecipes], "f1");
+
+    expect(updated[0].folderId).toBeUndefined();
+    expect(updated[1]).toBe(inRecipes);
   });
 });

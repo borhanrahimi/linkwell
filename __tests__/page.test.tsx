@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
   createFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
   moveToFolder: vi.fn(async () => {}),
+  renameFolder: vi.fn(async () => null),
+  deleteFolder: vi.fn(async () => {}),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
   removeLink: vi.fn(async () => { }),
@@ -703,5 +705,69 @@ describe("showing one folder", () => {
     fireEvent.click(screen.getByRole("button", { name: "📁 Recipes" }));
 
     expect(screen.getByText("No links in this folder yet.")).toBeDefined();
+  });
+});
+
+describe("renaming and deleting folders", () => {
+  const work = { id: "f1", name: "Work" };
+  const github = { id: "1", url: "https://github.com", createdAt: "2026-10-01T12:00:00.000Z", folderId: "f1" };
+
+  function openWork() {
+    render(<LinkManager initialLinks={[github]} initialFolders={[work]} />);
+    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+  }
+
+  test("only offers rename and delete when a folder is selected", () => {
+    render(<LinkManager initialLinks={[github]} initialFolders={[work]} />);
+
+    expect(screen.queryByRole("button", { name: "Rename folder" })).toBeNull();
+  });
+
+  test("renames the selected folder", async () => {
+    openWork();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename folder" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "New folder name" }), { target: { value: "Job" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    });
+
+    expect(renameFolder).toHaveBeenCalledWith("f1", "Job");
+    expect(screen.getByRole("button", { name: "📁 Job" })).toBeDefined();
+  });
+
+  test("shows the server's error when renaming fails", async () => {
+    vi.mocked(renameFolder).mockResolvedValueOnce('You already have a folder called "Recipes".');
+    openWork();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename folder" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    });
+
+    expect(screen.getByRole("alert").textContent).toBe('You already have a folder called "Recipes".');
+  });
+
+  test("deletes the folder after asking, and keeps its links", async () => {
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    openWork();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+    });
+
+    expect(deleteFolder).toHaveBeenCalledWith("f1");
+    expect(screen.queryByRole("button", { name: "📁 Work" })).toBeNull();
+    expect(screen.getByRole("link", { name: "github.com" })).toBeDefined();
+  });
+
+  test("does nothing when you cancel the delete", () => {
+    vi.spyOn(window, "confirm").mockReturnValueOnce(false);
+    openWork();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+
+    expect(deleteFolder).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "📁 Work" })).toBeDefined();
   });
 });

@@ -1,11 +1,13 @@
 "use server";
 
 import {
+  deleteFolderById,
   deleteLinkById,
   getLinks,
   getFolders,
   insertFolder,
   insertLink,
+  updateFolderName,
   updateLinkFolder,
   updateLinkStatus,
   updateLinkTitle,
@@ -73,15 +75,40 @@ export async function checkAllLinks(): Promise<Link[]> {
   return getLinks();
 }
 
-
 export async function createFolder(name: string): Promise<Folder | string> {
   const trimmed = name.trim();
   if (!trimmed) {
     return "Please give the folder a name.";
   }
   const existing = await getFolders();
-  if (existing.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())) {
+  if (
+    existing.some(
+      (folder) => folder.name.toLowerCase() === trimmed.toLowerCase()
+    )
+  ) {
     return `You already have a folder called "${trimmed}".`;
   }
   return insertFolder(trimmed);
+}
+
+export async function renameFolder(
+  id: string,
+  name: string
+): Promise<string | null> {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return "Please give the folder a name.";
+  }
+  const others = (await getFolders()).filter((folder) => folder.id !== id);
+  if (
+    others.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())
+  ) {
+    return `You already have a folder called "${trimmed}".`;
+  }
+  await updateFolderName(id, trimmed);
+  return null;
+}
+
+export async function deleteFolder(id: string) {
+  await deleteFolderById(id);
 }

@@ -7,8 +7,9 @@ import ImportBanner from "@/components/ImportBanner";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
-import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
+import FolderActions from "@/components/FolderActions";
+import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle, deleteFolder, renameFolder } from "@/app/actions";
+import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, updateTitle, parseTags, clearFolder, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Folder, Link } from "@/types/link";
 
 type LinkManagerProps = {
@@ -29,6 +30,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     sortOrder
   );
   const rediscover = now ? pickRediscover(links, now) : [];
+  const selectedFolder = folders.find((folder) => folder.id === activeFolder);
 
   async function addLink(url: string, title: string, tags: string) {
     if (isDuplicate(links, url)) {
@@ -81,6 +83,21 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     setFolders((current) => [...current, result]);
     return null;
   }
+  async function changeFolderName(id: string, name: string) {
+    const error = await renameFolder(id, name);
+    if (error) {
+      return error;
+    }
+    setFolders((current) => current.map((folder) => (folder.id === id ? { ...folder, name: name.trim() } : folder)));
+    return null;
+  }
+
+  async function removeFolder(id: string) {
+    setFolders((current) => current.filter((folder) => folder.id !== id));
+    setLinks((current) => clearFolder(current, id));
+    setActiveFolder(null);
+    await deleteFolder(id);
+  }
 
   return (
     <>
@@ -92,6 +109,9 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
 
 
       <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
+      {selectedFolder && (
+        <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onDelete={removeFolder} />
+      )}
 
       <div className="mt-6 flex gap-2">
         <input

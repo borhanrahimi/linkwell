@@ -94,6 +94,10 @@ export function setFolder(
   return links.map((link) => (link.id === id ? { ...link, folderId } : link));
 }
 
+export function clearFolder(links: Link[], folderId: string): Link[] {
+  return links.map((link) => (link.folderId === folderId ? { ...link, folderId: undefined } : link));
+}
+
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 export function pickRediscover(links: Link[], now: Date, count = 3): Link[] {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, importLinks, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 
@@ -12,6 +12,8 @@ vi.mock("@/lib/data", () => ({
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
   updateLinkFolder: vi.fn(async () => {}),
+  updateFolderName: vi.fn(async () => {}),
+  deleteFolderById: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
   insertFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
 }));
@@ -177,5 +179,40 @@ describe("moveToFolder", () => {
     await moveToFolder("1", null);
 
     expect(updateLinkFolder).toHaveBeenCalledWith("1", null);
+  });
+});
+
+describe("renameFolder", () => {
+  test("renames the folder with a trimmed name", async () => {
+    expect(await renameFolder("f1", "  Job  ")).toBeNull();
+    expect(updateFolderName).toHaveBeenCalledWith("f1", "Job");
+  });
+
+  test("refuses an empty name", async () => {
+    expect(await renameFolder("f1", " ")).toBe("Please give the folder a name.");
+    expect(updateFolderName).not.toHaveBeenCalled();
+  });
+
+  test("refuses the name of another folder", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([
+      { id: "f1", name: "Work" },
+      { id: "f2", name: "Recipes" },
+    ]);
+
+    expect(await renameFolder("f1", "recipes")).toBe('You already have a folder called "recipes".');
+  });
+
+  test("allows changing only the capitals of its own name", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "work" }]);
+
+    expect(await renameFolder("f1", "Work")).toBeNull();
+  });
+});
+
+describe("deleteFolder", () => {
+  test("deletes the folder", async () => {
+    await deleteFolder("f1");
+
+    expect(deleteFolderById).toHaveBeenCalledWith("f1");
   });
 });

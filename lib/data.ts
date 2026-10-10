@@ -57,3 +57,11 @@ export async function insertFolder(name: string): Promise<Folder> {
   const [row] = await db.insert(folders).values({ name }).returning();
   return toFolder(row);
 }
+
+export async function updateFolderName(id: string, name: string) {
+  await db.update(folders).set({ name }).where(eq(folders.id, id));
+}
+
+export async function deleteFolderById(id: string) {
+  await db.delete(folders).where(eq(folders.id, id));
+}
