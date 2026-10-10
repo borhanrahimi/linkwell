@@ -8,7 +8,7 @@ import CheckLinksButton from "@/components/CheckLinksButton";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
 import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { createLink, isDuplicate, pickRediscover, setFolder, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
+import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, updateTitle, parseTags, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
 import type { Folder, Link } from "@/types/link";
 
 type LinkManagerProps = {
@@ -20,10 +20,14 @@ type LinkManagerProps = {
 export default function LinkManager({ initialLinks, initialFolders = [], now }: LinkManagerProps) {
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
-  const visibleLinks = sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder);
+  const visibleLinks = sortLinks(
+    searchLinks(filterByTag(filterByFolder(links, activeFolder), activeTag), query),
+    sortOrder
+  );
   const rediscover = now ? pickRediscover(links, now) : [];
 
   async function addLink(url: string, title: string, tags: string) {
@@ -87,8 +91,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
       {now && <Rediscover links={rediscover} now={now} />}
 
 
-      <FolderBar folders={folders} onCreate={addFolder} />
-
+      <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
       <div className="mt-6 flex gap-2">
         <input
           type="search"
@@ -122,7 +125,9 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
         </div>
       )}
       {links.length === 0 && (
-        <p className="mt-6 text-slate-400">No links yet. Add your first one above.</p>
+        <p className="mt-6 text-slate-400">
+          {activeFolder && !activeTag && !query ? "No links in this folder yet." : "No links match your search."}
+        </p>
       )}
       {links.length > 0 && visibleLinks.length === 0 && (
         <p className="mt-6 text-slate-400">No links match your search.</p>

@@ -131,6 +131,13 @@ export function filterByTag(links: Link[], tag: string | null): Link[] {
   return links.filter((link) => link.tags?.includes(tag));
 }
 
+export function filterByFolder(links: Link[], folderId: string | null): Link[] {
+  if (!folderId) {
+    return links;
+  }
+  return links.filter((link) => link.folderId === folderId);
+}
+
 export function searchLinks(links: Link[], query: string): Link[] {
   const text = query.trim().toLowerCase();
   if (!text) {
