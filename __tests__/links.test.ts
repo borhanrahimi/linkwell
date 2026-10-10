@@ -19,6 +19,7 @@ import {
   pickRediscover,
   toFolder,
   setFolder,
+  filterByFolder,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -490,5 +491,18 @@ describe("setFolder", () => {
     const inFolder = { ...first, folderId: "f1" };
 
     expect(setFolder([inFolder], first.id, undefined)[0].folderId).toBeUndefined();
+  });
+});
+
+describe("filterByFolder", () => {
+  const work = { ...createLink("https://github.com"), folderId: "f1" };
+  const loose = createLink("https://react.dev");
+
+  test("returns every link when no folder is chosen", () => {
+    expect(filterByFolder([work, loose], null)).toEqual([work, loose]);
+  });
+
+  test("keeps only the links in the chosen folder", () => {
+    expect(filterByFolder([work, loose], "f1")).toEqual([work]);
   });
 });

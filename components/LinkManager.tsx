@@ -92,6 +92,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
 
 
       <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
+
       <div className="mt-6 flex gap-2">
         <input
           type="search"
@@ -125,12 +126,12 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
         </div>
       )}
       {links.length === 0 && (
+        <p className="mt-6 text-slate-400">No links yet. Add your first one above.</p>
+      )}
+      {links.length > 0 && visibleLinks.length === 0 && (
         <p className="mt-6 text-slate-400">
           {activeFolder && !activeTag && !query ? "No links in this folder yet." : "No links match your search."}
         </p>
-      )}
-      {links.length > 0 && visibleLinks.length === 0 && (
-        <p className="mt-6 text-slate-400">No links match your search.</p>
       )}
 
       {visibleLinks.length > 0 && (

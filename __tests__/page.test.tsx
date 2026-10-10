@@ -661,3 +661,47 @@ describe("moving links into folders", () => {
     expect(moveToFolder).toHaveBeenCalledWith("1", null);
   });
 });
+
+describe("showing one folder", () => {
+  const work = { id: "f1", name: "Work" };
+  const recipes = { id: "f2", name: "Recipes" };
+  const github = { id: "1", url: "https://github.com", createdAt: "2026-10-01T12:00:00.000Z", folderId: "f1" };
+  const react = { id: "2", url: "https://react.dev", createdAt: "2026-10-02T12:00:00.000Z" };
+
+  test("shows only the links in the clicked folder", () => {
+    render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+
+    expect(screen.getByRole("link", { name: "github.com" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "react.dev" })).toBeNull();
+    expect(screen.getByRole("button", { name: "📁 Work", pressed: true })).toBeDefined();
+  });
+
+  test("All links shows every link again", () => {
+    render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "All links" }));
+
+    expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "All links", pressed: true })).toBeDefined();
+  });
+
+  test("clicking the chosen folder again shows every link", () => {
+    render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+
+    expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
+  });
+
+  test("says when a folder is empty", () => {
+    render(<LinkManager initialLinks={[github, react]} initialFolders={[work, recipes]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "📁 Recipes" }));
+
+    expect(screen.getByText("No links in this folder yet.")).toBeDefined();
+  });
+});
