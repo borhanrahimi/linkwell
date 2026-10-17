@@ -102,7 +102,7 @@ Folder names must be unique (ignoring case). We didn't need a SQL join after all
 - [ ] User accounts (sign up and log in)
 - [ ] Each user sees only their own links (add a `user_id` column)
 - [ ] Every Server Action checks who is asking before reading or changing data
-- [ ] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
+- [x] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
 - [ ] Deploy to the web (for example Vercel)
 - [ ] Check links automatically on a schedule (for example Vercel Cron), instead of only with the button
 - [ ] End-to-end tests in a real browser (for example Playwright)

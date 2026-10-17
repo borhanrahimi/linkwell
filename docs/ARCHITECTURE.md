@@ -10,7 +10,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts` |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -201,24 +201,39 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 
 **`lib/checkLink.ts`** (server-side, talks to the internet):
 
-`checkLink(url, fetchFn = fetch)` visits a URL and returns `"ok"` or `"broken"`. **Only say "broken" when we're sure**: a wrong Broken badge on a working link is worse than a missed one.
+`checkLink(url, fetchFn = safeFetch)` visits a URL and returns `"ok"` or `"broken"`. **Only say "broken" when we're sure**: a wrong Broken badge on a working link is worse than a missed one.
 
 | What happens | Verdict |
 |---|---|
 | Not an `http://` or `https://` address | broken |
+| Points to a private or internal address (`BlockedUrlError` from `safeFetch`), or more than 5 redirects | broken |
 | Answer `404` (not found) or `410` (gone) | broken |
 | Error code `ENOTFOUND` (domain doesn't exist) or `ECONNREFUSED` (nothing answers) | broken |
 | Any other answer (`200`, `403` blocked, `5xx` temporary problem…) | ok |
 | Any other error (timeout after 10 s, expired certificate, `UND_ERR_HEADERS_OVERFLOW`…) | ok |
 
-It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away (`response.body?.cancel()`), so it never downloads whole pages. The error code is in `error.cause.code`.
+It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away (`response.body?.cancel()`), so it never downloads whole pages. The error code is in `error.code` when our own DNS lookup fails (in `safeFetch`), and in `error.cause.code` when `fetch` fails; `checkLink` reads both.
 
 **`lib/fetchTitle.ts`** (server-side, talks to the internet):
 
 | Function | Job |
 |---|---|
 | `readTitle(html)` | Pure: finds `<title>…</title>` (any case, with attributes), turns common HTML codes like `&amp;` back into characters, squashes spaces and line breaks, cuts at 200 characters. Returns `undefined` if there's no title or it's empty |
-| `fetchTitle(url, fetchFn = fetch)` | Downloads the page (only `http(s)`, 5-second timeout) and returns `readTitle` of it. Returns `undefined` for anything that isn't an OK HTML page (404, PDF…) or when the site can't be reached. Never throws |
+| `fetchTitle(url, fetchFn = safeFetch)` | Downloads the page (only `http(s)`, 5-second timeout) and returns `readTitle` of it. Returns `undefined` for anything that isn't an OK HTML page (404, PDF…), when the site can't be reached, or when the address is blocked. Never throws |
+
+**`lib/safeUrl.ts`** (server-side, SSRF protection):
+
+The server fetches URLs that users typed. Without protection, someone could save `http://169.254.169.254/` (the cloud metadata address, where a server's secret keys live) or `http://localhost:5432` and make our server fetch it for them. This is called **SSRF** (server-side request forgery). Every fetch of a user's URL goes through `safeFetch`.
+
+| Function | Job |
+|---|---|
+| `isPrivateAddress(ip)` | `true` for loopback (`127.0.0.0/8`, `::1`), private networks (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`), link-local and cloud metadata (`169.254/16`, `fe80::/10`), carrier-grade NAT, multicast and reserved ranges, using Node's `BlockList`. Unwraps IPv4 hidden in IPv6 (`::ffff:127.0.0.1`). Anything that isn't an IP address counts as private (fail closed) |
+| `assertPublicUrl(url, lookupFn)` | Throws `BlockedUrlError` unless the URL is `http(s)` and **every** address its hostname resolves to is public (`dns.lookup` with `all: true`). IP addresses typed into the URL are checked directly, without a lookup (brackets around IPv6 are removed first) |
+| `safeFetch(url, init, fetchFn, lookupFn)` | Like `fetch`, but checks the URL first and follows redirects itself (`redirect: "manual"`), checking every hop before requesting it. Gives up after 5 redirects (`BlockedUrlError`) |
+| `BlockedUrlError` | The error for "refused on purpose", so callers can tell it apart from network problems with `instanceof` |
+| `FetchFn` | `(url: string, init?: RequestInit) => Promise<Response>`: the shape `checkLink` and `fetchTitle` accept. Both `safeFetch` and the tests' fake `fetch` functions fit it |
+
+**Known limit (DNS rebinding):** we look up the name, then `fetch` looks it up **again** when it connects. A tricky DNS server could answer "public" the first time and "private" the second. The full fix is to make `fetch` connect to the exact address we checked (an `undici` `Agent` with a custom `connect.lookup`). It's left out for now: the attack needs a DNS server built for it, and most hosting platforms (like Vercel) don't expose sensitive internal addresses anyway.
 
 **`lib/links.ts`** (pure functions, used on both server and browser):
 
@@ -284,7 +299,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Never touch the real database in tests.** Replace the module with a fake using `vi.mock("@/app/actions", () => ({ saveLink: vi.fn(async () => null), ... }))` in page tests, and `vi.mock("@/lib/data", ...)` in `actions.test.ts`. Clear the fakes' call records with `vi.clearAllMocks()` in `afterEach`.
 - **Checking that the server was asked:** `expect(saveTitle).toHaveBeenCalledWith("1", "New title")`. To make a fake answer differently for one call: `vi.mocked(saveLink).mockResolvedValueOnce("You already saved this link!")`.
 - **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
-- **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = fetch)`, `fetchTitle(url, fetchFn = fetch)`). Tests pass a fake that returns `new Response(null, { status: 404 })` or `new Response("<title>Hi</title>", { headers: { "content-type": "text/html" } })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
+- **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = safeFetch)`, `fetchTitle(url, fetchFn = safeFetch)`). Passing a fake skips `safeFetch`, so the SSRF checks are tested on their own in `safeUrl.test.ts`, with a fake DNS lookup (`LookupFn`) and a fake site whose URLs either redirect or answer with a status code. Tests pass a fake that returns `new Response(null, { status: 404 })` or `new Response("<title>Hi</title>", { headers: { "content-type": "text/html" } })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
 - **Looking inside one area:** when the same link appears twice (in Rediscover and in the list), find the area first and search inside it: `within(screen.getByRole("region", { name: "Rediscover" }))`. A `<section>` becomes a `region` once it has a name (`aria-labelledby` pointing to its heading).
 - **Confirm dialogs:** jsdom has no real `window.confirm`. Fake the answer for one click with `vi.spyOn(window, "confirm").mockReturnValueOnce(true)` (or `false` to test Cancel).
 - **Browser storage in tests:** tests for the import put old links in with `localStorage.setItem(STORAGE_KEY, JSON.stringify([...]))`, and `afterEach` calls `localStorage.clear()`, so they can't leak into the next test.
@@ -374,3 +389,8 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-09 | Folder names are unique ignoring case, checked in the actions | "Work" and "work" side by side would be confusing. A database `UNIQUE` index can come with accounts (unique per user) |
 | 2026-10-09 | Links and folders load as two lists and are matched in the browser, no SQL join | The page needs every folder anyway (even empty ones), and filtering by folder is a simple `filter`, like tags |
 | 2026-10-09 | The folder filter is the first step of the `visibleLinks` chain (`filterByFolder`) | Works together with tag, search and sort for free |
+| 2026-10-17 | SSRF protection in `lib/safeUrl.ts`: check every address a hostname resolves to against a list of private ranges (Node's `BlockList`), before every request | Blocking names like `localhost` isn't enough: any domain can point to `127.0.0.1`. Checking the resolved addresses catches all of them; no library needed |
+| 2026-10-17 | `safeFetch` follows redirects itself (`redirect: "manual"`, at most 5) and checks each hop | With automatic redirects, a public site could send our server on to a private address without us seeing it |
+| 2026-10-17 | `safeFetch` is the default `fetchFn` of `checkLink` and `fetchTitle`; blocked links count as broken / no title | The app is protected without changing the callers; existing tests keep passing their fake `fetch` |
+| 2026-10-17 | Anything unclear (not an IP, no addresses, not a URL) is blocked (fail closed) | For security checks, a wrong "blocked" is a small bug; a wrong "allowed" is a hole |
+| 2026-10-17 | DNS rebinding is not handled yet (we look up the name, then `fetch` looks it up again) | The full fix (`undici` `Agent` with `connect.lookup`) adds complexity; the attack needs a special DNS server, and the risk is low on Vercel. Revisit if Linkwell runs on a server with sensitive internal services |
