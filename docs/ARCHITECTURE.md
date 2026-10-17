@@ -25,7 +25,7 @@ The code is split into layers. Each layer may only use the layers **below** it:
 
 ```
  ┌──────────────────────────────────────────┐
- │  app/page.tsx      (Server Component)    │  loads links, renders the page
+ │  app/page.tsx      (Server Component)    │  loads links and folders, renders the page
  │  app/actions.ts    (Server Actions)      │  the browser's doorway to the server
  ├──────────────────────────────────────────┤
  │  components/       (Client Components)   │  state, filters, forms, cards
@@ -35,7 +35,7 @@ The code is split into layers. Each layer may only use the layers **below** it:
  ├──────────────────────────────────────────┤
  │  db/               (server-only)         │  connection + table schema
  ├──────────────────────────────────────────┤
- │  types/            (shapes)              │  describes what a Link is
+ │  types/            (shapes)              │  describes what a Link and a Folder are
  └──────────────────────────────────────────┘
 ```
 
@@ -54,25 +54,27 @@ Why: when dependencies only point downward, you can change the UI without touchi
 ```
   Postgres (Neon)
      │   ▲
-     │   └──────── insertLink / deleteLinkById / updateLinkTitle (lib/data.ts)
+     │   └──────── insertLink / updateLinkFolder / insertFolder … (lib/data.ts)
      │                         ▲
-  getLinks()                   │
-     │                  app/actions.ts  (saveLink, removeLink, saveTitle)
+  getLinks() + getFolders()    │
+     │                  app/actions.ts  (saveLink, moveToFolder, createFolder …)
      ▼                         ▲
   app/page.tsx  (server)       │  called like normal async functions
-     │ props: initialLinks, now│
+     │ props: initialLinks,    │
+     │   initialFolders, now   │
      ▼                         │
   LinkManager  (client) ───────┘
-   state: links, activeTag, query, sortOrder
-      ┌─────┴───────────────┐
-      │ props: onAdd        │ props: link, activeTag, now,
-      │                     │        onDelete, onEditTitle, onTagClick
-      ▼                     ▼
-  LinkForm             LinkCard × N
+   state: links, folders, activeFolder, activeTag, query, sortOrder
+      │
+      ├── LinkForm        props: onAdd
+      ├── FolderBar       props: folders, activeFolder, onSelect, onCreate
+      ├── FolderActions   props: folder, onRename, onDelete  (only when a folder is selected)
+      └── LinkCard × N    props: link, folders, activeTag, now, onDelete,
+                                 onEditTitle, onMove, onTagClick, onToggleRead
 ```
 
-1. On every request, `app/page.tsx` runs on the server, reads all links with `getLinks()`, and passes them to `LinkManager` as `initialLinks`, together with `now` (the server's current time).
-2. `LinkManager` copies them into state (`useState(initialLinks)`). While the page is open, that state is what the screen shows.
+1. On every request, `app/page.tsx` runs on the server, reads all links and all folders at the same time (`Promise.all([getLinks(), getFolders()])`), and passes them to `LinkManager` as `initialLinks` and `initialFolders`, together with `now` (the server's current time).
+2. `LinkManager` copies them into state (`useState(initialLinks)`, `useState(initialFolders)`). While the page is open, that state is what the screen shows.
 3. It passes data and callback functions down to `LinkForm` and `LinkCard`. Children never change the list directly. They call a callback.
 4. Each callback updates the state **and** calls a Server Action, which writes to Postgres:
    - **Add** waits for the server first (`await saveLink(link)`). The server answers with either an error message (a string, for example a duplicate) or the **saved link**, possibly with a title it fetched from the page. Only the saved link is shown, so the card always matches the database.
@@ -87,7 +89,7 @@ Because the state already shows each change, actions don't call `refresh()`: the
 
 **Raw text up, clean data in `lib/`:** the form sends tags exactly as typed (`"React, news"`). `LinkManager` turns them into a list with `parseTags` before calling `createLink`. The form only deals with what the user typed, and the rules for what a tag is live in one testable function.
 
-**Derived state: store the facts, compute the rest:** `LinkManager` stores four things in state: `links` (every link), `activeTag` (the tag the user clicked, or `null`), `query` (the text in the search box) and `sortOrder` (`"newest"`, `"oldest"` or `"title"`). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `sortLinks(searchLinks(filterByTag(links, activeTag), query), sortOrder)`. Each step takes a list and returns a new one, so they chain: first the tag, then the search inside it, then the order. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead. A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and `toggleTag` decides. Clicking the selected tag again clears the filter (`setActiveTag((current) => current === tag ? null : tag)`). The card also gets `activeTag`, only to highlight the selected pill and set `aria-pressed`.
+**Derived state: store the facts, compute the rest:** `LinkManager` stores these facts in state: `links` (every link), `activeFolder` (the folder the user clicked, or `null` for all links), `activeTag` (the tag the user clicked, or `null`), `query` (the text in the search box) and `sortOrder` (`"newest"`, `"oldest"` or `"title"`). The list on screen, `visibleLinks`, is a plain `const` computed from them on every render: `sortLinks(searchLinks(filterByTag(filterByFolder(links, activeFolder), activeTag), query), sortOrder)`. Each step takes a list and returns a new one, so they chain: first the folder, then the tag, then the search inside it, then the order. It is never stored with `useState`, so it can't fall out of sync with `links`. Adding, deleting and editing still work on the full `links` list, and the "No links yet" message checks `links`, not `visibleLinks`. When there are links but the filters hide all of them, the page shows "No links match your search." instead, or "No links in this folder yet." when only a folder is selected (no tag, no search). A tag pill doesn't know what filtering is: it calls `onTagClick(tag)`, and `toggleTag` decides. Clicking the selected tag again clears the filter (`setActiveTag((current) => current === tag ? null : tag)`). The card also gets `activeTag`, only to highlight the selected pill and set `aria-pressed`.
 
 **Where state lives:** keep state in the lowest component that needs it. The text typed in the form and its error message only matter to `LinkForm`, so `LinkForm` owns them. The list of links and the filters are needed by the form, the search row and the cards, so they live in their shared parent, `LinkManager`. Whether a card is in edit mode (`isEditing`) and the text being typed (`draft`) only matter to that one card, so each `LinkCard` owns them. The list only hears about an edit when the user presses Save. Cancel just throws the draft away.
 
@@ -98,6 +100,8 @@ Because the state already shows each change, actions don't call `refresh()`: the
 **Read and unread:** each card has a **Mark read** / **Mark unread** button (`onToggleRead`). `LinkManager.toggleRead` updates the screen first with `setReadAt` (read cards get `opacity-60`), then calls `saveReadStatus(id, read)`. The browser only says read or not; the server picks the time.
 
 **Rediscover:** `LinkManager` computes `const rediscover = now ? pickRediscover(links, now) : []` on every render (derived state, like `visibleLinks`) and shows `<Rediscover>` right under the form. Marking a link as read removes it from the box automatically. It only runs when the server's `now` is passed in, because "more than a week ago" depends on the clock, and server and browser must agree (hydration). Tests that don't pass `now` don't see the box.
+
+**Folders:** each link has at most one folder (`folderId`); tags stay for "what it's about". `FolderBar` (above the search row) shows an **All links** pill and one 📁 pill per folder, each with `aria-pressed`. Clicking a folder calls `onSelect`; clicking the selected one again goes back to all links, like tags. **+ New folder** opens a small form. `LinkManager.addFolder` waits for `createFolder` (the server gives the folder its id) and either adds the folder or hands the error back to the form. Each card gets a `<select aria-label="Folder">` ("No folder" + every folder, shown only when folders exist); `moveLink` updates the screen with `setFolder` first, then calls `moveToFolder`. When a folder is selected, `FolderActions` shows **Rename folder** and **Delete folder** under the bar. It gets `key={selectedFolder.id}`, so switching folders starts it fresh (closing a half-typed rename). Rename waits for `renameFolder`, because the name might be taken. Delete asks with `window.confirm` first, then updates the screen at once: the folder leaves `folders`, its links lose their `folderId` (`clearFolder`), and the view goes back to all links. In the database, `ON DELETE SET NULL` does the same to the links' `folder_id`, so screen and database agree without an extra query.
 
 **Importing links from before v0.5:** `ImportBanner` sits at the top of `LinkManager`. After the first render it reads `localStorage` with `loadLinks()` (reading it during render would make the server and browser output differ). If it finds links, it shows a banner. **Import** calls `importLinks`, deletes the browser's copy with `clearSavedLinks()`, and reports the saved links up with `onImported(imported)`, which `LinkManager` adds to its list. **Not now** only hides the banner until the next visit. The buttons are disabled while importing, so a double click can't import twice.
 
@@ -115,10 +119,12 @@ Anything a client component imports becomes client code as well, so you don't ne
 |---|---|---|
 | `app/page.tsx` | Server | `async`; reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
-| `components/LinkManager.tsx` | Client | Holds `useState` for links, tag filter, search text and sort order; calls the Server Actions |
+| `components/LinkManager.tsx` | Client | Holds `useState` for links, folders, folder and tag filters, search text and sort order; calls the Server Actions |
 | `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
 | `components/CheckLinksButton.tsx` | Client | Calls `checkAllLinks`, shows "Checking..." while it runs and a summary when it's done |
 | `components/Rediscover.tsx` | Client (imported by `LinkManager`) | No state: shows the links it's given in a named `<section>`. Has no `"use client"` of its own |
+| `components/FolderBar.tsx` | Client | Folder pills (select a folder) and the "+ New folder" form with its own input and error state |
+| `components/FolderActions.tsx` | Client | Rename form and Delete button for the selected folder; asks `window.confirm` before deleting |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
 
@@ -132,13 +138,13 @@ Anything a client component imports becomes client code as well, so you don't ne
 
 ## 5. Data storage
 
-All reading and writing of links goes through **`lib/data.ts`**. Components and pages never query the database directly.
+All reading and writing of links and folders goes through **`lib/data.ts`**. Components and pages never query the database directly.
 
 | Stage | Where links live | Survives refresh? |
 |---|---|---|
 | v0.1 | React state in memory | ❌ |
 | v0.2–v0.4 | Browser `localStorage`, key `linkwell:links` | ✅ (this browser only) |
-| **v0.5+ (now)** | **Postgres on Neon**, table `links` | ✅ (any device) |
+| **v0.5+ (now)** | **Postgres on Neon**, tables `links` and `folders` (v0.8) | ✅ (any device) |
 
 **The `links` table** (`db/schema.ts`):
 
@@ -152,6 +158,15 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `status` | `text` (`"ok"` or `"broken"`), can be `null` | Result of the last link check. `null` = never checked (added in migration `0001`) |
 | `checked_at` | `timestamp with time zone`, can be `null` | When the link was last checked |
 | `read_at` | `timestamp with time zone`, can be `null` | `null` = still to read; a date = read, and when (migration `0002`) |
+| `folder_id` | `uuid`, can be `null`, foreign key → `folders.id`, `ON DELETE SET NULL` | `null` = no folder. The database refuses a folder id that doesn't exist, and empties this column when its folder is deleted (migration `0003`) |
+
+**The `folders` table** (`db/schema.ts`, migration `0003`; defined above `links` because `links` points to it):
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid`, primary key, default random | Made by the database (unlike links, the browser doesn't need the id before the server answers) |
+| `name` | `text`, required | Trimmed. Unique ignoring case, checked by the actions, not the database |
+| `created_at` | `timestamp with time zone`, required, default `now()` | Folders are listed oldest first, so new ones appear at the end |
 
 **`lib/data.ts`** (server-only, all `async`):
 
@@ -163,6 +178,11 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `updateLinkTitle(id, title)` | Sets a new title (trimmed; blank → `null`) |
 | `updateLinkStatus(id, status)` | Saves a check result and sets `checked_at` to now |
 | `updateLinkReadAt(id, readAt)` | Sets `read_at` to a date (read) or `null` (unread) |
+| `updateLinkFolder(id, folderId)` | Moves a link into a folder, or out of it with `null` |
+| `getFolders()` | All folders, oldest first, converted with `toFolder` |
+| `insertFolder(name)` | Creates a folder and returns it, with the id the database made (`.returning()`) |
+| `updateFolderName(id, name)` | Renames a folder |
+| `deleteFolderById(id)` | Deletes a folder; Postgres sets its links' `folder_id` to `null` |
 
 **`app/actions.ts`** (Server Actions, called by `LinkManager`):
 
@@ -173,6 +193,10 @@ All reading and writing of links goes through **`lib/data.ts`**. Components and 
 | `importLinks(oldLinks)` | Saves links from the browser's `localStorage`. Gives each a fresh id and `tags: []` if missing; skips blank URLs and links already in the database or earlier in the same batch. Returns the links it saved |
 | `saveTitle(id, title)` | Saves the new title |
 | `saveReadStatus(id, read)` | `true` → `read_at` = now (the server's time, never the browser's); `false` → `null` |
+| `moveToFolder(id, folderId)` | Moves a link into a folder (`null` = no folder) |
+| `createFolder(name)` | Returns `"Please give the folder a name."` for a blank name, `You already have a folder called "X".` for a duplicate (ignoring case). Otherwise saves the trimmed name and returns the new `Folder` |
+| `renameFolder(id, name)` | Same checks as `createFolder`, but only against the *other* folders (renaming "Work" to "work" is fine). Returns an error message, or `null` when it worked |
+| `deleteFolder(id)` | Deletes the folder; its links stay, without a folder |
 | `checkAllLinks()` | Checks every link **at the same time** (`Promise.all`), saves each result, and returns the list fresh from the database |
 
 **`lib/checkLink.ts`** (server-side, talks to the internet):
@@ -201,11 +225,15 @@ It uses `GET` with `AbortSignal.timeout(10_000)` and cancels the body right away
 | Function | Job |
 |---|---|
 | `createLink(url, title?, tags?)` | Builds a new `Link` with a new id and the current time. Trims the title, and turns a blank title into `undefined`. `tags` defaults to `[]` |
-| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` → `undefined` (for `title`, `status`, `checkedAt`, `readAt`) |
+| `toLink(row)` | Turns a database row into a `Link`: `Date` → ISO string, `null` → `undefined` (for `title`, `status`, `checkedAt`, `readAt`, `folderId`) |
+| `toFolder(row)` | Turns a database row into a `Folder` (`{ id, name }`) |
 | `filterByTag(links, tag)` | Links whose `tags` include `tag`. Returns the list unchanged when `tag` is `null`. Links without a `tags` field never match |
+| `filterByFolder(links, folderId)` | Links in that folder. Returns the list unchanged when `folderId` is `null` |
 | `searchLinks(links, query)` | Links whose URL or title contains `query`, ignoring case and surrounding spaces. Returns the list unchanged when `query` is blank |
 | `sortLinks(links, order)` | Returns a **new**, sorted list (copies with `[...links]` first, because `.sort()` changes the array in place). `"newest"` / `"oldest"` compare `createdAt` (ISO strings sort correctly as text). `"title"` sorts A–Z by the name the card shows (title, or domain), ignoring case. Also exports the `SortOrder` type |
 | `setReadAt(links, id, readAt)` | Returns a **new** list where the matching link has the new `readAt` (a date, or `undefined` for unread) |
+| `setFolder(links, id, folderId)` | Returns a **new** list where the matching link is in the new folder (`undefined` = no folder) |
+| `clearFolder(links, folderId)` | Returns a **new** list where no link is in that folder anymore (what `ON DELETE SET NULL` does in the database) |
 | `pickRediscover(links, now, count = 3)` | Unread, not broken links saved more than a week before `now`, oldest first, at most `count`. Deterministic (no randomness), so server and browser pick the same links |
 | `getArchiveUrl(url)` | `https://web.archive.org/web/<url>`: the Wayback Machine jumps to its newest saved copy of the page, or says it has none |
 | `getDomain(url)` | `https://www.example.com/page` → `example.com`. Returns the text unchanged if it isn't a valid URL |
@@ -258,6 +286,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Async clicks:** when a click starts something async (saving), wrap it in `await act(async () => { fireEvent.click(...) })`, so React finishes the update before the test checks the screen. The `addLink` test helper does this, so tests call `await addLink(...)`.
 - **Fake network in tests:** functions that fetch take the fetch function as a parameter (`checkLink(url, fetchFn = fetch)`, `fetchTitle(url, fetchFn = fetch)`). Tests pass a fake that returns `new Response(null, { status: 404 })` or `new Response("<title>Hi</title>", { headers: { "content-type": "text/html" } })`, or throws an `Error` with `{ cause: { code: "ENOTFOUND" } }` like real `fetch` does. Tests never use the real internet.
 - **Looking inside one area:** when the same link appears twice (in Rediscover and in the list), find the area first and search inside it: `within(screen.getByRole("region", { name: "Rediscover" }))`. A `<section>` becomes a `region` once it has a name (`aria-labelledby` pointing to its heading).
+- **Confirm dialogs:** jsdom has no real `window.confirm`. Fake the answer for one click with `vi.spyOn(window, "confirm").mockReturnValueOnce(true)` (or `false` to test Cancel).
 - **Browser storage in tests:** tests for the import put old links in with `localStorage.setItem(STORAGE_KEY, JSON.stringify([...]))`, and `afterEach` calls `localStorage.clear()`, so they can't leak into the next test.
 - **Old data:** `Link` fields added later stay optional. Give a test an old-style link (without the field) through `initialLinks` and check it still shows.
 - **Searching inside one element:** use `within(element)` when the same role appears elsewhere on the page (a tag `listitem` sits inside a card `listitem`).
@@ -339,3 +368,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-09 | Read links fade (`opacity-60`) instead of disappearing | You can still find them; unread links stand out |
 | 2026-10-09 | Rediscover picks unread, not-broken links older than a week, oldest first, at most 3 | Random picks would differ between server and browser renders (hydration error); oldest first is fair and predictable |
 | 2026-10-09 | The weekly email digest is optional and moved to Later / ideas | Rediscover already covers "come back to them" inside the app; email needs deployment, accounts, a schedule and an email service |
+| 2026-10-09 | Each link has at most one folder (`folder_id` on `links`), and tags stay | A folder answers "where does it belong", tags answer "what is it about". One folder per link needs no extra table; several folders per link would need a join table |
+| 2026-10-09 | Deleting a folder sets its links' `folder_id` to `null` (`ON DELETE SET NULL`) | Deleting a folder should never delete links. `CASCADE` would; `RESTRICT` would force emptying the folder first |
+| 2026-10-09 | Folder ids are made by the database, link ids by the browser | A new folder can wait for the server's answer before it shows; links are shown and deleted right away, so the browser needs the id first |
+| 2026-10-09 | Folder names are unique ignoring case, checked in the actions | "Work" and "work" side by side would be confusing. A database `UNIQUE` index can come with accounts (unique per user) |
+| 2026-10-09 | Links and folders load as two lists and are matched in the browser, no SQL join | The page needs every folder anyway (even empty ones), and filtering by folder is a simple `filter`, like tags |
+| 2026-10-09 | The folder filter is the first step of the `visibleLinks` chain (`filterByFolder`) | Works together with tag, search and sort for free |

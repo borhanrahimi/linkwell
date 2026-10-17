@@ -84,18 +84,20 @@ Scheduled (automatic) link checks moved to v1.0: they need the app to be deploye
 
 The weekly email digest is now optional (see Later / ideas): Rediscover already brings old links back whenever you open the app.
 
-## 🔜 v0.8: Folders 📁
+## ✅ v0.8: Folders 📁 (done)
 
 Each link lives in one folder ("where it belongs"); tags stay for "what it's about".
 
-- [ ] A `folders` table, and a `folder_id` column on links that points to it (a foreign key)
-- [ ] Create, rename and delete folders (decide what happens to a deleted folder's links: `ON DELETE`)
-- [ ] Move a link into a folder (and out again)
-- [ ] Show one folder at a time, working together with the tag filter, search and sort
+- [x] A `folders` table, and a `folder_id` column on links that points to it (a foreign key)
+- [x] Create, rename and delete folders (deleting a folder keeps its links, just without a folder: `ON DELETE SET NULL`)
+- [x] Move a link into a folder (and out again)
+- [x] Show one folder at a time, working together with the tag filter, search and sort
 
-**You'll learn:** relationships between tables, foreign keys, and joins.
+**You'll learn:** relationships between tables and foreign keys.
 
-## v1.0: Ready for other people
+Folder names must be unique (ignoring case). We didn't need a SQL join after all: the page loads links and folders as two separate lists and matches them in the browser by `folderId`.
+
+## 🔜 v1.0: Ready for other people
 
 - [ ] User accounts (sign up and log in)
 - [ ] Each user sees only their own links (add a `user_id` column)
