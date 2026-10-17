@@ -1,4 +1,5 @@
 import { BlockList, isIP } from "node:net";
+import { lookup } from "node:dns/promises";
 
 const privateRanges = new BlockList();
 // IPv4
@@ -30,4 +31,41 @@ export function isPrivateAddress(ip: string): boolean {
   }
 
   return privateRanges.check(ip, "ipv4");
+}
+export class BlockedUrlError extends Error {
+  constructor(url: string, reason: string) {
+    super(`Blocked ${url}: ${reason}`);
+    this.name = "BlockedUrlError";
+  }
+}
+
+export type LookupFn = (hostname: string) => Promise<{ address: string }[]>;
+
+const lookupAll: LookupFn = (hostname) => lookup(hostname, { all: true });
+
+export async function assertPublicUrl(
+  url: string,
+  lookupFn: LookupFn = lookupAll
+): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new BlockedUrlError(url, "not a valid URL");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new BlockedUrlError(url, "only http and https are allowed");
+  }
+
+  // new URL("http://[::1]/").hostname is "[::1]": remove the brackets
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+
+  const addresses = isIP(hostname)
+    ? [hostname]
+    : (await lookupFn(hostname)).map((result) => result.address);
+
+  if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
+    throw new BlockedUrlError(url, "it points to a private address");
+  }
 }

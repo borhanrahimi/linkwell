@@ -1,5 +1,10 @@
-import { describe, expect, test } from "vitest";
-import { isPrivateAddress } from "../lib/safeUrl";
+import { describe, expect, test, vi } from "vitest";
+import {
+  assertPublicUrl,
+  BlockedUrlError,
+  isPrivateAddress,
+  type LookupFn,
+} from "../lib/safeUrl";
 
 describe("isPrivateAddress", () => {
   test("allows normal public addresses", () => {
@@ -31,5 +36,55 @@ describe("isPrivateAddress", () => {
   test("blocks anything that is not an IP address", () => {
     expect(isPrivateAddress("not-an-ip")).toBe(true);
     expect(isPrivateAddress("")).toBe(true);
+  });
+});
+
+function resolvesTo(...addresses: string[]): LookupFn {
+  return async () => addresses.map((address) => ({ address }));
+}
+
+describe("assertPublicUrl", () => {
+  test("allows a site on a public address", async () => {
+    await expect(
+      assertPublicUrl("https://example.com", resolvesTo("93.184.215.14"))
+    ).resolves.toBeUndefined();
+  });
+
+  test("blocks a site whose name points to a private address", async () => {
+    await expect(
+      assertPublicUrl("http://sneaky.example", resolvesTo("127.0.0.1"))
+    ).rejects.toThrow(BlockedUrlError);
+  });
+
+  test("blocks a site if any of its addresses is private", async () => {
+    await expect(
+      assertPublicUrl(
+        "http://sneaky.example",
+        resolvesTo("93.184.215.14", "10.0.0.1")
+      )
+    ).rejects.toThrow(BlockedUrlError);
+  });
+
+  test("blocks private IP addresses typed straight into the URL", async () => {
+    const lookupFn = vi.fn(resolvesTo("93.184.215.14"));
+    await expect(
+      assertPublicUrl("http://169.254.169.254/latest/meta-data", lookupFn)
+    ).rejects.toThrow(BlockedUrlError);
+    await expect(
+      assertPublicUrl("http://[::1]:3000", lookupFn)
+    ).rejects.toThrow(BlockedUrlError);
+    expect(lookupFn).not.toHaveBeenCalled();
+  });
+
+  test("blocks anything that is not http or https", async () => {
+    await expect(
+      assertPublicUrl("file:///etc/passwd", resolvesTo("93.184.215.14"))
+    ).rejects.toThrow(BlockedUrlError);
+  });
+
+  test("blocks text that is not a URL", async () => {
+    await expect(
+      assertPublicUrl("not a url", resolvesTo("93.184.215.14"))
+    ).rejects.toThrow(BlockedUrlError);
   });
 });
