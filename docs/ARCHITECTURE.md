@@ -10,14 +10,14 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts` |
-| `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`) | Server-only. Never imported by a client component |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half |
+| `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`, plus `auth-schema.ts` for Better Auth's `user`, `session`, `account` and `verification` tables) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
 | `__tests__/` | Automated tests | One test file per module (`links.test.ts`, `actions.test.ts`, `page.test.tsx`) |
 | `docs/` | Project documentation | |
 
-Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, never committed).
+Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, never committed).
 
 ## 2. Layers
 
@@ -117,7 +117,10 @@ Anything a client component imports becomes client code as well, so you don't ne
 
 | File | Type | Why |
 |---|---|---|
-| `app/page.tsx` | Server | `async`; reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
+| `app/page.tsx` | Server | `async`; reads the session with `auth.api.getSession`. Signed out: shows the sign-in screen. Signed in: shows who is signed in, reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
+| `app/api/auth/[...all]/route.ts` | Route Handler | Hands every `/api/auth/*` request (sign in, Google callback, sign out) to Better Auth |
+| `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google" })` on click |
+| `components/SignOutButton.tsx` | Client | Calls `authClient.signOut()`, then `router.refresh()` so the server page renders again and finds no session |
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
 | `components/LinkManager.tsx` | Client | Holds `useState` for links, folders, folder and tag filters, search text and sort order; calls the Server Actions |
 | `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
@@ -270,7 +273,7 @@ The server fetches URLs that users typed. Without protection, someone could save
 
 Never edit a migration that has already been applied. Make a new one instead.
 
-**Secrets:** `DATABASE_URL` lives only in `.env.local` (ignored by Git). It has no `NEXT_PUBLIC_` prefix, so Next.js never sends it to the browser. `drizzle.config.ts` loads it with `loadEnvConfig` from `@next/env`, because `drizzle-kit` runs outside Next.js.
+**Secrets:** `DATABASE_URL` lives only in `.env.local` (ignored by Git). It has no `NEXT_PUBLIC_` prefix, so Next.js never sends it to the browser. `drizzle.config.ts` loads it with `loadEnvConfig` from `@next/env`, because `drizzle-kit` runs outside Next.js. The auth settings live there too: `BETTER_AUTH_SECRET` (a random string, for example from `openssl rand -base64 32`, that signs session cookies; changing it signs everyone out), `BETTER_AUTH_URL` (the app's address, `http://localhost:3000` locally) and `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` from Google Cloud Console. Google only sends users back to redirect URIs listed there, so `http://localhost:3000/api/auth/callback/google` must be one of them (and the deployed address, in v1.0). Restart `npm run dev` after changing `.env.local`.
 
 ## 6. Conventions
 
@@ -394,3 +397,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-17 | `safeFetch` is the default `fetchFn` of `checkLink` and `fetchTitle`; blocked links count as broken / no title | The app is protected without changing the callers; existing tests keep passing their fake `fetch` |
 | 2026-10-17 | Anything unclear (not an IP, no addresses, not a URL) is blocked (fail closed) | For security checks, a wrong "blocked" is a small bug; a wrong "allowed" is a hole |
 | 2026-10-17 | DNS rebinding is not handled yet (we look up the name, then `fetch` looks it up again) | The full fix (`undici` `Agent` with `connect.lookup`) adds complexity; the attack needs a special DNS server, and the risk is low on Vercel. Revisit if Linkwell runs on a server with sensitive internal services |
+| 2026-10-17 | Accounts with **Better Auth**, Google as the only sign-in method | Stores users and sessions in our own Postgres through the Drizzle adapter, so there's no extra service. Google sign-in means no passwords to store, reset or leak |
+| 2026-10-17 | `app/page.tsx` checks the session on the server and shows a sign-in screen when there is none | Signed-out visitors never receive the link data. No middleware needed while there is only one page |
+| 2026-10-17 | Sign-out runs in the browser (`authClient.signOut()`), followed by `router.refresh()` | Better Auth clears the session cookie; the refresh makes the Server Component check again and show the sign-in screen |
+| 2026-10-17 | Links and folders are not tied to users yet, and Server Actions don't check the session yet | Done in small steps: sign-in first, then a `user_id` column and session checks in every action. Until then, every signed-in user sees the same links |

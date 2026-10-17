@@ -99,7 +99,7 @@ Folder names must be unique (ignoring case). We didn't need a SQL join after all
 
 ## 🔜 v1.0: Ready for other people
 
-- [ ] User accounts (sign up and log in)
+- [x] User accounts: Sign in with Google, see who is signed in, sign out (Better Auth)
 - [ ] Each user sees only their own links (add a `user_id` column)
 - [ ] Every Server Action checks who is asking before reading or changing data
 - [x] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
