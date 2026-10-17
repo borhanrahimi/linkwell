@@ -3,6 +3,7 @@ import {
   assertPublicUrl,
   BlockedUrlError,
   isPrivateAddress,
+  safeFetch,
   type LookupFn,
 } from "../lib/safeUrl";
 
@@ -86,5 +87,88 @@ describe("assertPublicUrl", () => {
     await expect(
       assertPublicUrl("not a url", resolvesTo("93.184.215.14"))
     ).rejects.toThrow(BlockedUrlError);
+  });
+});
+// Names starting with "internal" point inside the network; everything else is public.
+const fakeDns: LookupFn = async (hostname) => [
+  { address: hostname.startsWith("internal") ? "10.0.0.1" : "93.184.215.14" },
+];
+
+// Each URL either redirects (a string: where to go next) or answers with a status code.
+function site(pages: Record<string, string | number>) {
+  return vi.fn(async (input: string | URL | Request) => {
+    const page = pages[String(input)] ?? 404;
+    if (typeof page === "string") {
+      return new Response(null, { status: 302, headers: { location: page } });
+    }
+    return new Response("hello", { status: page });
+  });
+}
+
+describe("safeFetch", () => {
+  test("fetches a public page", async () => {
+    const fetchFn = site({ "https://example.com/": 200 });
+    const response = await safeFetch(
+      "https://example.com/",
+      {},
+      fetchFn,
+      fakeDns
+    );
+    expect(response.status).toBe(200);
+  });
+
+  test("follows redirects between public pages, also relative ones", async () => {
+    const fetchFn = site({
+      "http://example.com/": "https://example.com/",
+      "https://example.com/": "/home",
+      "https://example.com/home": 200,
+    });
+    const response = await safeFetch(
+      "http://example.com/",
+      {},
+      fetchFn,
+      fakeDns
+    );
+    expect(response.status).toBe(200);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  test("never follows a redirect to a private address", async () => {
+    const fetchFn = site({ "https://example.com/": "http://127.0.0.1/admin" });
+    await expect(
+      safeFetch("https://example.com/", {}, fetchFn, fakeDns)
+    ).rejects.toThrow(BlockedUrlError);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  test("never follows a redirect to a name that points inside the network", async () => {
+    const fetchFn = site({
+      "https://example.com/": "http://internal.example/",
+    });
+    await expect(
+      safeFetch("https://example.com/", {}, fetchFn, fakeDns)
+    ).rejects.toThrow(BlockedUrlError);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  test("gives up after too many redirects", async () => {
+    const fetchFn = site({
+      "https://a.example/": "https://b.example/",
+      "https://b.example/": "https://a.example/",
+    });
+    await expect(
+      safeFetch("https://a.example/", {}, fetchFn, fakeDns)
+    ).rejects.toThrow(BlockedUrlError);
+    expect(fetchFn).toHaveBeenCalledTimes(6);
+  });
+
+  test("passes options through but always handles redirects itself", async () => {
+    const fetchFn = site({ "https://example.com/": 200 });
+    const signal = AbortSignal.timeout(1_000);
+    await safeFetch("https://example.com/", { signal }, fetchFn, fakeDns);
+    expect(fetchFn).toHaveBeenCalledWith("https://example.com/", {
+      signal,
+      redirect: "manual",
+    });
   });
 });

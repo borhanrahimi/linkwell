@@ -69,3 +69,31 @@ export async function assertPublicUrl(
     throw new BlockedUrlError(url, "it points to a private address");
   }
 }
+const REDIRECTS = [301, 302, 303, 307, 308];
+export type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
+const MAX_REDIRECTS = 5;
+
+export async function safeFetch(
+  url: string,
+  init: RequestInit = {},
+  fetchFn: typeof fetch = fetch,
+  lookupFn: LookupFn = lookupAll
+): Promise<Response> {
+  let current = url;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    await assertPublicUrl(current, lookupFn);
+    const response = await fetchFn(current, { ...init, redirect: "manual" });
+
+    const location = response.headers.get("location");
+    if (!REDIRECTS.includes(response.status) || !location) {
+      return response;
+    }
+
+    await response.body?.cancel();
+    // "location" can be relative, like "/new-page": resolve it against the current URL
+    current = new URL(location, current).toString();
+  }
+
+  throw new BlockedUrlError(url, "too many redirects");
+}

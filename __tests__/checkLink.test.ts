@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { checkLink } from "@/lib/checkLink";
+import { BlockedUrlError } from "@/lib/safeUrl";
 
 function respondWith(status: number): typeof fetch {
   return async () => new Response(null, { status });
@@ -19,11 +20,15 @@ describe("checkLink", () => {
   });
 
   test("is broken when the page is not found", async () => {
-    expect(await checkLink("https://example.com/old", respondWith(404))).toBe("broken");
+    expect(await checkLink("https://example.com/old", respondWith(404))).toBe(
+      "broken"
+    );
   });
 
   test("is broken when the page is gone for good", async () => {
-    expect(await checkLink("https://example.com/old", respondWith(410))).toBe("broken");
+    expect(await checkLink("https://example.com/old", respondWith(410))).toBe(
+      "broken"
+    );
   });
 
   test("is ok when the site blocks us or has a temporary problem", async () => {
@@ -32,24 +37,68 @@ describe("checkLink", () => {
   });
 
   test("is broken when the domain doesn't exist", async () => {
-    expect(await checkLink("https://no-such-site.example", failWith("TypeError", "ENOTFOUND"))).toBe("broken");
+    expect(
+      await checkLink(
+        "https://no-such-site.example",
+        failWith("TypeError", "ENOTFOUND")
+      )
+    ).toBe("broken");
   });
 
   test("is broken when nothing answers at that address", async () => {
-    expect(await checkLink("https://example.com", failWith("TypeError", "ECONNREFUSED"))).toBe("broken");
+    expect(
+      await checkLink(
+        "https://example.com",
+        failWith("TypeError", "ECONNREFUSED")
+      )
+    ).toBe("broken");
   });
 
   test("is ok when the site answers but fetch can't read the answer", async () => {
-    expect(await checkLink("https://gemini.google.com/app", failWith("TypeError", "UND_ERR_HEADERS_OVERFLOW"))).toBe("ok");
-    expect(await checkLink("https://example.com", failWith("TypeError", "CERT_HAS_EXPIRED"))).toBe("ok");
+    expect(
+      await checkLink(
+        "https://gemini.google.com/app",
+        failWith("TypeError", "UND_ERR_HEADERS_OVERFLOW")
+      )
+    ).toBe("ok");
+    expect(
+      await checkLink(
+        "https://example.com",
+        failWith("TypeError", "CERT_HAS_EXPIRED")
+      )
+    ).toBe("ok");
   });
 
   test("is ok when the site is only slow", async () => {
-    expect(await checkLink("https://example.com", failWith("TimeoutError"))).toBe("ok");
+    expect(
+      await checkLink("https://example.com", failWith("TimeoutError"))
+    ).toBe("ok");
   });
 
   test("is broken when the address isn't a web link", async () => {
-    expect(await checkLink("ftp://example.com", respondWith(200))).toBe("broken");
+    expect(await checkLink("ftp://example.com", respondWith(200))).toBe(
+      "broken"
+    );
     expect(await checkLink("not a url", respondWith(200))).toBe("broken");
+  });
+  test("is broken when the domain doesn't exist in our own DNS lookup", async () => {
+    const noSuchName: typeof fetch = async () => {
+      throw Object.assign(new Error("getaddrinfo ENOTFOUND"), {
+        code: "ENOTFOUND",
+      });
+    };
+    expect(await checkLink("https://no-such-site.example", noSuchName)).toBe(
+      "broken"
+    );
+  });
+
+  test("is broken when the link points to a private address", async () => {
+    const blocked: typeof fetch = async () => {
+      throw new BlockedUrlError(
+        "http://localhost",
+        "it points to a private address"
+      );
+    };
+    expect(await checkLink("http://localhost", blocked)).toBe("broken");
   });
 });

@@ -1,3 +1,5 @@
+import { safeFetch, type FetchFn } from "@/lib/safeUrl";
+
 const ENTITIES: Record<string, string> = {
     "&amp;": "&",
     "&lt;": "<",
@@ -20,7 +22,7 @@ const ENTITIES: Record<string, string> = {
     return title.slice(0, 200) || undefined;
   }
   
-  export async function fetchTitle(url: string, fetchFn: typeof fetch = fetch): Promise<string | undefined> {
+  export async function fetchTitle(url: string, fetchFn: FetchFn = safeFetch): Promise<string | undefined> {
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
       return undefined;
     }
