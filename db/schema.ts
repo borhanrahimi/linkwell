@@ -20,3 +20,4 @@ export const links = pgTable("links", {
 
 export type LinkRow = typeof links.$inferSelect;
 export type FolderRow = typeof folders.$inferSelect;
+export * from "./auth-schema";
