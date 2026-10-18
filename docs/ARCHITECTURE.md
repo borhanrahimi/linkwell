@@ -17,7 +17,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 | `__tests__/` | Automated tests | One test file per module (`links.test.ts`, `actions.test.ts`, `page.test.tsx`) |
 | `docs/` | Project documentation | |
 
-Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, never committed).
+Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `CRON_SECRET`, never committed), and `vercel.json` (the daily cron schedule).
 
 ## 2. Layers
 
@@ -119,6 +119,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 |---|---|---|
 | `app/page.tsx` | Server | `async`; reads the session with `auth.api.getSession`. Signed out: shows the sign-in screen. Signed in: shows who is signed in, reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
 | `app/api/auth/[...all]/route.ts` | Route Handler | Hands every `/api/auth/*` request (sign in, Google callback, sign out) to Better Auth |
+| `app/api/cron/check-links/route.ts` | Route Handler | Called daily by Vercel Cron. Checks the secret, then checks every user's links with `getLinksToCheck()` and saves each result for its owner |
 | `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google" })` on click |
 | `components/SignOutButton.tsx` | Client | Calls `authClient.signOut()`, then `router.refresh()` so the server page renders again and finds no session |
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
@@ -412,3 +413,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | Production and local development share one Neon database for now | Only one user, so there's nothing to keep apart yet. A separate Neon branch for development can come before other people sign up |
 | 2026-10-18 | `lib/auth.ts` reads its settings through `requireEnv`, which throws with the variable's name | A missing variable on Vercel shows up as a clear error in the logs, instead of a 500 on sign-in |
 | 2026-10-18 | Sign-in only works on the production address, not on Vercel preview deployments | Previews get a new address each time, and Google only accepts redirect URIs listed in advance |
+| 2026-10-18 | Daily link checks: Vercel Cron calls `GET /api/cron/check-links` at 06:00 UTC (`vercel.json`) | The free plan allows one run a day, which is enough to catch dead links. The Check links button still works for a check right away |
+| 2026-10-18 | The cron route requires `Authorization: Bearer <CRON_SECRET>`, and refuses everything when `CRON_SECRET` isn't set | It's a public address that makes the server fetch every saved link; without the secret, anyone could trigger that over and over. Failing closed means a missing variable can't open it up |
+| 2026-10-18 | `getLinksToCheck()` is the only `lib/data.ts` function without a `userId`, and returns each link's owner | The cron job works for all users at once, and `updateLinkStatus` still needs the owner's id. Only the cron route may call it, never a Server Action |
+| 2026-10-18 | The cron route checks all links at the same time (`Promise.all`), like the button | Fine for a handful of users. With many links, it should check in batches so it stays within Vercel's time limit |
