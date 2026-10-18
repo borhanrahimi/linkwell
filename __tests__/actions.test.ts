@@ -3,6 +3,7 @@ import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, m
 import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
+import { getUserId } from "@/lib/session";
 
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
@@ -15,7 +16,11 @@ vi.mock("@/lib/data", () => ({
   updateFolderName: vi.fn(async () => {}),
   deleteFolderById: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
-  insertFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
+  insertFolder: vi.fn(async (_userId: string, name: string) => ({ id: "f1", name })),
+}));
+
+vi.mock("@/lib/session", () => ({
+  getUserId: vi.fn(async () => "u1"),
 }));
 
 vi.mock("@/lib/checkLink", () => ({
@@ -28,21 +33,52 @@ vi.mock("@/lib/fetchTitle", () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getUserId).mockResolvedValue("u1");
 });
 
 const link = { id: "1", url: "https://example.com", tags: [], createdAt: "2026-10-01T12:00:00.000Z" };
 
+describe("signed out", () => {
+  test("every action refuses to run and touches no data", async () => {
+    vi.mocked(getUserId).mockRejectedValue(new Error("Not signed in"));
+
+    await expect(saveLink(link)).rejects.toThrow("Not signed in");
+    await expect(removeLink("1")).rejects.toThrow("Not signed in");
+    await expect(saveTitle("1", "x")).rejects.toThrow("Not signed in");
+    await expect(saveReadStatus("1", true)).rejects.toThrow("Not signed in");
+    await expect(moveToFolder("1", null)).rejects.toThrow("Not signed in");
+    await expect(importLinks([link])).rejects.toThrow("Not signed in");
+    await expect(checkAllLinks()).rejects.toThrow("Not signed in");
+    await expect(createFolder("Work")).rejects.toThrow("Not signed in");
+    await expect(renameFolder("f1", "Job")).rejects.toThrow("Not signed in");
+    await expect(deleteFolder("f1")).rejects.toThrow("Not signed in");
+
+    expect(getLinks).not.toHaveBeenCalled();
+    expect(getFolders).not.toHaveBeenCalled();
+    expect(insertLink).not.toHaveBeenCalled();
+    expect(deleteLinkById).not.toHaveBeenCalled();
+    expect(insertFolder).not.toHaveBeenCalled();
+    expect(deleteFolderById).not.toHaveBeenCalled();
+  });
+});
+
 describe("saveLink", () => {
   test("saves a new link", async () => {
     expect(await saveLink(link)).toEqual(link);
-    expect(insertLink).toHaveBeenCalledWith(link);
+    expect(insertLink).toHaveBeenCalledWith("u1", link);
+  });
+
+  test("only looks for duplicates among the user's own links", async () => {
+    await saveLink(link);
+
+    expect(getLinks).toHaveBeenCalledWith("u1");
   });
 
   test("fills in the page's title when none was given", async () => {
     vi.mocked(fetchTitle).mockResolvedValueOnce("Example Domain");
 
     expect(await saveLink(link)).toEqual({ ...link, title: "Example Domain" });
-    expect(insertLink).toHaveBeenCalledWith({ ...link, title: "Example Domain" });
+    expect(insertLink).toHaveBeenCalledWith("u1", { ...link, title: "Example Domain" });
   });
 
   test("keeps the title the user typed", async () => {
@@ -67,7 +103,7 @@ describe("removeLink", () => {
   test("deletes the link with that id", async () => {
     await removeLink("1");
 
-    expect(deleteLinkById).toHaveBeenCalledWith("1");
+    expect(deleteLinkById).toHaveBeenCalledWith("u1", "1");
   });
 });
 
@@ -75,7 +111,7 @@ describe("saveTitle", () => {
   test("updates the title of the link with that id", async () => {
     await saveTitle("1", "New title");
 
-    expect(updateLinkTitle).toHaveBeenCalledWith("1", "New title");
+    expect(updateLinkTitle).toHaveBeenCalledWith("u1", "1", "New title");
   });
 });
 
@@ -88,7 +124,7 @@ describe("importLinks", () => {
     expect(imported).toHaveLength(1);
     expect(imported[0]).toMatchObject({ url: "https://old.com", createdAt: old.createdAt });
     expect(imported[0].id).not.toBe("old-1");
-    expect(insertLink).toHaveBeenCalledWith(imported[0]);
+    expect(insertLink).toHaveBeenCalledWith("u1", imported[0]);
   });
 
   test("gives links saved before tags existed an empty tag list", async () => {
@@ -123,8 +159,8 @@ describe("checkAllLinks", () => {
 
     await checkAllLinks();
 
-    expect(updateLinkStatus).toHaveBeenCalledWith("1", "ok");
-    expect(updateLinkStatus).toHaveBeenCalledWith("2", "broken");
+    expect(updateLinkStatus).toHaveBeenCalledWith("u1", "1", "ok");
+    expect(updateLinkStatus).toHaveBeenCalledWith("u1", "2", "broken");
   });
 
   test("returns the links fresh from the database", async () => {
@@ -139,20 +175,20 @@ describe("saveReadStatus", () => {
   test("saves the time when a link is marked as read", async () => {
     await saveReadStatus("1", true);
 
-    expect(updateLinkReadAt).toHaveBeenCalledWith("1", expect.any(Date));
+    expect(updateLinkReadAt).toHaveBeenCalledWith("u1", "1", expect.any(Date));
   });
 
   test("clears the time when a link is marked as unread", async () => {
     await saveReadStatus("1", false);
 
-    expect(updateLinkReadAt).toHaveBeenCalledWith("1", null);
+    expect(updateLinkReadAt).toHaveBeenCalledWith("u1", "1", null);
   });
 });
 
 describe("createFolder", () => {
   test("creates a folder with a trimmed name", async () => {
     expect(await createFolder("  Work  ")).toEqual({ id: "f1", name: "Work" });
-    expect(insertFolder).toHaveBeenCalledWith("Work");
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Work");
   });
 
   test("refuses an empty name", async () => {
@@ -170,22 +206,33 @@ describe("createFolder", () => {
 
 describe("moveToFolder", () => {
   test("puts the link into the folder", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Work" }]);
+
     await moveToFolder("1", "f1");
 
-    expect(updateLinkFolder).toHaveBeenCalledWith("1", "f1");
+    expect(updateLinkFolder).toHaveBeenCalledWith("u1", "1", "f1");
   });
 
   test("takes the link out of any folder", async () => {
     await moveToFolder("1", null);
 
-    expect(updateLinkFolder).toHaveBeenCalledWith("1", null);
+    expect(updateLinkFolder).toHaveBeenCalledWith("u1", "1", null);
+  });
+
+  test("refuses a folder that isn't the user's own", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Work" }]);
+
+    await moveToFolder("1", "someone-elses-folder");
+
+    expect(getFolders).toHaveBeenCalledWith("u1");
+    expect(updateLinkFolder).not.toHaveBeenCalled();
   });
 });
 
 describe("renameFolder", () => {
   test("renames the folder with a trimmed name", async () => {
     expect(await renameFolder("f1", "  Job  ")).toBeNull();
-    expect(updateFolderName).toHaveBeenCalledWith("f1", "Job");
+    expect(updateFolderName).toHaveBeenCalledWith("u1", "f1", "Job");
   });
 
   test("refuses an empty name", async () => {
@@ -213,6 +260,6 @@ describe("deleteFolder", () => {
   test("deletes the folder", async () => {
     await deleteFolder("f1");
 
-    expect(deleteFolderById).toHaveBeenCalledWith("f1");
+    expect(deleteFolderById).toHaveBeenCalledWith("u1", "f1");
   });
 });

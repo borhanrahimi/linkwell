@@ -10,7 +10,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`, plus `auth-schema.ts` for Better Auth's `user`, `session`, `account` and `verification` tables) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -135,7 +135,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 
 **Props from server to client** must be serializable: plain objects, arrays, strings, numbers, and `Date`s are fine. Functions are not, except Server Actions.
 
-**Server Actions are public.** Next.js turns each one into an address that anyone on the internet can send a request to, skipping your form. So every action **checks its input again on the server**, even if the browser already checked (`saveLink` re-checks for an empty URL and for duplicates). In v1.0, every action must also check *who* is asking.
+**Server Actions are public.** Next.js turns each one into an address that anyone on the internet can send a request to, skipping your form. So every action **checks its input again on the server**, even if the browser already checked (`saveLink` re-checks for an empty URL and for duplicates). Every action also starts with `await getUserId()` (`lib/session.ts`), which throws when nobody is signed in, and passes that id to `lib/data.ts`. Every function in `lib/data.ts` takes the user id first and only reads or changes that user's rows: updates and deletes match on the row's id **and** `user_id`, so sending someone else's link id changes nothing. A new action must follow the same pattern.
 
 **Fresh data on every request:** `getLinks()` calls `await connection()` first. Without it, Next.js could render the page once at build time and serve that frozen copy forever. `next build` should show the home page as `ƒ (Dynamic)`.
 
@@ -401,3 +401,10 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-17 | `app/page.tsx` checks the session on the server and shows a sign-in screen when there is none | Signed-out visitors never receive the link data. No middleware needed while there is only one page |
 | 2026-10-17 | Sign-out runs in the browser (`authClient.signOut()`), followed by `router.refresh()` | Better Auth clears the session cookie; the refresh makes the Server Component check again and show the sign-in screen |
 | 2026-10-17 | Links and folders are not tied to users yet, and Server Actions don't check the session yet | Done in small steps: sign-in first, then a `user_id` column and session checks in every action. Until then, every signed-in user sees the same links |
+| 2026-10-18 | `links` and `folders` get a required `user_id` that points to `user.id`, `ON DELETE CASCADE` | Every row has an owner. Deleting an account deletes its links and folders, instead of leaving data nobody can reach |
+| 2026-10-18 | Three migrations: add `user_id` as optional, give existing rows to the first user (a `--custom` migration), then make it required | A new required column can't be added to a table that already has rows. The links saved before accounts existed belong to the app's first user |
+| 2026-10-18 | The user id comes from the session on the server (`getUserId()`), never from the browser | The browser could send any id. The session cookie is signed with `BETTER_AUTH_SECRET`, so it can't be faked |
+| 2026-10-18 | `lib/data.ts` functions take `userId` as their first parameter and filter on it (`ownLink`, `ownFolder`) | Forgetting the filter becomes a type error, not a data leak. Checking ownership inside the query needs no extra read first |
+| 2026-10-18 | `moveToFolder` does nothing if the folder isn't one of the user's own | Otherwise a link could be put into another user's folder by guessing its id |
+| 2026-10-18 | Signed-out calls throw instead of returning an error message | The UI only shows these actions to signed-in users, so a signed-out call is a bug or an attack, not something to explain to a user |
+| 2026-10-18 | Folder names are still checked for uniqueness in the actions, now per user; no database `UNIQUE` index yet | Two users may both have a "Work" folder. A `UNIQUE (user_id, lower(name))` index can come later if needed |

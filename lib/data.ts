@@ -1,20 +1,37 @@
 import "server-only";
 import { connection } from "next/server";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { folders, links } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
 import type { Folder, Link, LinkStatus } from "@/types/link";
 
-export async function getLinks(): Promise<Link[]> {
+// Every function takes the signed-in user's id and only touches that user's rows.
+// Updates and deletes match on id AND user_id, so a guessed id from someone
+// else's account changes nothing.
+
+function ownLink(userId: string, id: string) {
+  return and(eq(links.id, id), eq(links.userId, userId));
+}
+
+function ownFolder(userId: string, id: string) {
+  return and(eq(folders.id, id), eq(folders.userId, userId));
+}
+
+export async function getLinks(userId: string): Promise<Link[]> {
   await connection();
-  const rows = await db.select().from(links).orderBy(desc(links.createdAt));
+  const rows = await db
+    .select()
+    .from(links)
+    .where(eq(links.userId, userId))
+    .orderBy(desc(links.createdAt));
   return rows.map(toLink);
 }
 
-export async function insertLink(link: Link) {
+export async function insertLink(userId: string, link: Link) {
   await db.insert(links).values({
     id: link.id,
+    userId,
     url: link.url,
     title: link.title ?? null,
     tags: link.tags ?? [],
@@ -22,46 +39,50 @@ export async function insertLink(link: Link) {
   });
 }
 
-export async function deleteLinkById(id: string) {
-  await db.delete(links).where(eq(links.id, id));
+export async function deleteLinkById(userId: string, id: string) {
+  await db.delete(links).where(ownLink(userId, id));
 }
 
-export async function updateLinkTitle(id: string, title: string) {
+export async function updateLinkTitle(userId: string, id: string, title: string) {
   await db
     .update(links)
     .set({ title: title.trim() || null })
-    .where(eq(links.id, id));
+    .where(ownLink(userId, id));
 }
 
-export async function updateLinkStatus(id: string, status: LinkStatus) {
+export async function updateLinkStatus(userId: string, id: string, status: LinkStatus) {
   await db
     .update(links)
     .set({ status, checkedAt: new Date() })
-    .where(eq(links.id, id));
+    .where(ownLink(userId, id));
 }
 
-export async function updateLinkReadAt(id: string, readAt: Date | null) {
-  await db.update(links).set({ readAt }).where(eq(links.id, id));
+export async function updateLinkReadAt(userId: string, id: string, readAt: Date | null) {
+  await db.update(links).set({ readAt }).where(ownLink(userId, id));
 }
 
-export async function updateLinkFolder(id: string, folderId: string | null) {
-  await db.update(links).set({ folderId }).where(eq(links.id, id));
+export async function updateLinkFolder(userId: string, id: string, folderId: string | null) {
+  await db.update(links).set({ folderId }).where(ownLink(userId, id));
 }
 
-export async function getFolders(): Promise<Folder[]> {
-  const rows = await db.select().from(folders).orderBy(asc(folders.createdAt));
+export async function getFolders(userId: string): Promise<Folder[]> {
+  const rows = await db
+    .select()
+    .from(folders)
+    .where(eq(folders.userId, userId))
+    .orderBy(asc(folders.createdAt));
   return rows.map(toFolder);
 }
 
-export async function insertFolder(name: string): Promise<Folder> {
-  const [row] = await db.insert(folders).values({ name }).returning();
+export async function insertFolder(userId: string, name: string): Promise<Folder> {
+  const [row] = await db.insert(folders).values({ userId, name }).returning();
   return toFolder(row);
 }
 
-export async function updateFolderName(id: string, name: string) {
-  await db.update(folders).set({ name }).where(eq(folders.id, id));
+export async function updateFolderName(userId: string, id: string, name: string) {
+  await db.update(folders).set({ name }).where(ownFolder(userId, id));
 }
 
-export async function deleteFolderById(id: string) {
-  await db.delete(folders).where(eq(folders.id, id));
+export async function deleteFolderById(userId: string, id: string) {
+  await db.delete(folders).where(ownFolder(userId, id));
 }

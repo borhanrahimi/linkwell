@@ -22,7 +22,10 @@ export default async function Home() {
     );
   }
 
-  const [links, folders] = await Promise.all([getLinks(), getFolders()]);
+  const [links, folders] = await Promise.all([
+    getLinks(session.user.id),
+    getFolders(session.user.id),
+  ]);
   return (
     <main className="min-h-screen bg-slate-50 p-8">
       <div className="mx-auto max-w-2xl">

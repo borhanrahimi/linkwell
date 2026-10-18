@@ -343,6 +343,7 @@ describe("toLink", () => {
     checkedAt: null,
     readAt: null,
     folderId: null,
+    userId: "u1",
   };
 
   test("turns the date into an ISO string", () => {
@@ -359,6 +360,10 @@ describe("toLink", () => {
       url: "https://example.com",
       tags: ["news"],
     });
+  });
+
+  test("leaves out the owner's user id", () => {
+    expect(toLink(row)).not.toHaveProperty("userId");
   });
 
   test("leaves the status out when the link was never checked", () => {
@@ -471,6 +476,7 @@ describe("toFolder", () => {
       id: "f1",
       name: "Work",
       createdAt: new Date("2026-10-09T12:00:00.000Z"),
+      userId: "u1",
     };
 
     expect(toFolder(row)).toEqual({ id: "f1", name: "Work" });
