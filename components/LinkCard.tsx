@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { Folder ,Link } from "@/types/link";
+import type { Folder, Link } from "@/types/link";
 import { getArchiveUrl, getDomain, getFaviconUrl, timeAgo } from "@/lib/links";
 
 
@@ -22,6 +22,8 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
+  // Broken links get a double-width tile, so they stand out in the grid.
+  const tileSize = link.status === "broken" ? " ring-1 ring-red-300" : "";
 
   function startEditing() {
     setDraft(link.title || "");
@@ -40,8 +42,8 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
 
   if (isEditing) {
     return (
-      <li className="rounded-lg bg-white p-4 shadow-sm">
-        <form onSubmit={handleSave} className="flex items-center gap-2">
+      <li className={`rounded-2xl bg-white p-4 shadow-sm ${tileSize}`}>
+        <form onSubmit={handleSave} className="flex flex-wrap items-center gap-2">
           <input
             type="text"
             value={draft}
@@ -68,11 +70,21 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
   }
   return (
     <li
-      className={`flex items-center justify-between rounded-lg bg-white p-4 shadow-sm ${link.readAt ? "opacity-60" : ""}`}
+      className={`flex flex-col justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ${tileSize} ${link.readAt ? "opacity-60" : ""}`}
     >
-      <div className="flex min-w-0 items-center gap-3">
-        {faviconUrl && (
-          <Image src={faviconUrl} alt="" width={30} height={30} unoptimized className="shrink-0" />)}
+      <div className="flex gap-3 border-t border-slate-100 pt-3">
+                {/* Every icon sits in the same rounded tile, so square, round and
+            transparent icons all line up. The 64px image shown at 24px stays
+            sharp on high-resolution (retina) screens. */}
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-200">
+          {faviconUrl ? (
+            <Image src={faviconUrl} alt="" width={24} height={24} unoptimized className="size-6 rounded" />
+          ) : (
+            <span aria-hidden="true" className="text-sm font-semibold text-slate-500">
+              {getDomain(link.url).charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
             <a
@@ -132,7 +144,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               ))}
             </ul>
           )}
-                    {folders.length > 0 && (
+          {folders.length > 0 && (
             <select
               value={link.folderId ?? ""}
               onChange={(e) => onMove(link.id, e.target.value || undefined)}

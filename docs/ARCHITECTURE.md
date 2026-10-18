@@ -123,10 +123,11 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google" })` on click |
 | `components/SignOutButton.tsx` | Client | Calls `authClient.signOut()`, then `router.refresh()` so the server page renders again and finds no session |
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
-| `components/LinkManager.tsx` | Client | Holds `useState` for links, folders, folder and tag filters, search text and sort order; calls the Server Actions |
+| `components/LinkManager.tsx` | Client | Holds `useState` for links, folders, folder and tag filters, search text and sort order; calls the Server Actions. Lays out the bento grid: the dashboard tiles and the grid of `LinkCard`s |
 | `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
 | `components/CheckLinksButton.tsx` | Client | Calls `checkAllLinks`, shows "Checking..." while it runs and a summary when it's done |
-| `components/Rediscover.tsx` | Client (imported by `LinkManager`) | No state: shows the links it's given in a named `<section>`. Has no `"use client"` of its own |
+| `components/Rediscover.tsx` | Client (imported by `LinkManager`) | No state: shows the links it's given in a named `<section>`. Takes a `className` so the grid can make it wide. Has no `"use client"` of its own |
+| `components/Overview.tsx` | Client (imported by `LinkManager`) | No state: shows `countLinks(links)` (saved, unread, broken) as a `<dl>`, plus the `CheckLinksButton`. Has no `"use client"` of its own |
 | `components/FolderBar.tsx` | Client | Folder pills (select a folder) and the "+ New folder" form with its own input and error state |
 | `components/FolderActions.tsx` | Client | Rename form and Delete button for the selected folder; asks `window.confirm` before deleting |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
@@ -431,3 +432,10 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | Browser tests use their own Neon branch (`e2e`, copied from production with data, never auto-deleted) | Tests create and delete users and links, which must never happen in the real database. Copying with data also copies Drizzle's migration records, so `drizzle-kit migrate` works on the branch |
 | 2026-10-18 | Tests sign in through Better Auth's `testUtils` plugin, in a test-only auth instance | Google's login page can't be automated (and shouldn't be). The cookie is signed with the real secret, so the app treats it like a normal session; nothing test-only ships to production |
 | 2026-10-18 | Playwright runs a production build (`next build && next start`) on port 3100 | Tests what Vercel runs, and doesn't clash with `npm run dev` on port 3000 |
+| 2026-10-18 | v1.1 layout: **dashboard + card grid** (chosen over a sidebar, or mixing controls and links in one grid) | The tools (save, overview, Rediscover, folders) stay together at the top, and links get the full width below. Easy to scan on desktop, and it stacks into one column on phones |
+| 2026-10-18 | The dashboard is `grid-cols-1 md:grid-cols-3`; the link list is `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` | Mobile first: one column by default, more as the screen grows. `grid-cols-1` (not leaving the column count out) stops long URLs from stretching the grid wider than a phone screen |
+| 2026-10-18 | When Rediscover is empty, the Folders tile spans the whole row | A grid with a missing tile would leave a hole next to Folders |
+| 2026-10-18 | Broken links keep the same card size, with a red outline (`ring-1 ring-red-300`) and the Broken badge | A double-width card was tried first, but uneven card sizes looked out of place; the outline and badge are enough to stand out |
+| 2026-10-18 | New `countLinks()` in `lib/links.ts` feeds the Overview tile | A pure function, so the counting is tested without rendering anything; the tile only shows the numbers |
+| 2026-10-18 | Favicons are fetched at 64px and shown at 24px inside a fixed rounded tile, with the domain's first letter when there's no icon | 32px icons looked blurry on retina screens, and icons of different shapes didn't line up |
+| 2026-10-18 | Inputs inside flex rows get `min-w-0` | Flex and grid items don't shrink below their content's width by default, which pushed buttons out of their tiles on narrow screens |

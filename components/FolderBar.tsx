@@ -39,7 +39,7 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
   }
 
   return (
-    <div className="mt-6">
+    <div className="mt-3">
       <div className="flex flex-wrap items-center gap-2">
         <ul aria-label="Folders" className="flex flex-wrap gap-2">
           {folders.length > 0 && (
@@ -82,7 +82,7 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
             aria-label="Folder name"
             placeholder="Folder name"
             autoFocus
-            className="flex-1 rounded border border-slate-300 px-3 py-1 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
           />
           <button
             type="submit"

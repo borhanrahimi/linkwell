@@ -4,15 +4,16 @@ import { getDomain, timeAgo } from "@/lib/links";
 type RediscoverProps = {
   links: Link[];
   now: Date;
+  className?: string;
 };
 
-export default function Rediscover({ links, now }: RediscoverProps) {
+export default function Rediscover({ links, now, className = "" }: RediscoverProps) {
   if (links.length === 0) {
     return null;
   }
 
   return (
-    <section aria-labelledby="rediscover-heading" className="mt-6 rounded-lg bg-violet-50 p-4">
+    <section aria-labelledby="rediscover-heading" className={`rounded-2xl bg-violet-50 p-5 shadow-sm ${className}`}>
       <h2 id="rediscover-heading" className="font-semibold text-violet-900">
         Rediscover
       </h2>

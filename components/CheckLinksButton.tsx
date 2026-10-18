@@ -26,7 +26,7 @@ export default function CheckLinksButton({ onChecked }: CheckLinksButtonProps) {
   }
 
   return (
-    <div className="mt-3 flex items-center gap-3 text-sm">
+    <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
       <button
         onClick={handleClick}
         disabled={isChecking}

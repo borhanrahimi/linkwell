@@ -95,7 +95,9 @@ export function setFolder(
 }
 
 export function clearFolder(links: Link[], folderId: string): Link[] {
-  return links.map((link) => (link.folderId === folderId ? { ...link, folderId: undefined } : link));
+  return links.map((link) =>
+    link.folderId === folderId ? { ...link, folderId: undefined } : link
+  );
 }
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -111,7 +113,7 @@ export function pickRediscover(links: Link[], now: Date, count = 3): Link[] {
 export function getFaviconUrl(url: string) {
   try {
     const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
   } catch {
     return null;
   }
@@ -189,4 +191,12 @@ export function toLink(row: LinkRow): Link {
 
 export function toFolder(row: FolderRow): Folder {
   return { id: row.id, name: row.name };
+}
+
+export function countLinks(links: Link[]) {
+  return {
+    total: links.length,
+    unread: links.filter((link) => !link.readAt).length,
+    broken: links.filter((link) => link.status === "broken").length,
+  };
 }

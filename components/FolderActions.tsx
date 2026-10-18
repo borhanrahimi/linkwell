@@ -49,7 +49,7 @@ export default function FolderActions({ folder, onRename, onDelete }: FolderActi
                         }}
                         aria-label="New folder name"
                         autoFocus
-                        className="flex-1 rounded border border-slate-300 px-3 py-1 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                        className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
                     />
                     <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-sm font-semibold text-white hover:bg-slate-800">
                         Rename

@@ -17,6 +17,7 @@ import {
   getArchiveUrl,
   setReadAt,
   pickRediscover,
+  countLinks,
   toFolder,
   setFolder,
   filterByFolder,
@@ -218,7 +219,7 @@ describe("updateTitle", () => {
 describe("getFaviconUrl", () => {
   test("returns a favicon address for the link's domain", () => {
     expect(getFaviconUrl("https://nextjs.org/docs")).toBe(
-      "https://www.google.com/s2/favicons?domain=nextjs.org&sz=32"
+      "https://www.google.com/s2/favicons?domain=nextjs.org&sz=64"
     );
   });
 
@@ -424,6 +425,22 @@ describe("setReadAt", () => {
     const read = { ...first, readAt: "2026-10-09T10:00:00.000Z" };
 
     expect(setReadAt([read], first.id, undefined)[0].readAt).toBeUndefined();
+  });
+});
+
+describe("countLinks", () => {
+  test("counts all, unread and broken links", () => {
+    const links = [
+      { id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" },
+      { id: "2", url: "https://b.com", createdAt: "2020-01-01T00:00:00.000Z", readAt: "2020-01-02T00:00:00.000Z" },
+      { id: "3", url: "https://c.com", createdAt: "2020-01-01T00:00:00.000Z", status: "broken" as const },
+    ];
+
+    expect(countLinks(links)).toEqual({ total: 3, unread: 2, broken: 1 });
+  });
+
+  test("is all zeros when there are no links", () => {
+    expect(countLinks([])).toEqual({ total: 0, unread: 0, broken: 0 });
   });
 });
 

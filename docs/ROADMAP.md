@@ -113,7 +113,7 @@ Folder names must be unique (ignoring case). We didn't need a SQL join after all
 
 Redesign after launch: it's mostly styling, so the data, Server Actions and tests barely change (tests find elements by role and name, not by CSS class).
 
-- [ ] Bento grid layout: cards in a CSS Grid with different tile sizes (for example bigger tiles for rediscover and broken links), working on phone and desktop
+- [x] Bento grid layout: a dashboard of tiles (Save a link, Overview, Rediscover, Folders) above a grid of link cards, one column on phones and up to three on desktop
 - [ ] Glassmorphism cards: frosted glass (`backdrop-blur`, see-through backgrounds, light borders) over a gradient background
 - [ ] Check text contrast on glass cards so everything stays readable and accessible
 - [ ] Dark mode

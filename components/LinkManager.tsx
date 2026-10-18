@@ -4,7 +4,7 @@ import { useState } from "react";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
 import ImportBanner from "@/components/ImportBanner";
-import CheckLinksButton from "@/components/CheckLinksButton";
+import Overview from "@/components/Overview";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
 import FolderActions from "@/components/FolderActions";
@@ -30,6 +30,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     sortOrder
   );
   const rediscover = now ? pickRediscover(links, now) : [];
+  const showRediscover = now !== undefined && rediscover.length > 0;
   const selectedFolder = folders.find((folder) => folder.id === activeFolder);
 
   async function addLink(url: string, title: string, tags: string) {
@@ -98,20 +99,37 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     setActiveFolder(null);
     await deleteFolder(id);
   }
-
   return (
     <>
       <ImportBanner onImported={(imported) => setLinks((current) => [...imported, ...current])} />
 
-      <LinkForm onAdd={addLink} />
+      {/* The bento dashboard: one column on phones, three on wider screens. */}
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <section aria-labelledby="save-heading" className="rounded-2xl bg-white p-5 shadow-sm md:col-span-2">
+          <h2 id="save-heading" className="font-semibold text-slate-900">
+            Save a link
+          </h2>
+          <LinkForm onAdd={addLink} />
+        </section>
 
-      {now && <Rediscover links={rediscover} now={now} />}
+        <Overview links={links} onChecked={setLinks} />
 
+        {showRediscover && <Rediscover links={rediscover} now={now} className="md:col-span-2" />}
 
-      <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
-      {selectedFolder && (
-        <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onDelete={removeFolder} />
-      )}
+        {/* Without Rediscover, Folders takes the whole row instead of leaving a gap. */}
+        <section
+          aria-labelledby="folders-heading"
+          className={`rounded-2xl bg-white p-5 shadow-sm ${showRediscover ? "" : "md:col-span-3"}`}
+        >
+          <h2 id="folders-heading" className="font-semibold text-slate-900">
+            Folders
+          </h2>
+          <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
+          {selectedFolder && (
+            <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onDelete={removeFolder} />
+          )}
+        </section>
+      </div>
 
       <div className="mt-6 flex gap-2">
         <input
@@ -134,7 +152,6 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
         </select>
       </div>
 
-      {links.length > 0 && <CheckLinksButton onChecked={setLinks} />}
       {activeTag && (
         <div className="mt-6 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-2 text-blue-800">
           <span>Showing links tagged #{activeTag}</span>
@@ -155,7 +172,8 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
       )}
 
       {visibleLinks.length > 0 && (
-        <ul className="mt-6 space-y-3">
+        // grid-flow-dense lets later cards fill the gaps that wide (broken) cards leave.
+        <ul className="mt-4 grid grid-flow-dense grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleLinks.map((link) => (
             <LinkCard
               key={link.id}
@@ -175,3 +193,4 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     </>
   );
 }
+

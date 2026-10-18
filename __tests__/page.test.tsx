@@ -340,7 +340,7 @@ test("shows the site's favicon next to a link", async () => {
 
   const icon = document.querySelector("img");
   expect(icon?.getAttribute("src")).toBe(
-    "https://www.google.com/s2/favicons?domain=example.com&sz=32"
+    "https://www.google.com/s2/favicons?domain=example.com&sz=64"
   );
 });
 
@@ -438,6 +438,31 @@ describe("importing links saved in this browser", () => {
 
     expect(screen.queryByRole("button", { name: "Import" })).toBeNull();
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+  });
+});
+
+describe("overview", () => {
+  test("shows how many links are saved, unread and broken", () => {
+    render(
+      <LinkManager
+        initialLinks={[
+          { id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" },
+          { id: "2", url: "https://b.com", createdAt: "2020-01-01T00:00:00.000Z", readAt: "2020-01-02T00:00:00.000Z" },
+          { id: "3", url: "https://c.com", createdAt: "2020-01-01T00:00:00.000Z", status: "broken" },
+        ]}
+      />
+    );
+
+    const overview = screen.getByRole("region", { name: "Overview" });
+    expect(within(overview).getByText("links").nextSibling?.textContent).toBe("3");
+    expect(within(overview).getByText("unread").nextSibling?.textContent).toBe("2");
+    expect(within(overview).getByText("broken").nextSibling?.textContent).toBe("1");
+  });
+
+  test("says 'link' when there is only one", () => {
+    render(<LinkManager initialLinks={[{ id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" }]} />);
+
+    expect(within(screen.getByRole("region", { name: "Overview" })).getByText("link")).toBeDefined();
   });
 });
 
