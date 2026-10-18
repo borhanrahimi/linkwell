@@ -43,25 +43,41 @@ export async function deleteLinkById(userId: string, id: string) {
   await db.delete(links).where(ownLink(userId, id));
 }
 
-export async function updateLinkTitle(userId: string, id: string, title: string) {
+export async function updateLinkTitle(
+  userId: string,
+  id: string,
+  title: string
+) {
   await db
     .update(links)
     .set({ title: title.trim() || null })
     .where(ownLink(userId, id));
 }
 
-export async function updateLinkStatus(userId: string, id: string, status: LinkStatus) {
+export async function updateLinkStatus(
+  userId: string,
+  id: string,
+  status: LinkStatus
+) {
   await db
     .update(links)
     .set({ status, checkedAt: new Date() })
     .where(ownLink(userId, id));
 }
 
-export async function updateLinkReadAt(userId: string, id: string, readAt: Date | null) {
+export async function updateLinkReadAt(
+  userId: string,
+  id: string,
+  readAt: Date | null
+) {
   await db.update(links).set({ readAt }).where(ownLink(userId, id));
 }
 
-export async function updateLinkFolder(userId: string, id: string, folderId: string | null) {
+export async function updateLinkFolder(
+  userId: string,
+  id: string,
+  folderId: string | null
+) {
   await db.update(links).set({ folderId }).where(ownLink(userId, id));
 }
 
@@ -74,15 +90,31 @@ export async function getFolders(userId: string): Promise<Folder[]> {
   return rows.map(toFolder);
 }
 
-export async function insertFolder(userId: string, name: string): Promise<Folder> {
+export async function insertFolder(
+  userId: string,
+  name: string
+): Promise<Folder> {
   const [row] = await db.insert(folders).values({ userId, name }).returning();
   return toFolder(row);
 }
 
-export async function updateFolderName(userId: string, id: string, name: string) {
+export async function updateFolderName(
+  userId: string,
+  id: string,
+  name: string
+) {
   await db.update(folders).set({ name }).where(ownFolder(userId, id));
 }
 
 export async function deleteFolderById(userId: string, id: string) {
   await db.delete(folders).where(ownFolder(userId, id));
+}
+// Every user's links, for the daily check that Vercel Cron runs.
+// The only function here without a userId: never call it from a Server Action.
+export async function getLinksToCheck(): Promise<
+  { id: string; userId: string; url: string }[]
+> {
+  return db
+    .select({ id: links.id, userId: links.userId, url: links.url })
+    .from(links);
 }
