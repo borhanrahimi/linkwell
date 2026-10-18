@@ -408,3 +408,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | `moveToFolder` does nothing if the folder isn't one of the user's own | Otherwise a link could be put into another user's folder by guessing its id |
 | 2026-10-18 | Signed-out calls throw instead of returning an error message | The UI only shows these actions to signed-in users, so a signed-out call is a bug or an attack, not something to explain to a user |
 | 2026-10-18 | Folder names are still checked for uniqueness in the actions, now per user; no database `UNIQUE` index yet | Two users may both have a "Work" folder. A `UNIQUE (user_id, lower(name))` index can come later if needed |
+| 2026-10-18 | Hosted on **Vercel** (free tier), deployed on every push to `main` | Made by the Next.js team, so it needs no setup. Vercel Cron can run the scheduled link checks next |
+| 2026-10-18 | Production and local development share one Neon database for now | Only one user, so there's nothing to keep apart yet. A separate Neon branch for development can come before other people sign up |
+| 2026-10-18 | `lib/auth.ts` reads its settings through `requireEnv`, which throws with the variable's name | A missing variable on Vercel shows up as a clear error in the logs, instead of a 500 on sign-in |
+| 2026-10-18 | Sign-in only works on the production address, not on Vercel preview deployments | Previews get a new address each time, and Google only accepts redirect URIs listed in advance |

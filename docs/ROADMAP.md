@@ -103,7 +103,7 @@ Folder names must be unique (ignoring case). We didn't need a SQL join after all
 - [x] Each user sees only their own links and folders (a `user_id` column on both)
 - [x] Every Server Action checks who is asking before reading or changing data
 - [x] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
-- [ ] Deploy to the web (for example Vercel)
+- [x] Deploy to the web: live on Vercel at https://linkwell-dypu.vercel.app
 - [ ] Check links automatically on a schedule (for example Vercel Cron), instead of only with the button
 - [ ] End-to-end tests in a real browser (for example Playwright)
 
