@@ -295,7 +295,7 @@ Never edit a migration that has already been applied. Make a new one instead.
 
 ## 7. Testing
 
-Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake browser).
+Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake browser). On top of that, a few **Playwright** tests in `e2e/` click through the real app in a real browser (see "Browser tests" below).
 
 - **`lib/` functions** get unit tests: call the function, check the result.
 - **Pages and components** get tests that act like a user: type into inputs and click buttons, found by role, label or placeholder, never by CSS class. If a test can't find an element by role and name, a screen reader probably can't either. Fix the markup, not the test.
@@ -317,6 +317,16 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Write the test first** when you can: watch it fail (🔴), then write the code (🟢). A test that never failed hasn't proven anything.
 - **Time-dependent code takes `now` as a parameter** (with a default), so tests pass a fixed date and give the same result every day. Pick dates far from today (for example 2020), so a test can't pass by accident because the real clock gives the same answer.
 - **Never copy values like storage keys or error messages from one module into another's code.** Import shared values, so a typo can't make a test pass for the wrong reason.
+
+**Browser tests (Playwright, `npm run e2e`):**
+
+- They cover what the fake-browser tests can't: the real server, the real database, sessions and cookies. Keep them few, one per important path (signed out, sign in and out, saving survives a reload, accounts are kept apart). Details belong in the Vitest tests.
+- `playwright.config.ts` builds the app and starts it on port 3100, with `DATABASE_URL` set to `E2E_DATABASE_URL` (a Neon branch called `e2e`) and `BETTER_AUTH_URL` set to `http://localhost:3100`. The real database is never touched, and `npm run dev` on port 3000 can keep running.
+- **Signing in without Google:** `e2e/fixtures.ts` makes a second Better Auth instance with the `testUtils` plugin, the same secret and the test database. Its `signIn(name)` fixture saves a brand-new user and puts a real, signed session cookie in the browser. The plugin lives only in the tests, never in `lib/auth.ts`.
+- Each test signs in its own new user, and the users are deleted afterwards (their links and folders go with them through `ON DELETE CASCADE`). Tests can run in parallel and never see each other's data.
+- Find elements the same way as in Vitest tests: by role, label or placeholder. Type a title when saving a link, so the server doesn't fetch the page.
+- When you add a migration, apply it to the test branch too: `DATABASE_URL="$(grep '^E2E_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`.
+- Vitest skips `e2e/` (`exclude` in `vitest.config.mts`), so `npm run check` stays fast and doesn't need the test database.
 
 ## 8. Decision log
 
@@ -417,3 +427,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | The cron route requires `Authorization: Bearer <CRON_SECRET>`, and refuses everything when `CRON_SECRET` isn't set | It's a public address that makes the server fetch every saved link; without the secret, anyone could trigger that over and over. Failing closed means a missing variable can't open it up |
 | 2026-10-18 | `getLinksToCheck()` is the only `lib/data.ts` function without a `userId`, and returns each link's owner | The cron job works for all users at once, and `updateLinkStatus` still needs the owner's id. Only the cron route may call it, never a Server Action |
 | 2026-10-18 | The cron route checks all links at the same time (`Promise.all`), like the button | Fine for a handful of users. With many links, it should check in batches so it stays within Vercel's time limit |
+| 2026-10-18 | End-to-end tests with **Playwright**, Chromium only | The standard tool, with Next.js docs for it. One browser is enough to catch broken flows; more can come with the redesign |
+| 2026-10-18 | Browser tests use their own Neon branch (`e2e`, copied from production with data, never auto-deleted) | Tests create and delete users and links, which must never happen in the real database. Copying with data also copies Drizzle's migration records, so `drizzle-kit migrate` works on the branch |
+| 2026-10-18 | Tests sign in through Better Auth's `testUtils` plugin, in a test-only auth instance | Google's login page can't be automated (and shouldn't be). The cookie is signed with the real secret, so the app treats it like a normal session; nothing test-only ships to production |
+| 2026-10-18 | Playwright runs a production build (`next build && next start`) on port 3100 | Tests what Vercel runs, and doesn't clash with `npm run dev` on port 3000 |

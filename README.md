@@ -6,7 +6,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 
 ## Status
 
-🚧 **Early development (v0.8 done, v1.0 next).** You can add and delete links, give them an optional title and edit it later. If you leave the title empty, Linkwell reads it from the page itself. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. The **Check links** button visits every saved link from the server and marks dead ones with a red **Broken** badge (hover it to see when it was checked). A link only counts as broken when the page is gone (404/410), the domain doesn't exist, or nothing answers; slow sites, sites that block robots, and temporary errors count as working. Broken links get a **View archived copy** link to the Wayback Machine. Mark links as read when you're done with them (read links fade out). A violet **Rediscover** box at the top brings back up to three links you saved more than a week ago and still haven't read. You can also sort links into folders: **+ New folder** creates one, the menu on each card moves a link into a folder (or back to "No folder"), and clicking a folder shows only its links, together with the tag filter, search and sort. A selected folder can be renamed or deleted; deleting a folder keeps its links, they just leave the folder. Next up: v1.0, getting Linkwell ready for other people. Done so far: the server refuses to fetch private or internal addresses (like `localhost`) when checking links or reading titles, and such links count as broken. You now sign in with Google to use the app; the page shows who is signed in and has a **Sign out** button. Each account has its own links and folders: nobody else can see or change yours. Linkwell is online at [linkwell-dypu.vercel.app](https://linkwell-dypu.vercel.app). Every link is also checked automatically once a day. Next: end-to-end tests in a real browser. See the [roadmap](docs/ROADMAP.md).
+🚧 **Early development (v1.0 done, v1.1 next).** You can add and delete links, give them an optional title and edit it later. If you leave the title empty, Linkwell reads it from the page itself. Links are saved in a Postgres database, so they survive a refresh and are the same on every device that opens the app. Each card shows the site's icon, the full URL and when it was saved ("3 days ago"; hover for the exact date). Saving the same link twice shows an error instead. You can add tags when saving a link (comma separated, like `react, news`), and they show as `#react` `#news` under the card. Click a tag to show only the links with that tag; click it again (or "Show all") to go back. The search box finds links by URL or title as you type, and the menu next to it sorts the list by newest, oldest or title. Tag filter, search and sort all work together. If you saved links in your browser before v0.5, a banner offers to import them into the database. The **Check links** button visits every saved link from the server and marks dead ones with a red **Broken** badge (hover it to see when it was checked). A link only counts as broken when the page is gone (404/410), the domain doesn't exist, or nothing answers; slow sites, sites that block robots, and temporary errors count as working. Broken links get a **View archived copy** link to the Wayback Machine. Mark links as read when you're done with them (read links fade out). A violet **Rediscover** box at the top brings back up to three links you saved more than a week ago and still haven't read. You can also sort links into folders: **+ New folder** creates one, the menu on each card moves a link into a folder (or back to "No folder"), and clicking a folder shows only its links, together with the tag filter, search and sort. A selected folder can be renamed or deleted; deleting a folder keeps its links, they just leave the folder. Next up: v1.0, getting Linkwell ready for other people. Done so far: the server refuses to fetch private or internal addresses (like `localhost`) when checking links or reading titles, and such links count as broken. You now sign in with Google to use the app; the page shows who is signed in and has a **Sign out** button. Each account has its own links and folders: nobody else can see or change yours. Linkwell is online at [linkwell-dypu.vercel.app](https://linkwell-dypu.vercel.app). Every link is also checked automatically once a day, and browser tests (Playwright) check signing in, saving links and keeping accounts apart. Next: v1.1, a new look. See the [roadmap](docs/ROADMAP.md).
 
 > **Where is my data?** Links are stored in a Postgres database hosted on [Neon](https://neon.tech), in the `links` and `folders` tables. Links saved before v0.5 lived in your browser's `localStorage` (key `linkwell:links`). When the app finds any, it offers to import them; after importing, the browser's copy is deleted.
 >
@@ -50,6 +50,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 | [Better Auth](https://better-auth.com) | 1 | Sign in with Google, sessions |
 | [ESLint](https://eslint.org) | 9 | Linting |
 | [Vitest](https://vitest.dev) + [Testing Library](https://testing-library.com) | 5 / 16 | Automated tests |
+| [Playwright](https://playwright.dev) | 1.64 | End-to-end tests in a real browser |
 
 ## Getting started
 
@@ -70,6 +71,8 @@ npm install
 #    GOOGLE_CLIENT_SECRET=...    #   Credentials → OAuth client ID (Web application)
 #    In Google Cloud, set the authorized redirect URI to
 #    http://localhost:3000/api/auth/callback/google
+#    For the browser tests (npm run e2e), also add a Neon branch's connection string:
+#    E2E_DATABASE_URL=...         # Neon → Branches → Create branch "e2e" (auto-delete: never)
 
 # 4. Create the tables in your database
 npx drizzle-kit migrate
@@ -111,6 +114,7 @@ Write `CRON_SECRET` in `.env.local` without quotes, or this command sends them a
 | `npm run lint` | Checks the code with ESLint |
 | `npm test` | Runs the tests in watch mode (re-runs on every save) |
 | `npm run check` | Type-check + lint + tests, once. **Run before every commit.** |
+| `npm run e2e` | Builds the app and runs the Playwright browser tests against the test database (`E2E_DATABASE_URL`). `npx playwright show-report` shows what went wrong |
 | `npx drizzle-kit generate --name <change>` | Writes a new SQL migration in `drizzle/` after you change `db/schema.ts` |
 | `npx drizzle-kit migrate` | Applies new migrations to the database in `DATABASE_URL` |
 
@@ -138,6 +142,7 @@ linkwell/
 ├── drizzle/          # Generated SQL migrations (committed)
 ├── types/          # Shared TypeScript types (Link, Folder)
 ├── __tests__/      # Automated tests (Vitest)
+├── e2e/            # Browser tests (Playwright); fixtures.ts signs in test users without Google
 ├── docs/           # Architecture and roadmap
 └── public/           # Static files served as-is (empty for now)
 ```

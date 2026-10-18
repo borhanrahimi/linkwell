@@ -97,7 +97,7 @@ Each link lives in one folder ("where it belongs"); tags stay for "what it's abo
 
 Folder names must be unique (ignoring case). We didn't need a SQL join after all: the page loads links and folders as two separate lists and matches them in the browser by `folderId`.
 
-## 🔜 v1.0: Ready for other people
+## ✅ v1.0: Ready for other people (done)
 
 - [x] User accounts: Sign in with Google, see who is signed in, sign out (Better Auth)
 - [x] Each user sees only their own links and folders (a `user_id` column on both)
@@ -105,11 +105,11 @@ Folder names must be unique (ignoring case). We didn't need a SQL join after all
 - [x] Stop the link checker from fetching private/internal addresses (SSRF protection) before going public
 - [x] Deploy to the web: live on Vercel at https://linkwell-dypu.vercel.app
 - [x] Check links automatically on a schedule: Vercel Cron checks every link once a day, and the button still works
-- [ ] End-to-end tests in a real browser (for example Playwright)
+- [x] End-to-end tests in a real browser with Playwright (`npm run e2e`), against their own Neon branch
 
 **You'll learn:** authentication, deployment, and testing.
 
-## v1.1: A new look ✨
+## 🔜 v1.1: A new look ✨
 
 Redesign after launch: it's mostly styling, so the data, Server Actions and tests barely change (tests find elements by role and name, not by CSS class).
 
