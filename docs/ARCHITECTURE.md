@@ -270,12 +270,24 @@ The server fetches URLs that users typed. Without protection, someone could save
 | `clearSavedLinks()` | Deletes the browser's copy after an import |
 | `STORAGE_KEY` | The old storage key (`linkwell:links`), exported so tests use the exact same value |
 
+**Three databases** (Neon branches), so development and tests never touch real data:
+
+| Variable in `.env.local` | Neon branch | Used by |
+|---|---|---|
+| `DATABASE_URL` | `dev` | `npm run dev` and `drizzle-kit` on your laptop |
+| `E2E_DATABASE_URL` | `e2e` | `npm run e2e` (the browser tests) |
+| `PROD_DATABASE_URL` | `production` | Only for migrating the live database. The live site itself gets its `DATABASE_URL` from Vercel's settings |
+
+Write these values without quotes, or the `grep ... | cut` commands below copy the quotes too.
+
 **Changing the database:**
 
 1. Edit `db/schema.ts`.
 2. `npx drizzle-kit generate --name <what_changed>` writes a new numbered SQL file in `drizzle/`. Read it.
-3. `npx drizzle-kit migrate` applies it to Neon (it prints nothing on success; check **Tables** in the Neon dashboard).
-4. Commit the schema change and the migration together.
+3. `npx drizzle-kit migrate` applies it to the `dev` branch (it prints nothing on success; check **Tables** in the Neon dashboard).
+4. Apply it to the test branch: `DATABASE_URL="$(grep '^E2E_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`, then run `npm run e2e`.
+5. Before pushing code that needs it, apply it to the live database: `DATABASE_URL="$(grep '^PROD_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`. Only add things (new tables, new optional columns) in a way the old live code can live with, because the migration runs a minute or two before the new code is deployed.
+6. Commit the schema change and the migration together.
 
 Never edit a migration that has already been applied. Make a new one instead.
 
@@ -494,3 +506,4 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | `LinkForm` only clears a field if it still holds what was saved | Saving can take seconds (the title is fetched), and clearing everything when it finished wiped a link you had started typing meanwhile |
 | 2026-10-18 | The blue button gets darker on hover (`#0062c4`) instead of lighter (`#0077ed`) | Found by the contrast test on the account page: white on the lighter blue was 4.32:1, below 4.5:1 |
 | 2026-10-18 | The contrast test skips disabled controls | WCAG doesn't require contrast for inactive controls, like the half-faded "Saving..." button |
+| 2026-10-19 | Local development moved to its own Neon branch (`dev`); the production URL is kept as `PROD_DATABASE_URL`, only for migrations | Building "delete account" means pressing delete buttons while testing; on the shared database one mistake would delete real data. The app reads `DATABASE_URL` everywhere, so nothing in the code changed |

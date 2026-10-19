@@ -41,6 +41,18 @@ export default async function AccountPage() {
             <div className="mt-6 border-t border-line pt-6">
               <UsernameForm initialUsername={user.username} />
             </div>
+
+            <div className="mt-6 border-t border-line pt-6">
+              <h2 className="text-sm font-medium text-ink">Export your links</h2>
+              <p className="text-sm text-muted">
+                Download all your links and folders as a bookmarks file. Chrome, Safari, Firefox and Raindrop can
+                import it.
+              </p>
+              {/* A plain <a>, not <Link>: this downloads a file instead of opening a page. */}
+              <a href="/api/export" download className="btn-secondary mt-3 inline-block">
+                Download bookmarks file
+              </a>
+            </div>
           </section>
         </div>
       </div>

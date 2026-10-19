@@ -98,7 +98,7 @@ Linkwell runs on [Vercel](https://vercel.com). Every push to `main` deploys auto
 2. In Google Cloud Console, add `https://linkwell-dypu.vercel.app/api/auth/callback/google` to the OAuth client's **Authorized redirect URIs**. If this is missing, Google shows "Access blocked: This app's request is invalid".
 3. After changing a variable, redeploy (**Deployments → ⋯ → Redeploy**), because variables are read when the app is built.
 
-Run new database migrations (`npx drizzle-kit migrate`) before pushing code that needs them. The live site uses the same Neon database as local development.
+Local development, the browser tests and the live site each use their own Neon branch (`DATABASE_URL`, `E2E_DATABASE_URL`, `PROD_DATABASE_URL`; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#5-data-storage)). Apply new migrations to the live database before pushing code that needs them.
 
 **Daily link check:** `vercel.json` tells Vercel Cron to call `/api/cron/check-links` every day at 06:00 UTC. Vercel sends `CRON_SECRET` with the request, and the route refuses any request without it. To run the check by hand, use **Settings → Cron Jobs → Run** in Vercel, or locally:
 

@@ -137,7 +137,7 @@ The first step toward public profiles: Linkwell knows who you are, and you choos
 Small things to tidy up before other people sign up.
 
 - [x] Saving a link no longer clears what you started typing while the previous link was still saving
-- [ ] Local development uses its own Neon branch (`dev`), so trying things out can never touch real data
+- [x] Local development uses its own Neon branch (`dev`), so trying things out can never touch real data
 
 **You'll learn:** race conditions in forms, and separate environments (development, test, production).
 
