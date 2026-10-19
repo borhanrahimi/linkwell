@@ -1,8 +1,8 @@
 import "server-only";
 import { connection } from "next/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { folders, links } from "@/db/schema";
+import { folders, links, user } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
 import type { Folder, Link, LinkStatus } from "@/types/link";
 
@@ -117,4 +117,18 @@ export async function getLinksToCheck(): Promise<
   return db
     .select({ id: links.id, userId: links.userId, url: links.url })
     .from(links);
+}
+
+// True when someone other than this user already has the username.
+export async function isUsernameTaken(userId: string, username: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(and(eq(user.username, username), ne(user.id, userId)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function updateUsername(userId: string, username: string) {
+  await db.update(user).set({ username }).where(eq(user.id, userId));
 }

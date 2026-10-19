@@ -12,11 +12,14 @@ import {
   updateLinkStatus,
   updateLinkTitle,
   updateLinkReadAt,
+  isUsernameTaken,
+  updateUsername,
 } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
 import { isDuplicate } from "@/lib/links";
+import { normalizeUsername, usernameError } from "@/lib/username";
 import type { Folder, Link } from "@/types/link";
 
 // Server Actions are public addresses, so each one asks who is calling first
@@ -124,4 +127,21 @@ export async function renameFolder(
 
 export async function deleteFolder(id: string) {
   await deleteFolderById(await getUserId(), id);
+}
+
+// Returns an error message, or null when the username was saved.
+export async function saveUsername(input: string): Promise<string | null> {
+  const userId = await getUserId();
+  const username = normalizeUsername(input);
+  const error = usernameError(username);
+  if (error) {
+    return error;
+  }
+  if (await isUsernameTaken(userId, username)) {
+    return `@${username} is already taken.`;
+  }
+  // The UNIQUE constraint in the database is the final guard, in case two
+  // people pick the same name at the same moment.
+  await updateUsername(userId, username);
+  return null;
 }

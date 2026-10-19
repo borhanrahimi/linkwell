@@ -19,5 +19,17 @@ for (const colorScheme of ["light", "dark"] as const) {
       expect(results.length).toBeGreaterThan(10);
       expect(tooLow).toEqual([]);
     });
+
+    test("every text on the account page is readable", async ({ page, signIn }) => {
+      await signIn();
+      await page.goto("/account");
+      await page.getByLabel("Username").fill("no spaces allowed");
+      await page.getByRole("button", { name: "Save" }).click();
+      await page.getByText("Use only letters, numbers and _.").waitFor();
+
+      const results = await measureContrast(page);
+
+      expect(results.filter((result) => result.ratio < result.needed)).toEqual([]);
+    });
   });
 }

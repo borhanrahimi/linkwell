@@ -17,6 +17,12 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg", schema }),
   baseURL: requireEnv("BETTER_AUTH_URL"),
   secret: requireEnv("BETTER_AUTH_SECRET"),
+  user: {
+    additionalFields: {
+      // Chosen on the account page (saveUsername), never while signing in.
+      username: { type: "string", required: false, input: false, unique: true },
+    },
+  },
   socialProviders: {
     google: {
       clientId: requireEnv("GOOGLE_CLIENT_ID"),

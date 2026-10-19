@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle, saveUsername } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
@@ -17,6 +17,8 @@ vi.mock("@/lib/data", () => ({
   deleteFolderById: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
   insertFolder: vi.fn(async (_userId: string, name: string) => ({ id: "f1", name })),
+  isUsernameTaken: vi.fn(async () => false),
+  updateUsername: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/session", () => ({
@@ -52,6 +54,7 @@ describe("signed out", () => {
     await expect(createFolder("Work")).rejects.toThrow("Not signed in");
     await expect(renameFolder("f1", "Job")).rejects.toThrow("Not signed in");
     await expect(deleteFolder("f1")).rejects.toThrow("Not signed in");
+    await expect(saveUsername("ada")).rejects.toThrow("Not signed in");
 
     expect(getLinks).not.toHaveBeenCalled();
     expect(getFolders).not.toHaveBeenCalled();
@@ -59,6 +62,7 @@ describe("signed out", () => {
     expect(deleteLinkById).not.toHaveBeenCalled();
     expect(insertFolder).not.toHaveBeenCalled();
     expect(deleteFolderById).not.toHaveBeenCalled();
+    expect(updateUsername).not.toHaveBeenCalled();
   });
 });
 
@@ -261,5 +265,25 @@ describe("deleteFolder", () => {
     await deleteFolder("f1");
 
     expect(deleteFolderById).toHaveBeenCalledWith("u1", "f1");
+  });
+});
+
+describe("saveUsername", () => {
+  test("saves the username in lowercase, without the @", async () => {
+    expect(await saveUsername("  @Ada_L ")).toBeNull();
+    expect(isUsernameTaken).toHaveBeenCalledWith("u1", "ada_l");
+    expect(updateUsername).toHaveBeenCalledWith("u1", "ada_l");
+  });
+
+  test("refuses a username that breaks the rules", async () => {
+    expect(await saveUsername("a!")).toBe("Usernames need at least 3 characters.");
+    expect(updateUsername).not.toHaveBeenCalled();
+  });
+
+  test("refuses a username someone else has", async () => {
+    vi.mocked(isUsernameTaken).mockResolvedValueOnce(true);
+
+    expect(await saveUsername("ada")).toBe("@ada is already taken.");
+    expect(updateUsername).not.toHaveBeenCalled();
   });
 });

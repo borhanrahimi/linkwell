@@ -120,6 +120,44 @@ Redesign after launch: it's mostly styling, so the data, Server Actions and test
 
 **You'll learn:** CSS Grid, responsive design, visual design, and accessible colour contrast.
 
+## 🔜 v1.2: Your profile 👤
+
+The first step toward public profiles: Linkwell knows who you are, and you choose how you're called.
+
+- [x] Show your Google profile picture in the header (or your first letter when there's none)
+- [x] An `/account` page with your picture, name, email and when you joined: the app's first second page
+- [x] Choose a username (like `@borhan`): lowercase letters, numbers and `_`, unique across Linkwell, some names reserved
+- [ ] Export your links as a bookmarks file that Chrome and Safari can import
+- [ ] Delete your account (with an "are you sure?" step); your links and folders go with it
+
+**You'll learn:** routing and a second page, adding a column to Better Auth's `user` table, unique constraints, and validation shared by the browser and the server.
+
+## v1.3: Fixes and safety 🧰
+
+Small things to tidy up before other people sign up.
+
+- [x] Saving a link no longer clears what you started typing while the previous link was still saving
+- [ ] Local development uses its own Neon branch (`dev`), so trying things out can never touch real data
+
+**You'll learn:** race conditions in forms, and separate environments (development, test, production).
+
+## v1.4: Easier saving 📲
+
+Saving should take one tap, wherever you find a link.
+
+- [ ] Installable app (PWA) that appears in your phone's Share menu: share a page to Linkwell and it's saved
+- [ ] Import bookmarks from Chrome, Safari or Firefox (the same bookmarks file format as the export in v1.2)
+- [ ] Browser extension: a button that saves the current tab
+
+**You'll learn:** web app manifests and share targets, parsing files, and browser extensions.
+
+## v1.5: Better notes and tags 📝
+
+- [ ] Notes on a link: "why I saved this", shown on the card and found by search
+- [ ] Edit or remove the tags of a saved link
+
+**You'll learn:** a new column end to end (schema, migration, action, UI, tests), and editing lists.
+
 ---
 
 ## 🔭 Long-term vision: Linkwell goes social
@@ -142,13 +180,8 @@ Not a milestone yet: a direction for after v1.1. Linkwell stays a **private** to
 
 Not planned yet, but worth remembering:
 
-- Browser extension to save the current tab
-- Import bookmarks from Chrome or Firefox
-- Edit or remove the tags of a saved link
 - Keyboard shortcuts
 - Fetch each page's description (and maybe a preview image) when it's saved
-- Share to Linkwell from your phone: make the site an installable app (PWA) so it appears in the phone's Share menu
-- Notes on a link: "why I saved this" (nice to have)
 - Optional: a weekly email digest of forgotten links (needs the deployed app, accounts, a schedule and an email service)
 
 ## How to use this roadmap

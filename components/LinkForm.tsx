@@ -23,15 +23,19 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
     e.preventDefault();
     if (!url.trim()) return;
 
+    // Remember what was sent: saving can take a few seconds (the server may
+    // fetch the page title), and you may start typing the next link meanwhile.
+    const sent = { url, title, tags };
     const message = await onAdd(url.trim(), title, tags);
     if (message) {
       setError(message);
       return;
     }
 
-    setUrl("");
-    setTitle("");
-    setTags("");
+    // Only clear what is still the saved link, never what you typed since.
+    setUrl((current) => (current === sent.url ? "" : current));
+    setTitle((current) => (current === sent.title ? "" : current));
+    setTags((current) => (current === sent.tags ? "" : current));
   }
 
   return (

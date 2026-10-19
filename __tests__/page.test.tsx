@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import LinkManager from "@/components/LinkManager";
 import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
+import type { Link } from "@/types/link";
 
 vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
@@ -398,6 +399,24 @@ describe("saving to the database", () => {
     });
 
     expect(saveTitle).toHaveBeenCalledWith("1", "New title");
+  });
+});
+
+describe("typing while a link is saving", () => {
+  test("keeps the next link you started typing", async () => {
+    // Hold the save open, like a slow server that is still fetching the title.
+    let finishSaving: (link: Link) => void = () => {};
+    vi.mocked(saveLink).mockImplementationOnce(
+      (link) => new Promise((resolve) => (finishSaving = () => resolve(link)))
+    );
+    render(<LinkManager initialLinks={[]} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Paste a link..."), { target: { value: "https://first.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(screen.getByPlaceholderText("Paste a link..."), { target: { value: "https://second.com" } });
+    await act(async () => finishSaving({ id: "x", url: "https://first.com", createdAt: "2020-01-01T00:00:00.000Z" }));
+
+    expect(screen.getByPlaceholderText("Paste a link...")).toHaveProperty("value", "https://second.com");
   });
 });
 

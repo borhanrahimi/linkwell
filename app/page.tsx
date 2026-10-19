@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import LinkManager from "@/components/LinkManager";
 import SignInButton from "@/components/SignInButton";
-import SignOutButton from "@/components/SignOutButton";
+import Header from "@/components/Header";
 import { auth } from "@/lib/auth";
 import { getFolders, getLinks } from "@/lib/data";
 
@@ -29,14 +29,9 @@ export default async function Home() {
   return (
     <main className="min-h-screen p-4 sm:p-8">
       <div className="mx-auto max-w-6xl">
-        {/* A floating glass bar that stays at the top while the links scroll underneath. */}
-        <header className="glass-bar sticky top-3 z-10 flex items-center justify-between gap-4 rounded-full py-2 pl-5 pr-2">
-          <h1 className="text-lg font-semibold tracking-tight text-ink">Linkwell</h1>
-          <div className="flex min-w-0 items-center gap-2 text-sm text-muted">
-            <span className="truncate">Signed in as {session.user.name || session.user.email}</span>
-            <SignOutButton />
-          </div>
-        </header>
+        <Header user={session.user} />
+        {/* Visible headings start at the tiles; screen readers still get a page title. */}
+        <h1 className="sr-only">Your links</h1>
         <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} />
       </div>
     </main>
