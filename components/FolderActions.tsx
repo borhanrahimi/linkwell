@@ -63,7 +63,7 @@ export default function FolderActions({ folder, onRename, onDelete }: FolderActi
                     </button>
                 </form>
                 {error && (
-                    <p role="alert" className="mt-2 text-sm text-red-600">
+                    <p role="alert" className="mt-2 text-sm text-danger">
                         {error}
                     </p>
                 )}
@@ -73,10 +73,10 @@ export default function FolderActions({ folder, onRename, onDelete }: FolderActi
 
     return (
         <div className="mt-2 flex gap-3 text-sm">
-            <button onClick={startRenaming} className="text-slate-600 hover:text-slate-800">
+            <button onClick={startRenaming} className="text-muted hover:text-ink">
                 Rename folder
             </button>
-            <button onClick={handleDelete} className="text-slate-600 hover:text-red-600">
+            <button onClick={handleDelete} className="text-muted hover:text-danger">
                 Delete folder
             </button>
         </div>

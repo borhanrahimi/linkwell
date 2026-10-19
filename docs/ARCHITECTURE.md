@@ -297,7 +297,24 @@ Never edit a migration that has already been applied. Make a new one instead.
   | `btn-quiet` | A way out (Cancel, Not now, Sign out): text only, grey on hover |
 
   Add layout classes next to them (`className="field min-w-0 flex-1"`), but don't override what the shared class sets (colours, padding, corners), because which one wins isn't reliable. If a control needs a different look, add a new shared class.
-- **Text colours:** use `text-slate-600` or darker for small text. `slate-400` and `slate-500` are too faint on glass; the contrast test (`e2e/contrast.spec.ts`) fails if text drops below WCAG AA.
+- **Colours are tokens named by their job,** defined once in `app/globals.css` and switched for dark mode there. Use these, never a Tailwind shade like `text-slate-900` or `bg-white`, or that element won't change in dark mode:
+
+  | Class | For | Light | Dark |
+  |---|---|---|---|
+  | `bg-canvas` | The page | `#f5f5f7` | black |
+  | `bg-surface` | Inputs, buttons, pills | white | `#1c1c1e` |
+  | `text-ink` | Main text | near-black | near-white |
+  | `text-muted` | Secondary and small text | `#475569` | `#a1a1a6` |
+  | `border-line` / `ring-line` | Borders and dividers | 10% black | 15% white |
+  | `bg-hover` | A light wash (hover, tag chips) | 5% black | 8% white |
+  | `text-accent` | Links | `#0066cc` | `#2997ff` |
+  | `text-danger` | Errors, broken links | red | soft red |
+  | `text-warning` | Archived copies | amber | light amber |
+  | `text-highlight` | Rediscover | violet | light violet |
+  | `text-success` | Mark read (hover) | green | light green |
+
+  Opacity works as usual (`bg-danger/15`). To add a colour: add a `--name` variable to both `:root` blocks and a `--color-name` line to `@theme inline`. No component uses `dark:` classes.
+- **Fixed colours, on purpose:** the blue `btn-primary` (`#0071e3` works in both modes), and the favicon tile, which stays white like an app icon so dark logos stay visible.
 - **IDs and dates:** link IDs come from `crypto.randomUUID()`. In the app, dates are ISO strings (`toISOString()`); in the database they're `timestamp with time zone`, and `toLink` / `insertLink` convert between the two. Dates are formatted only for display. The card shows a relative date (`timeAgo(createdAt, now)`) inside `<time dateTime={iso}>`, with the exact date (`toLocaleDateString()`) as a hover tooltip.
 - **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`), or check before using them (`link.tags && link.tags.length > 0`).
 - **Never change state in place.** Functions like `updateTitle` build a new array (`map`) and new objects (`{ ...link, title }`). React only re-renders when it gets a new value.
@@ -334,7 +351,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 
 **Browser tests (Playwright, `npm run e2e`):**
 
-- **Contrast:** `e2e/contrast.spec.ts` checks that every text on the page is readable (WCAG AA: 4.5:1, or 3:1 for large text). Glass is see-through, so the background can't be read from CSS: `measureContrast` in `e2e/contrast.ts` hides all text, takes a screenshot, and compares each text's colour with the darkest pixel behind it. Faded parents (`opacity-75` on read cards) are counted too. If it fails, it lists each text with its ratio.
+- **Contrast:** `e2e/contrast.spec.ts` checks that every text on the page is readable (WCAG AA: 4.5:1, or 3:1 for large text). Glass is see-through, so the background can't be read from CSS: `measureContrast` in `e2e/contrast.ts` hides all text, takes a screenshot, and compares each text's colour with the typical (median) pixel behind it. The median ignores the few edge pixels in a text's box (a button's rounded corners show the page behind them), and it works for dark text on light and light text on dark. Faded parents (`opacity`) are counted too. The test runs twice, with the browser set to light and to dark mode (`test.use({ colorScheme })`). If it fails, it lists each text with its ratio.
 
 - They cover what the fake-browser tests can't: the real server, the real database, sessions and cookies. Keep them few, one per important path (signed out, sign in and out, saving survives a reload, accounts are kept apart). Details belong in the Vitest tests.
 - `playwright.config.ts` builds the app and starts it on port 3100, with `DATABASE_URL` set to `E2E_DATABASE_URL` (a Neon branch called `e2e`) and `BETTER_AUTH_URL` set to `http://localhost:3100`. The real database is never touched, and `npm run dev` on port 3000 can keep running.
@@ -460,3 +477,8 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | Shared styles as Tailwind v4 `@utility` classes (`glass`, `glass-bar`, `field`, `btn-primary`, `btn-secondary`, `btn-quiet`) in `globals.css`, written with `@apply` | The same long class lists were copied into many files, and some were missed. Now the look changes in one place, and dark mode only has to change these |
 | 2026-10-18 | Small text is `text-slate-600` or darker; read cards fade with `opacity-75` instead of `opacity-60` | Measured on glass, `slate-400` was about 2.6:1 and a read card's title 4.03:1, both below the 4.5:1 WCAG AA needs |
 | 2026-10-18 | Contrast is checked by a Playwright test that measures screenshot pixels, not by an accessibility library | Tools like axe can't work out the colour behind see-through glass. Measuring the real pixels works for glass, gradients and dark mode alike |
+| 2026-10-18 | Dark mode follows the system setting (`prefers-color-scheme`), with no toggle in the app | That's how Apple apps behave, and it needs no saved preference. A toggle can come later if someone asks |
+| 2026-10-18 | Colours became tokens named by their job (`ink`, `muted`, `surface`, `line`, `accent`, ...), switched in one `@media (prefers-color-scheme: dark)` block, instead of `dark:` classes on every element | About 40 colour classes in 13 files would have needed a `dark:` partner, and new code would forget some. Now a component can't be "light only" by accident, and the theme lives in one file |
+| 2026-10-18 | Read cards no longer fade; they get a grey title and a "Read" label | Measured properly, faded text was 3.93:1 (light) and 4.02:1 (dark), below 4.5:1. The earlier `opacity-75` "pass" came from measuring against the darkest pixel, which was wrong for faded text |
+| 2026-10-18 | The contrast test compares against the median background pixel, and runs in light and dark mode | The darkest pixel is only the worst case for dark text; on a dark page, light text needs the opposite. The median works both ways and ignores edge pixels |
+| 2026-10-18 | Favicon tiles stay white in dark mode | Many logos (GitHub, Vercel, Next.js) are black and would vanish on a dark tile |

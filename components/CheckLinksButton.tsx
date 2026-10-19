@@ -35,7 +35,7 @@ export default function CheckLinksButton({ onChecked }: CheckLinksButtonProps) {
         {isChecking ? "Checking..." : "Check links"}
       </button>
       {message && (
-        <p role="status" className="text-slate-600">
+        <p role="status" className="text-muted">
           {message}
         </p>
       )}

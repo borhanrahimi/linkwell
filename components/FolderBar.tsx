@@ -12,7 +12,7 @@ type FolderBarProps = {
 
 function pill(active: boolean) {
   return `rounded-full px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-    active ? "bg-slate-900 text-white" : "bg-white text-slate-700 ring-1 ring-black/10 hover:bg-slate-50"
+    active ? "bg-ink text-canvas" : "bg-surface text-ink ring-1 ring-line hover:bg-canvas"
   }`;
 }
 
@@ -65,7 +65,7 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
         {!isCreating && (
           <button
             onClick={() => setIsCreating(true)}
-            className="rounded-full border border-dashed border-black/20 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-black/30 hover:text-slate-800"
+            className="rounded-full border border-dashed border-line px-3 py-1.5 text-sm font-medium text-muted hover:border-muted hover:text-ink"
           >
             + New folder
           </button>
@@ -94,7 +94,7 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
         </form>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-600">
+        <p role="alert" className="mt-2 text-sm text-danger">
           {error}
         </p>
       )}

@@ -106,7 +106,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
       {/* The bento dashboard: one column on phones, three on wider screens. */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <section aria-labelledby="save-heading" className="glass rounded-2xl p-5 md:col-span-2">
-          <h2 id="save-heading" className="font-semibold text-slate-900">
+          <h2 id="save-heading" className="font-semibold text-ink">
             Save a link
           </h2>
           <LinkForm onAdd={addLink} />
@@ -121,7 +121,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
           aria-labelledby="folders-heading"
           className={`glass rounded-2xl p-5 ${showRediscover ? "" : "md:col-span-3"}`}
         >
-          <h2 id="folders-heading" className="font-semibold text-slate-900">
+          <h2 id="folders-heading" className="font-semibold text-ink">
             Folders
           </h2>
           <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
@@ -153,7 +153,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
       </div>
 
       {activeTag && (
-        <div className="glass mt-6 flex items-center justify-between gap-4 rounded-full py-1.5 pl-5 pr-1.5 text-sm text-slate-700">
+        <div className="glass mt-6 flex items-center justify-between gap-4 rounded-full py-1.5 pl-5 pr-1.5 text-sm text-muted">
           <span>Showing links tagged #{activeTag}</span>
           <button onClick={() => setActiveTag(null)} className="btn-secondary">
             Show all
@@ -161,10 +161,10 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
         </div>
       )}
       {links.length === 0 && (
-        <p className="mt-6 text-slate-600">No links yet. Add your first one above.</p>
+        <p className="mt-6 text-muted">No links yet. Add your first one above.</p>
       )}
       {links.length > 0 && visibleLinks.length === 0 && (
-        <p className="mt-6 text-slate-600">
+        <p className="mt-6 text-muted">
           {activeFolder && !activeTag && !query ? "No links in this folder yet." : "No links match your search."}
         </p>
       )}

@@ -56,12 +56,14 @@ export async function measureContrast(page: Page): Promise<ContrastResult[]> {
 
       return texts.map((t) => {
         const pixels = context.getImageData(Math.round(t.x), Math.round(t.y), Math.max(1, Math.round(t.width)), Math.max(1, Math.round(t.height))).data;
-        // For dark text, the darkest pixel behind it is the worst case.
-        let background = [255, 255, 255];
-        for (let i = 0; i < pixels.length; i += 4) {
-          const pixel = [pixels[i], pixels[i + 1], pixels[i + 2]];
-          if (luminance(pixel) < luminance(background)) background = pixel;
-        }
+        // The background is the typical (median) pixel behind the text. The
+        // box can include a few edge pixels (a button's rounded corners show
+        // the page behind them), and the median ignores those.
+        const behind: number[][] = [];
+        for (let i = 0; i < pixels.length; i += 4) behind.push([pixels[i], pixels[i + 1], pixels[i + 2]]);
+        behind.sort((p, q) => luminance(p) - luminance(q));
+        const background = behind[Math.floor(behind.length / 2)];
+
         const alpha = (t.color[3] ?? 1) * t.opacity;
         const foreground = t.color.slice(0, 3).map((v, i) => v * alpha + background[i] * (1 - alpha));
         const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);

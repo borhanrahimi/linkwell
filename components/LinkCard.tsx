@@ -23,7 +23,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
   const [draft, setDraft] = useState(link.title || "");
   const faviconUrl = getFaviconUrl(link.url);
   // Broken links get a double-width tile, so they stand out in the grid.
-  const tileSize = link.status === "broken" ? " ring-1 ring-red-300" : "";
+  const tileSize = link.status === "broken" ? "ring-1 ring-danger/50" : "";
 
   function startEditing() {
     setDraft(link.title || "");
@@ -63,13 +63,13 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
   }
   return (
     <li
-      className={`glass flex flex-col justify-between gap-3 rounded-2xl p-4 ${tileSize} ${link.readAt ? "opacity-75" : ""}`}
+      className={`glass flex flex-col justify-between gap-3 rounded-2xl p-4 ${tileSize}`}
     >
       <div className="flex min-w-0 items-start gap-3">
                 {/* Every icon sits in the same rounded tile, so square, round and
             transparent icons all line up. The 64px image shown at 24px stays
             sharp on high-resolution (retina) screens. */}
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/80 ring-1 ring-slate-900/10">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-line">
           {faviconUrl ? (
             <Image src={faviconUrl} alt="" width={24} height={24} unoptimized className="size-6 rounded" />
           ) : (
@@ -84,31 +84,36 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate font-medium text-blue-600 hover:underline"
+              className={`truncate font-medium hover:underline ${link.readAt ? "text-muted" : "text-accent"}`}
             >
               {link.title || getDomain(link.url)}
             </a>
+            {/* Read links get a grey title and a label instead of fading the
+                whole card, because faded text became too hard to read. */}
+            {link.readAt && (
+              <span className="shrink-0 rounded-full bg-hover px-2 py-0.5 text-xs font-semibold text-muted">Read</span>
+            )}
             {link.status === "broken" && (
               <span
                 title={link.checkedAt && `Checked ${timeAgo(link.checkedAt, now)}`}
-                className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
+                className="shrink-0 rounded-full bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger"
               >
                 Broken
               </span>
             )}
           </div>
-          <p className="truncate text-sm text-slate-600">{link.url}</p>
+          <p className="truncate text-sm text-muted">{link.url}</p>
           {link.status === "broken" && (
             <a
               href={getArchiveUrl(link.url)}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-amber-700 hover:underline"
+              className="text-sm text-warning hover:underline"
             >
               View archived copy
             </a>
           )}
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-muted">
             Saved{" "}
             <time
               dateTime={link.createdAt}
@@ -126,8 +131,8 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
                     onClick={() => onTagClick(tag)}
                     aria-pressed={tag === activeTag}
                     className={`rounded-full px-2 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 ${tag === activeTag
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : "bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700"
+                      ? "bg-ink text-canvas"
+                      : "bg-hover text-muted hover:text-ink"
                       }`}
                   >
 
@@ -142,7 +147,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               value={link.folderId ?? ""}
               onChange={(e) => onMove(link.id, e.target.value || undefined)}
               aria-label="Folder"
-              className="mt-2 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="mt-2 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value="">No folder</option>
               {folders.map((folder) => (
@@ -154,16 +159,16 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
           )}
         </div>
       </div>
-      <div className="flex gap-3 border-t border-slate-900/10 pt-3">
-        <button onClick={() => onToggleRead(link.id)} className="text-sm text-slate-600 hover:text-green-700">
+      <div className="flex gap-3 border-t border-line pt-3">
+        <button onClick={() => onToggleRead(link.id)} className="text-sm text-muted hover:text-success">
           {link.readAt ? "Mark unread" : "Mark read"}
         </button>
-        <button onClick={startEditing} className="text-sm text-slate-600 hover:text-blue-600">
+        <button onClick={startEditing} className="text-sm text-muted hover:text-accent">
           Edit
         </button>
         <button
           onClick={() => onDelete(link.id)}
-          className="text-sm text-slate-600 hover:text-red-500">
+          className="text-sm text-muted hover:text-danger">
           Delete
         </button>
       </div>

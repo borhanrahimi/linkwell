@@ -32,7 +32,7 @@ export default function ImportBanner({ onImported }: ImportBannerProps) {
   }
 
   return (
-    <div className="glass mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-3 text-sm text-slate-700">
+    <div className="glass mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-3 text-sm text-muted">
       <p>
         You have {oldLinks.length} {oldLinks.length === 1 ? "link" : "links"} saved in this
         browser from before. Import them into Linkwell?

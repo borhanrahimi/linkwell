@@ -13,11 +13,11 @@ export default function Rediscover({ links, now, className = "" }: RediscoverPro
   }
 
   return (
-    <section aria-labelledby="rediscover-heading" className={`glass rounded-2xl p-5 ring-1 ring-violet-200 ${className}`}>
-      <h2 id="rediscover-heading" className="font-semibold text-violet-900">
+    <section aria-labelledby="rediscover-heading" className={`glass rounded-2xl p-5 ring-1 ring-highlight/30 ${className}`}>
+      <h2 id="rediscover-heading" className="font-semibold text-highlight">
         Rediscover
       </h2>
-      <p className="text-sm text-violet-700">Saved a while ago and still unread.</p>
+      <p className="text-sm text-highlight">Saved a while ago and still unread.</p>
       <ul className="mt-2 space-y-1">
         {links.map((link) => (
           <li key={link.id} className="flex items-baseline justify-between gap-3 text-sm">
@@ -25,11 +25,11 @@ export default function Rediscover({ links, now, className = "" }: RediscoverPro
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate font-medium text-violet-900 hover:underline"
+              className="truncate font-medium text-highlight hover:underline"
             >
               {link.title || getDomain(link.url)}
             </a>
-            <span className="shrink-0 text-violet-600">saved {timeAgo(link.createdAt, now)}</span>
+            <span className="shrink-0 text-muted">saved {timeAgo(link.createdAt, now)}</span>
           </li>
         ))}
       </ul>
