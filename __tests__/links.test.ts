@@ -7,7 +7,6 @@ import {
   isDuplicate,
   loadLinks,
   clearSavedLinks,
-  updateTitle,
   cleanDetails,
   updateDetails,
   NOTE_MAX_LENGTH,
@@ -184,41 +183,6 @@ describe("isDuplicate", () => {
   });
 });
 
-describe("updateTitle", () => {
-  const first = createLink("https://example.com", "Old title");
-  const second = createLink("https://nextjs.org", "Next.js");
-
-  test("changes the title of the matching link", () => {
-    const updated = updateTitle([first, second], first.id, "New title");
-
-    expect(updated[0].title).toBe("New title");
-  });
-
-  test("leaves the other links alone", () => {
-    const updated = updateTitle([first, second], first.id, "New title");
-
-    expect(updated[1]).toBe(second);
-  });
-
-  test("does not change the original list", () => {
-    updateTitle([first, second], first.id, "New title");
-
-    expect(first.title).toBe("Old title");
-  });
-
-  test("trims spaces around the title", () => {
-    const updated = updateTitle([first], first.id, "  New title  ");
-
-    expect(updated[0].title).toBe("New title");
-  });
-
-  test("removes the title when it is empty", () => {
-    const updated = updateTitle([first], first.id, "   ");
-
-    expect(updated[0].title).toBeUndefined();
-  });
-});
-
 describe("getFaviconUrl", () => {
   test("returns a favicon address for the link's domain", () => {
     expect(getFaviconUrl("https://nextjs.org/docs")).toBe(
@@ -360,6 +324,12 @@ describe("searchLinks", () => {
 
   test("returns nothing when no link matches", () => {
     expect(searchLinks([react, news], "vue")).toEqual([]);
+  });
+
+  test("finds links by their note", () => {
+    const noted = { ...news, note: "For the interview on Monday" };
+
+    expect(searchLinks([react, noted], "interview")).toEqual([noted]);
   });
 });
 

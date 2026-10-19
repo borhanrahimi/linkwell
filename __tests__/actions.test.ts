@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveTitle, saveUsername } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateLinkTitle, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
@@ -9,7 +9,6 @@ vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
   insertLink: vi.fn(async () => {}),
   deleteLinkById: vi.fn(async () => {}),
-  updateLinkTitle: vi.fn(async () => {}),
   updateLinkDetails: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
@@ -47,7 +46,6 @@ describe("signed out", () => {
 
     await expect(saveLink(link)).rejects.toThrow("Not signed in");
     await expect(removeLink("1")).rejects.toThrow("Not signed in");
-    await expect(saveTitle("1", "x")).rejects.toThrow("Not signed in");
     await expect(saveLinkDetails("1", { title: "", tags: "", note: "" })).rejects.toThrow("Not signed in");
     await expect(saveReadStatus("1", true)).rejects.toThrow("Not signed in");
     await expect(moveToFolder("1", null)).rejects.toThrow("Not signed in");
@@ -121,14 +119,6 @@ describe("saveLinkDetails", () => {
     const cleaned = { title: "React", tags: ["react", "docs"], note: "For Monday" };
     expect(updateLinkDetails).toHaveBeenCalledWith("u1", "1", cleaned);
     expect(saved).toEqual(cleaned);
-  });
-});
-
-describe("saveTitle", () => {
-  test("updates the title of the link with that id", async () => {
-    await saveTitle("1", "New title");
-
-    expect(updateLinkTitle).toHaveBeenCalledWith("u1", "1", "New title");
   });
 });
 

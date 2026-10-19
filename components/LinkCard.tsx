@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { Folder, Link } from "@/types/link";
-import { getArchiveUrl, getDomain, getFaviconUrl, timeAgo } from "@/lib/links";
+import type { Folder, Link, LinkDetailsInput } from "@/types/link";
+import { getArchiveUrl, getDomain, getFaviconUrl, NOTE_MAX_LENGTH, timeAgo } from "@/lib/links";
 
 
 type LinkCardProps = {
   link: Link;
   onDelete: (id: string) => void;
-  onEditTitle: (id: string, title: string) => void;
+  onEditDetails: (id: string, input: LinkDetailsInput) => void;
   onToggleRead: (id: string) => void;
   onMove: (id: string, folderId: string | undefined) => void;
   folders: Folder[];
@@ -18,15 +18,16 @@ type LinkCardProps = {
   now?: Date;
 };
 
-export default function LinkCard({ link, activeTag, now, folders, onDelete, onEditTitle, onMove, onTagClick, onToggleRead }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, now, folders, onDelete, onEditDetails, onMove, onTagClick, onToggleRead }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(link.title || "");
+  // The Edit form's three boxes, filled from the link when editing starts.
+  const [draft, setDraft] = useState<LinkDetailsInput>({ title: "", tags: "", note: "" });
   const faviconUrl = getFaviconUrl(link.url);
   // Broken links get a double-width tile, so they stand out in the grid.
   const tileSize = link.status === "broken" ? "ring-1 ring-danger/50" : "";
 
   function startEditing() {
-    setDraft(link.title || "");
+    setDraft({ title: link.title || "", tags: (link.tags ?? []).join(", "), note: link.note || "" });
     setIsEditing(true);
   }
 
@@ -36,27 +37,53 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    onEditTitle(link.id, draft);
+    onEditDetails(link.id, draft);
     setIsEditing(false);
   }
 
   if (isEditing) {
     return (
       <li className={`glass rounded-2xl p-4 ${tileSize}`}>
-        <form onSubmit={handleSave} className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            aria-label="Title"
-            className="field min-w-0 flex-1"
-          />
-          <button type="submit" className="btn-primary">
-            Save
-          </button>
-          <button type="button" onClick={cancelEditing} className="btn-quiet">
-            Cancel
-          </button>
+        <form onSubmit={handleSave} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-sm font-medium text-ink">
+            Title
+            <input
+              type="text"
+              value={draft.title}
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+              placeholder={getDomain(link.url)}
+              className="field font-normal"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-ink">
+            Tags
+            <input
+              type="text"
+              value={draft.tags}
+              onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
+              placeholder="Comma separated"
+              className="field font-normal"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-ink">
+            Note
+            <textarea
+              value={draft.note}
+              onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+              placeholder="Why did you save this?"
+              maxLength={NOTE_MAX_LENGTH}
+              rows={3}
+              className="field-area font-normal"
+            />
+          </label>
+          <div className="flex justify-end gap-2">
+            <button type="submit" className="btn-primary">
+              Save
+            </button>
+            <button type="button" onClick={cancelEditing} className="btn-quiet">
+              Cancel
+            </button>
+          </div>
         </form>
       </li>
     );
@@ -103,6 +130,12 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
             )}
           </div>
           <p className="truncate text-sm text-muted">{link.url}</p>
+          {link.note && (
+            // whitespace-pre-line keeps the line breaks typed in the note.
+            <p className="mt-1 line-clamp-3 whitespace-pre-line border-l-2 border-line pl-2 text-sm text-ink">
+              {link.note}
+            </p>
+          )}
           {link.status === "broken" && (
             <a
               href={getArchiveUrl(link.url)}

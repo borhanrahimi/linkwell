@@ -10,7 +10,6 @@ import {
   updateFolderName,
   updateLinkFolder,
   updateLinkStatus,
-  updateLinkTitle,
   updateLinkDetails,
   updateLinkReadAt,
   isUsernameTaken,
@@ -41,10 +40,6 @@ export async function saveLink(link: Link): Promise<Link | string> {
 
 export async function removeLink(id: string) {
   await deleteLinkById(await getUserId(), id);
-}
-
-export async function saveTitle(id: string, title: string) {
-  await updateLinkTitle(await getUserId(), id, title);
 }
 
 // Saves the Edit form. The server cleans the text itself (never trust the

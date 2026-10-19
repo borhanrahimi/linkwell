@@ -8,9 +8,9 @@ import Overview from "@/components/Overview";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
 import FolderActions from "@/components/FolderActions";
-import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle, deleteFolder, renameFolder } from "@/app/actions";
-import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, updateTitle, parseTags, clearFolder, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
-import type { Folder, Link } from "@/types/link";
+import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails, deleteFolder, renameFolder } from "@/app/actions";
+import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, cleanDetails, updateDetails, parseTags, clearFolder, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
+import type { Folder, Link, LinkDetailsInput } from "@/types/link";
 
 type LinkManagerProps = {
   initialLinks: Link[];
@@ -57,9 +57,11 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     await removeLink(id);
   }
 
-  async function editTitle(id: string, title: string) {
-    setLinks((current) => updateTitle(current, id, title));
-    await saveTitle(id, title);
+  async function editDetails(id: string, input: LinkDetailsInput) {
+    // Show the change right away, then use what the server actually stored.
+    setLinks((current) => updateDetails(current, id, cleanDetails(input)));
+    const saved = await saveLinkDetails(id, input);
+    setLinks((current) => updateDetails(current, id, saved));
   }
   async function toggleRead(id: string) {
     const link = links.find((l) => l.id === id);
@@ -179,7 +181,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
               activeTag={activeTag}
               now={now}
               onDelete={deleteLink}
-              onEditTitle={editTitle}
+              onEditDetails={editDetails}
               onToggleRead={toggleRead}
               folders={folders}
               onMove={moveLink}

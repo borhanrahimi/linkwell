@@ -100,6 +100,12 @@
   @apply rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-blue-400;
 }
 
+/* Text boxes with several lines (the note). Like `field`, but with rounded
+   corners instead of a pill, which would look odd on a tall box. */
+@utility field-area {
+  @apply rounded-2xl border border-line bg-surface px-4 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-blue-400;
+}
+
 /* The main action: Save, Sign in, Import. Apple blue works in both modes; it
    gets darker on hover, because a lighter blue makes white text too faint. */
 @utility btn-primary {

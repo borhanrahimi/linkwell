@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, removeLink, saveLink, saveReadStatus, saveTitle } from "@/app/actions";
+import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -14,7 +14,12 @@ vi.mock("@/app/actions", () => ({
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
   removeLink: vi.fn(async () => { }),
-  saveTitle: vi.fn(async () => { }),
+  // Like the real action: returns the cleaned details.
+  saveLinkDetails: vi.fn(async (_id: string, input: { title: string; tags: string; note: string }) => ({
+    title: input.title.trim() || undefined,
+    tags: input.tags.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean),
+    note: input.note.trim() || undefined,
+  })),
   saveReadStatus: vi.fn(async () => {}),
 }));
 
@@ -294,7 +299,7 @@ describe("Home page", () => {
   });
 });
 
-describe("editing a title", () => {
+describe("editing a link", () => {
   function editTitle(newTitle: string) {
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Title" }), {
@@ -302,12 +307,60 @@ describe("editing a title", () => {
     });
   }
 
+  async function saveEdit() {
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    });
+  }
+
+  test("fills the form with the link's title, tags and note", () => {
+    render(
+      <LinkManager initialLinks={[{ id: "1", url: "https://react.dev", title: "React", tags: ["react", "docs"], note: "Hooks", createdAt: "2020-01-01T00:00:00.000Z" }]} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveProperty("value", "React");
+    expect(screen.getByRole("textbox", { name: "Tags" })).toHaveProperty("value", "react, docs");
+    expect(screen.getByRole("textbox", { name: "Note" })).toHaveProperty("value", "Hooks");
+  });
+
+  test("changes and removes tags", async () => {
+    render(<LinkManager initialLinks={[]} />);
+    await addLink("https://example.com", "Example", "old, keep");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Tags" }), { target: { value: "keep, New" } });
+    await saveEdit();
+
+    expect(screen.queryByRole("button", { name: "#old" })).toBeNull();
+    expect(screen.getByRole("button", { name: "#keep" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "#new" })).toBeDefined();
+  });
+
+  test("adds a note that shows on the card and can be searched", async () => {
+    render(<LinkManager initialLinks={[]} />);
+    await addLink("https://example.com", "Example");
+    await addLink("https://other.com", "Other");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[1]);
+    fireEvent.change(screen.getByRole("textbox", { name: "Note" }), { target: { value: "For the interview" } });
+    await saveEdit();
+
+    expect(screen.getByText("For the interview")).toBeDefined();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), { target: { value: "interview" } });
+
+    expect(screen.getByRole("link", { name: "Example" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Other" })).toBeNull();
+  });
+
   test("changes the title of a link", async () => {
     render(<LinkManager initialLinks={[]} />);
     await addLink("https://example.com", "Old title");
 
     editTitle("New title");
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    await saveEdit();
 
     expect(screen.getByRole("link", { name: "New title" })).toBeDefined();
     expect(screen.queryByRole("link", { name: "Old title" })).toBeNull();
@@ -319,7 +372,7 @@ describe("editing a title", () => {
     await addLink("https://example.com", "Old title");
 
     editTitle("");
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
+    await saveEdit();
 
     expect(screen.getByRole("link", { name: "example.com" })).toBeDefined();
   });
@@ -387,7 +440,7 @@ describe("saving to the database", () => {
     expect(removeLink).toHaveBeenCalledWith("1");
   });
 
-  test("sends an edited title to the server", async () => {
+  test("sends the edited details to the server", async () => {
     render(<LinkManager initialLinks={[saved]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
@@ -398,7 +451,7 @@ describe("saving to the database", () => {
       fireEvent.click(screen.getAllByRole("button", { name: "Save" })[1]);
     });
 
-    expect(saveTitle).toHaveBeenCalledWith("1", "New title");
+    expect(saveLinkDetails).toHaveBeenCalledWith("1", { title: "New title", tags: "", note: "" });
   });
 });
 

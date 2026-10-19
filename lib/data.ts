@@ -43,17 +43,6 @@ export async function deleteLinkById(userId: string, id: string) {
   await db.delete(links).where(ownLink(userId, id));
 }
 
-export async function updateLinkTitle(
-  userId: string,
-  id: string,
-  title: string
-) {
-  await db
-    .update(links)
-    .set({ title: title.trim() || null })
-    .where(ownLink(userId, id));
-}
-
 export async function updateLinkStatus(
   userId: string,
   id: string,

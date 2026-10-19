@@ -73,12 +73,6 @@ export function isDuplicate(links: Link[], url: string) {
   return links.some((link) => normalizeUrl(link.url) === target);
 }
 
-export function updateTitle(links: Link[], id: string, title: string): Link[] {
-  return links.map((link) =>
-    link.id === id ? { ...link, title: title.trim() || undefined } : link
-  );
-}
-
 export function setReadAt(
   links: Link[],
   id: string,
@@ -173,7 +167,8 @@ export function searchLinks(links: Link[], query: string): Link[] {
   return links.filter(
     (link) =>
       link.url.toLowerCase().includes(text) ||
-      link.title?.toLowerCase().includes(text)
+      link.title?.toLowerCase().includes(text) ||
+      link.note?.toLowerCase().includes(text)
   );
 }
 

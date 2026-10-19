@@ -15,6 +15,12 @@ for (const colorScheme of ["light", "dark"] as const) {
       await saveLink(page, "https://example.com/one", "A link");
       await saveLink(page, "https://example.com/two", "A read link");
       await page.getByRole("button", { name: "Mark read" }).first().click();
+      // A note on one card, and the Edit form open on the other.
+      await page.getByRole("button", { name: "Edit" }).first().click();
+      await page.getByRole("textbox", { name: "Note" }).fill("Why I saved this");
+      await page.getByRole("button", { name: "Save" }).nth(1).click();
+      await page.getByText("Why I saved this").waitFor();
+      await page.getByRole("button", { name: "Edit" }).nth(1).click();
 
       const results = await measureContrast(page);
       const tooLow = results.filter((result) => result.ratio < result.needed);

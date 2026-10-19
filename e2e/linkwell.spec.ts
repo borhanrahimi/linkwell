@@ -124,7 +124,7 @@ test("a user can delete their account, and their links go with it", async ({
   await page.getByRole("button", { name: "Delete forever" }).click();
 
   await expect(page.getByRole("status")).toHaveText(
-    "Your account and all your links were deleted. Goodbye 👋"
+    "Your account and all your links were deleted. Goodbye"
   );
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })
@@ -135,4 +135,23 @@ test("a user can delete their account, and their links go with it", async ({
   await expect(
     page.getByRole("button", { name: "Sign in with Google" })
   ).toBeVisible();
+});
+
+test("a user can edit a link's title, tags and note", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/");
+  await saveLink(page, "https://example.com/edit-me", "Edit me");
+
+  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("textbox", { name: "Title", exact: true }).fill("Edited");
+  await page.getByRole("textbox", { name: "Tags", exact: true }).fill("react, Docs");
+  await page.getByRole("textbox", { name: "Note" }).fill("For the interview");
+  await page.getByRole("button", { name: "Save" }).nth(1).click();
+  await expect(page.getByText("For the interview")).toBeVisible();
+
+  // Still there after a reload: it was saved on the server.
+  await page.reload();
+  await expect(page.getByRole("link", { name: "Edited" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "#docs" })).toBeVisible();
+  await expect(page.getByText("For the interview")).toBeVisible();
 });
