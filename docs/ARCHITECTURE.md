@@ -137,7 +137,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/FolderBar.tsx` | Client | Folder pills (select a folder) and the "+ New folder" form with its own input and error state |
 | `components/FolderActions.tsx` | Client | Rename form and Delete button for the selected folder; asks `window.confirm` before deleting |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit |
-| `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, `draft`), handles Edit/Save/Cancel and tag clicks |
+| `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, and `draft` with the Edit form's title, tags and note as text), handles Edit/Save/Cancel and tag clicks. Shows the note under the URL (`whitespace-pre-line`, at most 3 lines) |
 
 **Keep `"use client"` as low in the tree as possible.** The page fetches data on the server and hands it to one client component that handles everything interactive.
 
@@ -288,7 +288,7 @@ Write these values without quotes, or the `grep ... | cut` commands below copy t
 2. `npx drizzle-kit generate --name <what_changed>` writes a new numbered SQL file in `drizzle/`. Read it.
 3. `npx drizzle-kit migrate` applies it to the `dev` branch (it prints nothing on success; check **Tables** in the Neon dashboard).
 4. Apply it to the test branch: `DATABASE_URL="$(grep '^E2E_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`, then run `npm run e2e`.
-5. Before pushing code that needs it, apply it to the live database: `DATABASE_URL="$(grep '^PROD_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`. Only add things (new tables, new optional columns) in a way the old live code can live with, because the migration runs a minute or two before the new code is deployed.
+5. **Before pushing** code that needs it, apply it to the live database (migrate first, push second, every time): `DATABASE_URL="$(grep '^PROD_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`. Only add things (new tables, new optional columns) in a way the old live code can live with, because the migration runs a minute or two before the new code is deployed. Pushing first breaks the live site: the new code asks for a column the live database doesn't have yet (this happened once with `note`).
 6. Commit the schema change and the migration together.
 
 Never edit a migration that has already been applied. Make a new one instead.
@@ -310,6 +310,7 @@ Never edit a migration that has already been applied. Make a new one instead.
   | `glass` | Every tile and card (quiet glass: almost white, bright top edge) |
   | `glass-bar` | Things that float above the page, like the sticky header (more see-through liquid glass) |
   | `field` | Every text input and menu |
+  | `field-area` | Text boxes with several lines (the note): like `field`, with rounded corners instead of a pill |
   | `btn-primary` | The main action (Save, Sign in, Import): Apple blue `#0071e3` |
   | `btn-secondary` | A second action (Check links, Create, Rename, Show all): white pill |
   | `btn-quiet` | A way out (Cancel, Not now, Sign out): text only, grey on hover |
@@ -518,3 +519,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-19 | Confirmation by typing `delete` (trimmed, any capitals), not `window.confirm` | Typing a word is much harder to do by accident than pressing Enter on "OK"; sloppy spaces or capitals still count |
 | 2026-10-19 | `btn-danger` is a red outline with red text, not a solid red button | White text on the dark-mode red (`#ff6961`) fails WCAG contrast; red text on the surface passes in both modes, and it's calmer |
 | 2026-10-19 | After deleting, the browser goes to `/?deleted=1`, and the sign-in screen reads `searchParams` to say goodbye | The account no longer exists, so there's no session to carry a message; the address carries it instead |
+| 2026-10-19 | v1.5 before v1.4 | Smaller and self-contained; the order of milestones is the user's call |
+| 2026-10-19 | One Edit form for title, tags and note, saved by one Server Action (`saveLinkDetails`), replacing `saveTitle` | All three are "details about a link" and are edited together; one action means one request and one place for the rules. The old title-only code was deleted, not kept next to it |
+| 2026-10-19 | The browser sends the raw text (`LinkDetailsInput`); the server cleans it with `cleanDetails` and returns the result (`LinkDetails`) | Never trust the browser. Tags go through the same `parseTags` as when saving, and the card shows what was really stored |
+| 2026-10-19 | Notes are plain text, at most 500 characters (`NOTE_MAX_LENGTH`, cut on the server, `maxLength` in the form) | "Why I saved this" is short; a limit stops anyone from filling the database through the public Server Action |
+| 2026-10-19 | Search also looks in notes | Notes are often the words you remember ("interview"), not the page title |
+| 2026-10-19 | Browser tests match field names with `exact: true` | Playwright matches names partly by default, so "Title" also found the save form's "Title (optional)" box |

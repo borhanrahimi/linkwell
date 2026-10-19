@@ -151,10 +151,10 @@ Saving should take one tap, wherever you find a link.
 
 **You'll learn:** web app manifests and share targets, parsing files, and browser extensions.
 
-## v1.5: Better notes and tags 📝
+## ✅ v1.5: Better notes and tags 📝 (done)
 
-- [ ] Notes on a link: "why I saved this", shown on the card and found by search
-- [ ] Edit or remove the tags of a saved link
+- [x] Notes on a link: "why I saved this", shown on the card and found by search
+- [x] Edit or remove the tags of a saved link (one Edit form for title, tags and note)
 
 **You'll learn:** a new column end to end (schema, migration, action, UI, tests), and editing lists.
 
