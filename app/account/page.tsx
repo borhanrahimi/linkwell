@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
+import DeleteAccount from "@/components/DeleteAccount";
 import Header from "@/components/Header";
 import UsernameForm from "@/components/UsernameForm";
 import { auth } from "@/lib/auth";
@@ -52,6 +53,9 @@ export default async function AccountPage() {
               <a href="/api/export" download className="btn-secondary mt-3 inline-block">
                 Download bookmarks file
               </a>
+            </div>
+            <div className="mt-6 border-t border-line pt-6">
+              <DeleteAccount />
             </div>
           </section>
         </div>

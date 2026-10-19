@@ -120,19 +120,19 @@ Redesign after launch: it's mostly styling, so the data, Server Actions and test
 
 **You'll learn:** CSS Grid, responsive design, visual design, and accessible colour contrast.
 
-## 🔜 v1.2: Your profile 👤
+## ✅ v1.2: Your profile 👤 (done)
 
 The first step toward public profiles: Linkwell knows who you are, and you choose how you're called.
 
 - [x] Show your Google profile picture in the header (or your first letter when there's none)
 - [x] An `/account` page with your picture, name, email and when you joined: the app's first second page
 - [x] Choose a username (like `@borhan`): lowercase letters, numbers and `_`, unique across Linkwell, some names reserved
-- [ ] Export your links as a bookmarks file that Chrome and Safari can import
-- [ ] Delete your account (with an "are you sure?" step); your links and folders go with it
+- [x] Export your links as a bookmarks file that Chrome and Safari can import
+- [x] Delete your account (type "delete" to confirm); your links and folders go with it
 
 **You'll learn:** routing and a second page, adding a column to Better Auth's `user` table, unique constraints, and validation shared by the browser and the server.
 
-## v1.3: Fixes and safety 🧰
+## ✅ v1.3: Fixes and safety 🧰 (done)
 
 Small things to tidy up before other people sign up.
 
@@ -141,7 +141,7 @@ Small things to tidy up before other people sign up.
 
 **You'll learn:** race conditions in forms, and separate environments (development, test, production).
 
-## v1.4: Easier saving 📲
+## 🔜 v1.4: Easier saving 📲
 
 Saving should take one tap, wherever you find a link.
 

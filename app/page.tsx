@@ -5,10 +5,12 @@ import Header from "@/components/Header";
 import { auth } from "@/lib/auth";
 import { getFolders, getLinks } from "@/lib/data";
 
-export default async function Home() {
+export default async function Home({ searchParams }: PageProps<"/">) {
   const session = await auth.api.getSession({ headers: await headers() });
 
   if (!session) {
+    // After deleting an account, DeleteAccount sends the visitor to /?deleted=1.
+    const { deleted } = await searchParams;
     return (
       <main className="min-h-screen p-8">
         <div className="glass mx-auto mt-16 max-w-md rounded-2xl p-8 text-center">
@@ -17,6 +19,11 @@ export default async function Home() {
             Save links. Keep them alive. Actually come back to them.
           </p>
           <SignInButton />
+          {deleted && (
+            <p role="status" className="mt-4 text-sm text-muted">
+              Your account and all your links were deleted. Goodbye
+            </p>
+          )}
         </div>
       </main>
     );

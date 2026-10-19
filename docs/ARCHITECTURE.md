@@ -10,7 +10,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules (pure) |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules and `bookmarks.ts` builds the bookmarks file (both pure) |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`, plus `auth-schema.ts` for Better Auth's `user`, `session`, `account` and `verification` tables) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -119,11 +119,13 @@ Anything a client component imports becomes client code as well, so you don't ne
 |---|---|---|
 | `app/page.tsx` | Server | `async`; reads the session with `auth.api.getSession`. Signed out: shows the sign-in screen. Signed in: shows who is signed in, reads links with `getLinks()` and renders the heading. Sends no JavaScript of its own to the browser |
 | `app/api/auth/[...all]/route.ts` | Route Handler | Hands every `/api/auth/*` request (sign in, Google callback, sign out) to Better Auth |
+| `app/api/export/route.ts` | Route Handler | `GET /api/export`: checks the session (401 without one), then sends `toBookmarksHtml(links, folders)` as a download (`Content-Disposition: attachment`, `Cache-Control: no-store`). The account page links to it with a plain `<a download>` |
 | `app/api/cron/check-links/route.ts` | Route Handler | Called daily by Vercel Cron. Checks the secret, then checks every user's links with `getLinksToCheck()` and saves each result for its owner |
 | `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google" })` on click |
 | `app/account/page.tsx` | Server | The account page. Reads the session; with none, `redirect("/")` sends the visitor to the sign-in screen. Shows the picture, name, email, join date and the `UsernameForm` |
 | `components/Header.tsx` | Server | The floating glass bar on every signed-in page: "Linkwell" (a link home), your `Avatar` and `@username` (or name) linking to `/account`, and `SignOutButton`. Has no `"use client"`; only the sign-out button inside it is a client component |
 | `components/Avatar.tsx` | Server or client | The Google profile picture (`next/image`, `unoptimized`, `referrerPolicy="no-referrer"` because Google's image server can refuse requests that say where they came from), or the name's first letter |
+| `components/DeleteAccount.tsx` | Client | "Delete my account…" opens a form; typing `delete` unlocks "Delete forever", which calls `authClient.deleteUser()`. On success it goes to `/?deleted=1` (the sign-in screen shows a goodbye message); on `SESSION_EXPIRED` it offers "Sign in again" |
 | `components/UsernameForm.tsx` | Client | Calls `saveUsername`, shows the error or "Saved", then `router.refresh()` so the header shows the new username |
 | `components/SignOutButton.tsx` | Client | Calls `authClient.signOut()`, then `router.refresh()` so the server page renders again and finds no session |
 | `app/actions.ts` | Server Actions (`"use server"`) | Runs on the server; the browser calls its functions over the network |
@@ -311,6 +313,7 @@ Never edit a migration that has already been applied. Make a new one instead.
   | `btn-primary` | The main action (Save, Sign in, Import): Apple blue `#0071e3` |
   | `btn-secondary` | A second action (Check links, Create, Rename, Show all): white pill |
   | `btn-quiet` | A way out (Cancel, Not now, Sign out): text only, grey on hover |
+  | `btn-danger` | Actions that can't be undone (Delete my account): red outline and text |
 
   Add layout classes next to them (`className="field min-w-0 flex-1"`), but don't override what the shared class sets (colours, padding, corners), because which one wins isn't reliable. If a control needs a different look, add a new shared class.
 - **Colours are tokens named by their job,** defined once in `app/globals.css` and switched for dark mode there. Use these, never a Tailwind shade like `text-slate-900` or `bg-white`, or that element won't change in dark mode:
@@ -507,3 +510,11 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | The blue button gets darker on hover (`#0062c4`) instead of lighter (`#0077ed`) | Found by the contrast test on the account page: white on the lighter blue was 4.32:1, below 4.5:1 |
 | 2026-10-18 | The contrast test skips disabled controls | WCAG doesn't require contrast for inactive controls, like the half-faded "Saving..." button |
 | 2026-10-19 | Local development moved to its own Neon branch (`dev`); the production URL is kept as `PROD_DATABASE_URL`, only for migrations | Building "delete account" means pressing delete buttons while testing; on the shared database one mistake would delete real data. The app reads `DATABASE_URL` everywhere, so nothing in the code changed |
+| 2026-10-19 | Export uses the Netscape bookmarks file format (HTML), with folders as `<H3>` + `<DL>` and tags in a `TAGS` attribute | Every browser and Raindrop can import it, so people can leave Linkwell with everything; v1.4's bookmark import will read the same format |
+| 2026-10-19 | Titles, URLs, tags and folder names are escaped (`escapeHtml`) in the exported file | Titles come from other websites; a title like `<script>` must stay text, never become code in the file |
+| 2026-10-19 | The export is a Route Handler (`GET /api/export`) linked with a plain `<a download>`, not a Server Action | A download is a file response with headers (`Content-Disposition`), which a normal address does well; it needs no JavaScript in the page |
+| 2026-10-19 | Delete account uses Better Auth's built-in `deleteUser` (`user.deleteUser.enabled: true`), called from the browser | Better Auth removes the user, their sessions and the sign-in cookie; the database deletes their links and folders through `ON DELETE CASCADE`. No delete code of our own to get wrong |
+| 2026-10-19 | Deleting only works within a day of signing in (Better Auth's `freshAge`); otherwise the app asks you to sign in again | Someone using a forgotten, signed-in laptop can't delete your account without signing in with Google first |
+| 2026-10-19 | Confirmation by typing `delete` (trimmed, any capitals), not `window.confirm` | Typing a word is much harder to do by accident than pressing Enter on "OK"; sloppy spaces or capitals still count |
+| 2026-10-19 | `btn-danger` is a red outline with red text, not a solid red button | White text on the dark-mode red (`#ff6961`) fails WCAG contrast; red text on the surface passes in both modes, and it's calmer |
+| 2026-10-19 | After deleting, the browser goes to `/?deleted=1`, and the sign-in screen reads `searchParams` to say goodbye | The account no longer exists, so there's no session to carry a message; the address carries it instead |

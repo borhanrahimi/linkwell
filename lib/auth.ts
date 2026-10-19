@@ -8,7 +8,9 @@ import * as schema from "@/db/schema";
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`${name} is not set. Add it to .env.local, or to the Vercel project's Environment Variables.`);
+    throw new Error(
+      `${name} is not set. Add it to .env.local, or to the Vercel project's Environment Variables.`
+    );
   }
   return value;
 }
@@ -22,7 +24,11 @@ export const auth = betterAuth({
       // Chosen on the account page (saveUsername), never while signing in.
       username: { type: "string", required: false, input: false, unique: true },
     },
+    // Lets a user delete their own account (authClient.deleteUser()). Only
+    // works within a day of signing in, so an old, forgotten session can't.
+    deleteUser: { enabled: true },
   },
+
   socialProviders: {
     google: {
       clientId: requireEnv("GOOGLE_CLIENT_ID"),

@@ -108,3 +108,31 @@ test("a user can download their links as a bookmarks file", async ({
   const file = await readFile(await download.path());
   expect(file.toString()).toContain('<A HREF="https://example.com/export-me"');
 });
+
+test("a user can delete their account, and their links go with it", async ({
+  page,
+  signIn,
+}) => {
+  await signIn("Leaving User");
+  await page.goto("/");
+  await saveLink(page, "https://example.com/goodbye", "Goodbye link");
+  await expect(page.getByRole("link", { name: "Goodbye link" })).toBeVisible();
+
+  await page.goto("/account");
+  await page.getByRole("button", { name: "Delete my account…" }).click();
+  await page.getByLabel("Type delete to confirm").fill("delete");
+  await page.getByRole("button", { name: "Delete forever" }).click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "Your account and all your links were deleted. Goodbye 👋"
+  );
+  await expect(
+    page.getByRole("button", { name: "Sign in with Google" })
+  ).toBeVisible();
+
+  // The session is gone too: the account page now sends us back to sign in.
+  await page.goto("/account");
+  await expect(
+    page.getByRole("button", { name: "Sign in with Google" })
+  ).toBeVisible();
+});

@@ -74,9 +74,7 @@
 @utility glass {
   background-color: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  box-shadow:
-    inset 0 1px 0 var(--glass-edge),
-    0 1px 2px var(--glass-shadow),
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 1px 2px var(--glass-shadow),
     0 8px 24px var(--glass-shadow);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   backdrop-filter: blur(20px) saturate(180%);
@@ -88,10 +86,8 @@
 @utility glass-bar {
   background-color: var(--bar-bg);
   border: 1px solid var(--glass-border);
-  box-shadow:
-    inset 0 1px 1px var(--glass-edge),
-    inset 0 -1px 1px var(--glass-shadow),
-    0 8px 32px var(--glass-shadow);
+  box-shadow: inset 0 1px 1px var(--glass-edge),
+    inset 0 -1px 1px var(--glass-shadow), 0 8px 32px var(--glass-shadow);
   -webkit-backdrop-filter: blur(24px) saturate(200%);
   backdrop-filter: blur(24px) saturate(200%);
 }
@@ -118,4 +114,9 @@
 /* A quiet way out: Cancel, Not now, Sign out. */
 @utility btn-quiet {
   @apply shrink-0 rounded-full px-3 py-2 text-sm font-medium text-ink hover:bg-hover focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50;
+}
+
+/* Actions that can't be undone, like deleting your account. */
+@utility btn-danger {
+  @apply shrink-0 rounded-full border border-danger/40 bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 focus:outline-none focus:ring-2 focus:ring-danger/40 disabled:opacity-50;
 }
