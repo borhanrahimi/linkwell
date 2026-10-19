@@ -1,5 +1,57 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-geist-sans);
+@theme {
+  /* The system font: San Francisco on Apple devices, Segoe UI on Windows. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Quiet glass for tiles and cards: almost white, with a bright top edge like
+   light catching the rim of a glass. Change the look here once, and every
+   `glass` element follows. */
+@utility glass {
+  background-color: rgb(255 255 255 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.8);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 8px 24px rgb(0 0 0 / 0.05);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Liquid glass for things that float above the page (the header bar). It's
+   more see-through, and the strong blur and saturation make the cards that
+   scroll underneath look bent and brighter, like through real glass. */
+@utility glass-bar {
+  background-color: rgb(255 255 255 / 0.5);
+  border: 1px solid rgb(255 255 255 / 0.6);
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.95),
+    inset 0 -1px 1px rgb(0 0 0 / 0.05),
+    0 8px 32px rgb(0 0 0 / 0.1);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  backdrop-filter: blur(24px) saturate(200%);
+}
+
+/* Shared control styles. Every input and button uses one of these, so the
+   whole app changes together (and dark mode only has to change them here). */
+
+/* Text inputs and menus. */
+@utility field {
+  @apply rounded-full border border-black/10 bg-white px-4 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400;
+}
+
+/* The main action: Save, Sign in, Import. */
+@utility btn-primary {
+  @apply shrink-0 rounded-full bg-[#0071e3] px-4 py-2 text-sm font-medium text-white hover:bg-[#0077ed] focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 disabled:opacity-50;
+}
+
+/* A second action next to it: Check links, Create, Rename, Show all. */
+@utility btn-secondary {
+  @apply shrink-0 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50;
+}
+
+/* A quiet way out: Cancel, Not now, Sign out. */
+@utility btn-quiet {
+  @apply shrink-0 rounded-full px-3 py-2 text-sm font-medium text-slate-700 hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50;
 }

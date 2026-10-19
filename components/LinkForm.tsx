@@ -45,27 +45,24 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
             setError(null);
           }}
           placeholder="Paste a link..."
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="field min-w-0 flex-1"
         />
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional)"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="field min-w-0 flex-1"
         />
         <input
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           placeholder="Tags, comma separated"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="field min-w-0 flex-1"
         />
 
-        <button
-          type="submit"
-          className="rounded-lg bg-green-700 px-4 py-2 font-medium text-white hover:bg-green-800"
-        >
+        <button type="submit" className="btn-primary">
           Save
         </button>
       </form>

@@ -30,12 +30,12 @@ export default function CheckLinksButton({ onChecked }: CheckLinksButtonProps) {
       <button
         onClick={handleClick}
         disabled={isChecking}
-        className="rounded border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-slate-400"
+        className="btn-secondary"
       >
         {isChecking ? "Checking..." : "Check links"}
       </button>
       {message && (
-        <p role="status" className="text-slate-500">
+        <p role="status" className="text-slate-600">
           {message}
         </p>
       )}

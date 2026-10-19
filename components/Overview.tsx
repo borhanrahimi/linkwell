@@ -16,7 +16,7 @@ export default function Overview({ links, onChecked }: OverviewProps) {
   ];
 
   return (
-    <section aria-labelledby="overview-heading" className="rounded-2xl bg-white p-5 shadow-sm">
+    <section aria-labelledby="overview-heading" className="glass rounded-2xl p-5">
       <h2 id="overview-heading" className="font-semibold text-slate-900">
         Overview
       </h2>
@@ -24,8 +24,8 @@ export default function Overview({ links, onChecked }: OverviewProps) {
         {stats.map((stat) => (
           // flex-col-reverse shows the number above its label, while screen
           // readers still read "links: 11" in the right order.
-          <div key={stat.label} className="flex flex-col-reverse rounded-xl bg-slate-50 py-2">
-            <dt className="text-xs text-slate-500">{stat.label}</dt>
+          <div key={stat.label} className="flex flex-col-reverse rounded-xl bg-white/70 py-2">
+            <dt className="text-xs text-slate-600">{stat.label}</dt>
             <dd className={`text-2xl font-bold ${stat.alert ? "text-red-600" : "text-slate-900"}`}>{stat.value}</dd>
           </div>
         ))}

@@ -49,15 +49,15 @@ export default function FolderActions({ folder, onRename, onDelete }: FolderActi
                         }}
                         aria-label="New folder name"
                         autoFocus
-                        className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                        className="field min-w-0 flex-1"
                     />
-                    <button type="submit" className="rounded bg-slate-700 px-3 py-1 text-sm font-semibold text-white hover:bg-slate-800">
+                    <button type="submit" className="btn-secondary">
                         Rename
                     </button>
                     <button
                         type="button"
                         onClick={() => setIsRenaming(false)}
-                        className="rounded px-3 py-1 text-sm text-slate-600 hover:bg-slate-100"
+                        className="btn-quiet"
                     >
                         Cancel
                     </button>
@@ -73,10 +73,10 @@ export default function FolderActions({ folder, onRename, onDelete }: FolderActi
 
     return (
         <div className="mt-2 flex gap-3 text-sm">
-            <button onClick={startRenaming} className="text-slate-500 hover:text-slate-800">
+            <button onClick={startRenaming} className="text-slate-600 hover:text-slate-800">
                 Rename folder
             </button>
-            <button onClick={handleDelete} className="text-slate-500 hover:text-red-600">
+            <button onClick={handleDelete} className="text-slate-600 hover:text-red-600">
                 Delete folder
             </button>
         </div>

@@ -105,7 +105,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
 
       {/* The bento dashboard: one column on phones, three on wider screens. */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <section aria-labelledby="save-heading" className="rounded-2xl bg-white p-5 shadow-sm md:col-span-2">
+        <section aria-labelledby="save-heading" className="glass rounded-2xl p-5 md:col-span-2">
           <h2 id="save-heading" className="font-semibold text-slate-900">
             Save a link
           </h2>
@@ -119,7 +119,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
         {/* Without Rediscover, Folders takes the whole row instead of leaving a gap. */}
         <section
           aria-labelledby="folders-heading"
-          className={`rounded-2xl bg-white p-5 shadow-sm ${showRediscover ? "" : "md:col-span-3"}`}
+          className={`glass rounded-2xl p-5 ${showRediscover ? "" : "md:col-span-3"}`}
         >
           <h2 id="folders-heading" className="font-semibold text-slate-900">
             Folders
@@ -138,13 +138,13 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search links..."
           aria-label="Search links"
-          className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+          className="field min-w-0 flex-1"
         />
         <select
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value as SortOrder)}
           aria-label="Sort links"
-          className="rounded border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+          className="field"
         >
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
@@ -153,20 +153,18 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
       </div>
 
       {activeTag && (
-        <div className="mt-6 flex items-center justify-between rounded-lg bg-blue-50 px-4 py-2 text-blue-800">
+        <div className="glass mt-6 flex items-center justify-between gap-4 rounded-full py-1.5 pl-5 pr-1.5 text-sm text-slate-700">
           <span>Showing links tagged #{activeTag}</span>
-          <button
-            onClick={() => setActiveTag(null)}
-            className="rounded bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-800 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1">
+          <button onClick={() => setActiveTag(null)} className="btn-secondary">
             Show all
           </button>
         </div>
       )}
       {links.length === 0 && (
-        <p className="mt-6 text-slate-400">No links yet. Add your first one above.</p>
+        <p className="mt-6 text-slate-600">No links yet. Add your first one above.</p>
       )}
       {links.length > 0 && visibleLinks.length === 0 && (
-        <p className="mt-6 text-slate-400">
+        <p className="mt-6 text-slate-600">
           {activeFolder && !activeTag && !query ? "No links in this folder yet." : "No links match your search."}
         </p>
       )}

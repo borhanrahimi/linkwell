@@ -13,7 +13,7 @@ export default function Rediscover({ links, now, className = "" }: RediscoverPro
   }
 
   return (
-    <section aria-labelledby="rediscover-heading" className={`rounded-2xl bg-violet-50 p-5 shadow-sm ${className}`}>
+    <section aria-labelledby="rediscover-heading" className={`glass rounded-2xl p-5 ring-1 ring-violet-200 ${className}`}>
       <h2 id="rediscover-heading" className="font-semibold text-violet-900">
         Rediscover
       </h2>

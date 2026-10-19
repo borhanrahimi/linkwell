@@ -285,6 +285,19 @@ Never edit a migration that has already been applied. Make a new one instead.
 - **Imports:** use the `@/` alias (`@/types/link`), not long relative paths (`../../types/link`).
 - **Type-only imports:** use `import type { ... }` for types.
 - **Styling:** use Tailwind utility classes in the JSX. Avoid separate CSS files except `app/globals.css`.
+- **Shared styles live in `app/globals.css` as `@utility` classes.** Use them instead of writing the classes again:
+
+  | Class | For |
+  |---|---|
+  | `glass` | Every tile and card (quiet glass: almost white, bright top edge) |
+  | `glass-bar` | Things that float above the page, like the sticky header (more see-through liquid glass) |
+  | `field` | Every text input and menu |
+  | `btn-primary` | The main action (Save, Sign in, Import): Apple blue `#0071e3` |
+  | `btn-secondary` | A second action (Check links, Create, Rename, Show all): white pill |
+  | `btn-quiet` | A way out (Cancel, Not now, Sign out): text only, grey on hover |
+
+  Add layout classes next to them (`className="field min-w-0 flex-1"`), but don't override what the shared class sets (colours, padding, corners), because which one wins isn't reliable. If a control needs a different look, add a new shared class.
+- **Text colours:** use `text-slate-600` or darker for small text. `slate-400` and `slate-500` are too faint on glass; the contrast test (`e2e/contrast.spec.ts`) fails if text drops below WCAG AA.
 - **IDs and dates:** link IDs come from `crypto.randomUUID()`. In the app, dates are ISO strings (`toISOString()`); in the database they're `timestamp with time zone`, and `toLink` / `insertLink` convert between the two. Dates are formatted only for display. The card shows a relative date (`timeAgo(createdAt, now)`) inside `<time dateTime={iso}>`, with the exact date (`toLocaleDateString()`) as a hover tooltip.
 - **Optional fields:** new fields on `Link` are optional (`title?: string`), because links saved earlier don't have them. Show a fallback when they're missing (`link.title || getDomain(link.url)`), or check before using them (`link.tags && link.tags.length > 0`).
 - **Never change state in place.** Functions like `updateTitle` build a new array (`map`) and new objects (`{ ...link, title }`). React only re-renders when it gets a new value.
@@ -320,6 +333,8 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Never copy values like storage keys or error messages from one module into another's code.** Import shared values, so a typo can't make a test pass for the wrong reason.
 
 **Browser tests (Playwright, `npm run e2e`):**
+
+- **Contrast:** `e2e/contrast.spec.ts` checks that every text on the page is readable (WCAG AA: 4.5:1, or 3:1 for large text). Glass is see-through, so the background can't be read from CSS: `measureContrast` in `e2e/contrast.ts` hides all text, takes a screenshot, and compares each text's colour with the darkest pixel behind it. Faded parents (`opacity-75` on read cards) are counted too. If it fails, it lists each text with its ratio.
 
 - They cover what the fake-browser tests can't: the real server, the real database, sessions and cookies. Keep them few, one per important path (signed out, sign in and out, saving survives a reload, accounts are kept apart). Details belong in the Vitest tests.
 - `playwright.config.ts` builds the app and starts it on port 3100, with `DATABASE_URL` set to `E2E_DATABASE_URL` (a Neon branch called `e2e`) and `BETTER_AUTH_URL` set to `http://localhost:3100`. The real database is never touched, and `npm run dev` on port 3000 can keep running.
@@ -439,3 +454,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | New `countLinks()` in `lib/links.ts` feeds the Overview tile | A pure function, so the counting is tested without rendering anything; the tile only shows the numbers |
 | 2026-10-18 | Favicons are fetched at 64px and shown at 24px inside a fixed rounded tile, with the domain's first letter when there's no icon | 32px icons looked blurry on retina screens, and icons of different shapes didn't line up |
 | 2026-10-18 | Inputs inside flex rows get `min-w-0` | Flex and grid items don't shrink below their content's width by default, which pushed buttons out of their tiles on narrow screens |
+| 2026-10-18 | Minimal Apple-style look: plain `#f5f5f7` background, the system font, pill-shaped buttons in Apple blue | Asked for a calm, minimal look. The system font is San Francisco on Apple devices, and it needs no download (the Geist font was removed) |
+| 2026-10-18 | The gradient background with colour blobs was tried and dropped | It looked broken when scrolling and too busy. A plain background is calmer, and it's easier to make readable and to turn dark |
+| 2026-10-18 | Two kinds of glass: quiet `glass` for tiles and cards, liquid `glass-bar` for the sticky header | Glass only looks like glass when something moves behind it. On a plain background that's the header, with the links scrolling underneath; the cards stay almost white so text is easy to read |
+| 2026-10-18 | Shared styles as Tailwind v4 `@utility` classes (`glass`, `glass-bar`, `field`, `btn-primary`, `btn-secondary`, `btn-quiet`) in `globals.css`, written with `@apply` | The same long class lists were copied into many files, and some were missed. Now the look changes in one place, and dark mode only has to change these |
+| 2026-10-18 | Small text is `text-slate-600` or darker; read cards fade with `opacity-75` instead of `opacity-60` | Measured on glass, `slate-400` was about 2.6:1 and a read card's title 4.03:1, both below the 4.5:1 WCAG AA needs |
+| 2026-10-18 | Contrast is checked by a Playwright test that measures screenshot pixels, not by an accessibility library | Tools like axe can't work out the colour behind see-through glass. Measuring the real pixels works for glass, gradients and dark mode alike |

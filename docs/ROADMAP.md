@@ -114,8 +114,8 @@ Folder names must be unique (ignoring case). We didn't need a SQL join after all
 Redesign after launch: it's mostly styling, so the data, Server Actions and tests barely change (tests find elements by role and name, not by CSS class).
 
 - [x] Bento grid layout: a dashboard of tiles (Save a link, Overview, Rediscover, Folders) above a grid of link cards, one column on phones and up to three on desktop
-- [ ] Glassmorphism cards: frosted glass (`backdrop-blur`, see-through backgrounds, light borders) over a gradient background
-- [ ] Check text contrast on glass cards so everything stays readable and accessible
+- [x] Glass cards, Apple-style: a plain light-grey background (the gradient was tried and dropped), quiet glass tiles and cards, and a floating "liquid glass" header bar that the links scroll under
+- [x] Check text contrast on glass cards: a Playwright test measures every text against the real pixels behind it (WCAG AA)
 - [ ] Dark mode
 
 **You'll learn:** CSS Grid, responsive design, visual design, and accessible colour contrast.

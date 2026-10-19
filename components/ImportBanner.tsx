@@ -32,7 +32,7 @@ export default function ImportBanner({ onImported }: ImportBannerProps) {
   }
 
   return (
-    <div className="mt-6 flex items-center justify-between gap-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    <div className="glass mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl px-5 py-3 text-sm text-slate-700">
       <p>
         You have {oldLinks.length} {oldLinks.length === 1 ? "link" : "links"} saved in this
         browser from before. Import them into Linkwell?
@@ -41,14 +41,14 @@ export default function ImportBanner({ onImported }: ImportBannerProps) {
         <button
           onClick={handleImport}
           disabled={isImporting}
-          className="rounded bg-amber-600 px-3 py-1 font-semibold text-white hover:bg-amber-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-1"
+          className="btn-primary"
         >
           {isImporting ? "Importing..." : "Import"}
         </button>
         <button
           onClick={() => setOldLinks([])}
           disabled={isImporting}
-          className="rounded px-3 py-1 font-semibold text-amber-900 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-1"
+          className="btn-quiet"
         >
           Not now
         </button>

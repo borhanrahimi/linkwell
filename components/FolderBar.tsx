@@ -11,8 +11,9 @@ type FolderBarProps = {
 };
 
 function pill(active: boolean) {
-  return `rounded-full px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-400 ${active ? "bg-slate-800 text-white" : "bg-white text-slate-700 hover:bg-slate-100"
-    }`;
+  return `rounded-full px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+    active ? "bg-slate-900 text-white" : "bg-white text-slate-700 ring-1 ring-black/10 hover:bg-slate-50"
+  }`;
 }
 
 export default function FolderBar({ folders, activeFolder, onSelect, onCreate }: FolderBarProps) {
@@ -64,7 +65,7 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
         {!isCreating && (
           <button
             onClick={() => setIsCreating(true)}
-            className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-sm text-slate-500 hover:border-slate-400 hover:text-slate-700"
+            className="rounded-full border border-dashed border-black/20 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-black/30 hover:text-slate-800"
           >
             + New folder
           </button>
@@ -82,15 +83,12 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
             aria-label="Folder name"
             placeholder="Folder name"
             autoFocus
-            className="min-w-0 flex-1 rounded border border-slate-300 px-3 py-1 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            className="field min-w-0 flex-1"
           />
-          <button
-            type="submit"
-            className="rounded bg-slate-700 px-3 py-1 text-sm font-semibold text-white hover:bg-slate-800"
-          >
+          <button type="submit" className="btn-secondary">
             Create
           </button>
-          <button type="button" onClick={cancel} className="rounded px-3 py-1 text-sm text-slate-600 hover:bg-slate-100">
+          <button type="button" onClick={cancel} className="btn-quiet">
             Cancel
           </button>
         </form>

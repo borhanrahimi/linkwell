@@ -42,26 +42,19 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
 
   if (isEditing) {
     return (
-      <li className={`rounded-2xl bg-white p-4 shadow-sm ${tileSize}`}>
+      <li className={`glass rounded-2xl p-4 ${tileSize}`}>
         <form onSubmit={handleSave} className="flex flex-wrap items-center gap-2">
           <input
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             aria-label="Title"
-            className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+            className="field min-w-0 flex-1"
           />
-          <button
-            type="submit"
-            className="rounded bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
-          >
+          <button type="submit" className="btn-primary">
             Save
           </button>
-          <button
-            type="button"
-            onClick={cancelEditing}
-            className="rounded bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
-          >
+          <button type="button" onClick={cancelEditing} className="btn-quiet">
             Cancel
           </button>
         </form>
@@ -70,17 +63,17 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
   }
   return (
     <li
-      className={`flex flex-col justify-between gap-3 rounded-2xl bg-white p-4 shadow-sm ${tileSize} ${link.readAt ? "opacity-60" : ""}`}
+      className={`glass flex flex-col justify-between gap-3 rounded-2xl p-4 ${tileSize} ${link.readAt ? "opacity-75" : ""}`}
     >
-      <div className="flex gap-3 border-t border-slate-100 pt-3">
+      <div className="flex min-w-0 items-start gap-3">
                 {/* Every icon sits in the same rounded tile, so square, round and
             transparent icons all line up. The 64px image shown at 24px stays
             sharp on high-resolution (retina) screens. */}
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-200">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/80 ring-1 ring-slate-900/10">
           {faviconUrl ? (
             <Image src={faviconUrl} alt="" width={24} height={24} unoptimized className="size-6 rounded" />
           ) : (
-            <span aria-hidden="true" className="text-sm font-semibold text-slate-500">
+            <span aria-hidden="true" className="text-sm font-semibold text-slate-600">
               {getDomain(link.url).charAt(0).toUpperCase()}
             </span>
           )}
@@ -104,7 +97,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               </span>
             )}
           </div>
-          <p className="truncate text-sm text-slate-500">{link.url}</p>
+          <p className="truncate text-sm text-slate-600">{link.url}</p>
           {link.status === "broken" && (
             <a
               href={getArchiveUrl(link.url)}
@@ -115,7 +108,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               View archived copy
             </a>
           )}
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-slate-600">
             Saved{" "}
             <time
               dateTime={link.createdAt}
@@ -149,7 +142,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               value={link.folderId ?? ""}
               onChange={(e) => onMove(link.id, e.target.value || undefined)}
               aria-label="Folder"
-              className="mt-2 rounded border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              className="mt-2 rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               <option value="">No folder</option>
               {folders.map((folder) => (
@@ -161,16 +154,16 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
           )}
         </div>
       </div>
-      <div className="ml-4 flex shrink-0 gap-3">
-        <button onClick={() => onToggleRead(link.id)} className="text-sm text-slate-400 hover:text-green-700">
+      <div className="flex gap-3 border-t border-slate-900/10 pt-3">
+        <button onClick={() => onToggleRead(link.id)} className="text-sm text-slate-600 hover:text-green-700">
           {link.readAt ? "Mark unread" : "Mark read"}
         </button>
-        <button onClick={startEditing} className="text-sm text-slate-400 hover:text-blue-600">
+        <button onClick={startEditing} className="text-sm text-slate-600 hover:text-blue-600">
           Edit
         </button>
         <button
           onClick={() => onDelete(link.id)}
-          className="text-sm text-slate-400 hover:text-red-500">
+          className="text-sm text-slate-600 hover:text-red-500">
           Delete
         </button>
       </div>
