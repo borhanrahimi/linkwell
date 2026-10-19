@@ -158,6 +158,28 @@ Saving should take one tap, wherever you find a link.
 
 **You'll learn:** a new column end to end (schema, migration, action, UI, tests), and editing lists.
 
+## v1.6: Our own style 🎨
+
+Give Linkwell a personality of its own, while the app itself stays calm and minimal: hand-drawn touches in a few chosen places, not everywhere. Use our own (or properly licensed) drawings, never someone else's characters.
+
+**Folders**
+- [ ] Each folder gets a colour from a small palette and a hand-drawn icon (book, coffee cup, plane, code brackets, ...), like a sticker
+- [ ] Folders look like paper folders or notebook tabs in the Folders tile
+
+**Bookmarks**
+- [ ] A hand-drawn checkmark for read links
+- [ ] A doodle "snapped chain" on broken links
+- [ ] Notes (from v1.5) shown as a small paper sticky note on the card
+
+**Illustrated moments** (simple ink drawings: black lines with one or two flat colours)
+- [ ] No links yet: a character holding an empty box, "Save your first link"
+- [ ] No search results: a character with a magnifying glass
+- [ ] Rediscover: a character with a telescope, "Remember these?"
+- [ ] Sign-in screen: a friendly welcome illustration
+- [ ] Account deleted (v1.2): a goodbye wave
+
+**You'll learn:** working with SVG, a small illustration style guide (line weight, palette), adding columns for folder colour and icon, and keeping drawings readable in light and dark mode.
+
 ---
 
 ## 🔭 Long-term vision: Linkwell goes social
@@ -180,6 +202,16 @@ Not a milestone yet: a direction for after v1.1. Linkwell stays a **private** to
 
 Not planned yet, but worth remembering:
 
+**Growing Linkwell, in this order:**
+
+1. **A product page** for visitors who aren't signed in: what Linkwell does and why ("Actually come back to them"), screenshots, a help/FAQ section, and a download section (installable app, browser extension). Writing it means answering "why Linkwell and not Raindrop?" in one sentence
+2. **Real users and their feedback:** find 10 to 20 people who keep using Linkwell every week, and learn what they miss
+3. **A better layout, like Raindrop,** shaped by that feedback: a sidebar with your folders, a choice of views (cards, a compact list, or big previews), and a details panel beside the list. Take the navigation ideas, but keep what's Linkwell's own (Rediscover, coming back to links) front and centre
+4. **Later, not now: a paid version (Linkwell Pro).** Only once people clearly use Linkwell and want more. A free plan with the basics, and Pro for features that cost money to run (AI summaries, archive copies, more storage), with a pricing page and payments (for example Stripe). Until then, build costly features with an on/off switch and a limit, so they're ready to become Pro
+
+**Other ideas:**
+
+- AI summary and tag suggestions: when a link is saved, a short summary (two sentences) appears on its card, and Linkwell suggests tags and a folder you can accept or change. Could use Claude through the Anthropic API; it costs a little per link, so it may need a limit or an on/off switch. Builds on the page fetching that already reads titles
 - Keyboard shortcuts
 - Fetch each page's description (and maybe a preview image) when it's saved
 - Optional: a weekly email digest of forgotten links (needs the deployed app, accounts, a schedule and an email service)
