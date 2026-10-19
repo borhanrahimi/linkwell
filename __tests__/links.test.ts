@@ -8,6 +8,9 @@ import {
   loadLinks,
   clearSavedLinks,
   updateTitle,
+  cleanDetails,
+  updateDetails,
+  NOTE_MAX_LENGTH,
   getFaviconUrl,
   parseTags,
   filterByTag,
@@ -227,6 +230,72 @@ describe("getFaviconUrl", () => {
     expect(getFaviconUrl("not a url")).toBeNull();
   });
 });
+describe("cleanDetails", () => {
+  test("trims the title and note, and tidies the tags like when saving", () => {
+    expect(
+      cleanDetails({
+        title: "  React  ",
+        tags: "React, docs, react",
+        note: "  For Monday  ",
+      })
+    ).toEqual({
+      title: "React",
+      tags: ["react", "docs"],
+      note: "For Monday",
+    });
+  });
+
+  test("turns empty boxes into no title, no tags and no note", () => {
+    expect(cleanDetails({ title: " ", tags: " , ", note: "   " })).toEqual({
+      title: undefined,
+      tags: [],
+      note: undefined,
+    });
+  });
+
+  test("cuts notes that are too long", () => {
+    const note = cleanDetails({
+      title: "",
+      tags: "",
+      note: "a".repeat(NOTE_MAX_LENGTH + 50),
+    }).note;
+
+    expect(note).toHaveLength(NOTE_MAX_LENGTH);
+  });
+});
+
+describe("updateDetails", () => {
+  const first = createLink("https://example.com", "Old title", ["old"]);
+  const second = createLink("https://nextjs.org");
+
+  test("changes the title, tags and note of the matching link only", () => {
+    const updated = updateDetails([first, second], first.id, {
+      title: "New",
+      tags: ["new"],
+      note: "Why",
+    });
+
+    expect(updated[0]).toMatchObject({
+      title: "New",
+      tags: ["new"],
+      note: "Why",
+      url: "https://example.com",
+    });
+    expect(updated[1]).toBe(second);
+  });
+
+  test("removes the title and note when they are empty", () => {
+    const updated = updateDetails([first], first.id, {
+      title: undefined,
+      tags: [],
+      note: undefined,
+    });
+
+    expect(updated[0].title).toBeUndefined();
+    expect(updated[0].note).toBeUndefined();
+    expect(updated[0].tags).toEqual([]);
+  });
+});
 
 describe("parseTags", () => {
   test("splits text on commas", () => {
@@ -345,6 +414,7 @@ describe("toLink", () => {
     readAt: null,
     folderId: null,
     userId: "u1",
+    note: null,
   };
 
   test("turns the date into an ISO string", () => {
@@ -353,6 +423,11 @@ describe("toLink", () => {
 
   test("turns an empty title into undefined", () => {
     expect(toLink(row).title).toBeUndefined();
+  });
+
+  test("keeps the note, and turns an empty one into undefined", () => {
+    expect(toLink(row).note).toBeUndefined();
+    expect(toLink({ ...row, note: "For Monday" }).note).toBe("For Monday");
   });
 
   test("keeps the id, url and tags", () => {
@@ -432,8 +507,18 @@ describe("countLinks", () => {
   test("counts all, unread and broken links", () => {
     const links = [
       { id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" },
-      { id: "2", url: "https://b.com", createdAt: "2020-01-01T00:00:00.000Z", readAt: "2020-01-02T00:00:00.000Z" },
-      { id: "3", url: "https://c.com", createdAt: "2020-01-01T00:00:00.000Z", status: "broken" as const },
+      {
+        id: "2",
+        url: "https://b.com",
+        createdAt: "2020-01-01T00:00:00.000Z",
+        readAt: "2020-01-02T00:00:00.000Z",
+      },
+      {
+        id: "3",
+        url: "https://c.com",
+        createdAt: "2020-01-01T00:00:00.000Z",
+        status: "broken" as const,
+      },
     ];
 
     expect(countLinks(links)).toEqual({ total: 3, unread: 2, broken: 1 });
@@ -514,7 +599,9 @@ describe("setFolder", () => {
   test("takes a link out of its folder", () => {
     const inFolder = { ...first, folderId: "f1" };
 
-    expect(setFolder([inFolder], first.id, undefined)[0].folderId).toBeUndefined();
+    expect(
+      setFolder([inFolder], first.id, undefined)[0].folderId
+    ).toBeUndefined();
   });
 });
 

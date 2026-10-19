@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveReadStatus, saveTitle, saveUsername } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkStatus, updateLinkTitle, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveTitle, saveUsername } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateLinkTitle, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
@@ -10,6 +10,7 @@ vi.mock("@/lib/data", () => ({
   insertLink: vi.fn(async () => {}),
   deleteLinkById: vi.fn(async () => {}),
   updateLinkTitle: vi.fn(async () => {}),
+  updateLinkDetails: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
   updateLinkFolder: vi.fn(async () => {}),
@@ -47,6 +48,7 @@ describe("signed out", () => {
     await expect(saveLink(link)).rejects.toThrow("Not signed in");
     await expect(removeLink("1")).rejects.toThrow("Not signed in");
     await expect(saveTitle("1", "x")).rejects.toThrow("Not signed in");
+    await expect(saveLinkDetails("1", { title: "", tags: "", note: "" })).rejects.toThrow("Not signed in");
     await expect(saveReadStatus("1", true)).rejects.toThrow("Not signed in");
     await expect(moveToFolder("1", null)).rejects.toThrow("Not signed in");
     await expect(importLinks([link])).rejects.toThrow("Not signed in");
@@ -63,6 +65,7 @@ describe("signed out", () => {
     expect(insertFolder).not.toHaveBeenCalled();
     expect(deleteFolderById).not.toHaveBeenCalled();
     expect(updateUsername).not.toHaveBeenCalled();
+    expect(updateLinkDetails).not.toHaveBeenCalled();
   });
 });
 
@@ -108,6 +111,16 @@ describe("removeLink", () => {
     await removeLink("1");
 
     expect(deleteLinkById).toHaveBeenCalledWith("u1", "1");
+  });
+});
+
+describe("saveLinkDetails", () => {
+  test("cleans the details on the server, saves and returns them", async () => {
+    const saved = await saveLinkDetails("1", { title: " React ", tags: "React, docs", note: " For Monday " });
+
+    const cleaned = { title: "React", tags: ["react", "docs"], note: "For Monday" };
+    expect(updateLinkDetails).toHaveBeenCalledWith("u1", "1", cleaned);
+    expect(saved).toEqual(cleaned);
   });
 });
 

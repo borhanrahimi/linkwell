@@ -4,7 +4,7 @@ import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { folders, links, user } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
-import type { Folder, Link, LinkStatus } from "@/types/link";
+import type { Folder, Link, LinkDetails, LinkStatus } from "@/types/link";
 
 // Every function takes the signed-in user's id and only touches that user's rows.
 // Updates and deletes match on id AND user_id, so a guessed id from someone
@@ -64,6 +64,20 @@ export async function updateLinkStatus(
     .set({ status, checkedAt: new Date() })
     .where(ownLink(userId, id));
 }
+export async function updateLinkDetails(
+  userId: string,
+  id: string,
+  details: LinkDetails
+) {
+  await db
+    .update(links)
+    .set({
+      title: details.title ?? null,
+      tags: details.tags,
+      note: details.note ?? null,
+    })
+    .where(ownLink(userId, id));
+}
 
 export async function updateLinkReadAt(
   userId: string,
@@ -120,7 +134,10 @@ export async function getLinksToCheck(): Promise<
 }
 
 // True when someone other than this user already has the username.
-export async function isUsernameTaken(userId: string, username: string): Promise<boolean> {
+export async function isUsernameTaken(
+  userId: string,
+  username: string
+): Promise<boolean> {
   const rows = await db
     .select({ id: user.id })
     .from(user)

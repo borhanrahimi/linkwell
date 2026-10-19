@@ -11,6 +11,7 @@ import {
   updateLinkFolder,
   updateLinkStatus,
   updateLinkTitle,
+  updateLinkDetails,
   updateLinkReadAt,
   isUsernameTaken,
   updateUsername,
@@ -18,9 +19,9 @@ import {
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
-import { isDuplicate } from "@/lib/links";
+import { cleanDetails, isDuplicate } from "@/lib/links";
 import { normalizeUsername, usernameError } from "@/lib/username";
-import type { Folder, Link } from "@/types/link";
+import type { Folder, Link, LinkDetails, LinkDetailsInput } from "@/types/link";
 
 // Server Actions are public addresses, so each one asks who is calling first
 // (getUserId throws when nobody is signed in) and only touches that user's data.
@@ -44,6 +45,15 @@ export async function removeLink(id: string) {
 
 export async function saveTitle(id: string, title: string) {
   await updateLinkTitle(await getUserId(), id, title);
+}
+
+// Saves the Edit form. The server cleans the text itself (never trust the
+// browser) and returns the cleaned details, so the card shows what was stored.
+export async function saveLinkDetails(id: string, input: LinkDetailsInput): Promise<LinkDetails> {
+  const userId = await getUserId();
+  const details = cleanDetails(input);
+  await updateLinkDetails(userId, id, details);
+  return details;
 }
 
 export async function saveReadStatus(id: string, read: boolean) {

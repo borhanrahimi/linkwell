@@ -1,4 +1,4 @@
-import type { Folder, Link } from "@/types/link";
+import type { Folder, Link, LinkDetails, LinkDetailsInput } from "@/types/link";
 import type { FolderRow, LinkRow } from "@/db/schema";
 
 export const STORAGE_KEY = "linkwell:links";
@@ -86,6 +86,27 @@ export function setReadAt(
 ): Link[] {
   return links.map((link) => (link.id === id ? { ...link, readAt } : link));
 }
+export const NOTE_MAX_LENGTH = 500;
+
+// Tidies what was typed in the Edit form, with the same rules as saving a new
+// link: trimmed title, tags through parseTags, and a trimmed, length-limited
+// note. Empty text becomes "no title" / "no note".
+export function cleanDetails(input: LinkDetailsInput): LinkDetails {
+  return {
+    title: input.title.trim() || undefined,
+    tags: parseTags(input.tags),
+    note: input.note.trim().slice(0, NOTE_MAX_LENGTH) || undefined,
+  };
+}
+
+export function updateDetails(
+  links: Link[],
+  id: string,
+  details: LinkDetails
+): Link[] {
+  return links.map((link) => (link.id === id ? { ...link, ...details } : link));
+}
+
 export function setFolder(
   links: Link[],
   id: string,
@@ -180,6 +201,7 @@ export function toLink(row: LinkRow): Link {
     id: row.id,
     url: row.url,
     title: row.title ?? undefined,
+    note: row.note ?? undefined,
     tags: row.tags,
     createdAt: row.createdAt.toISOString(),
     status: row.status ?? undefined,

@@ -5,6 +5,7 @@ export type Link = {
   url: string;
   title?: string;
   tags?: string[];
+  note?: string;
   createdAt: string;
   status?: LinkStatus;
   checkedAt?: string;
@@ -15,4 +16,17 @@ export type Link = {
 export type Folder = {
   id: string;
   name: string;
+};
+// What the Edit form sends: the raw text from its three boxes.
+export type LinkDetailsInput = {
+  title: string;
+  tags: string;
+  note: string;
+};
+
+// The same, cleaned up: what is stored and shown.
+export type LinkDetails = {
+  title?: string;
+  tags: string[];
+  note?: string;
 };

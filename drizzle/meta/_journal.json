@@ -64,6 +64,13 @@
       "when": 1792382993239,
       "tag": "0008_add_username",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792437584174,
+      "tag": "0009_add_link_note",
+      "breakpoints": true
     }
   ]
 }
