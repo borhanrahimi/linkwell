@@ -664,6 +664,14 @@ describe("rediscover", () => {
     expect(within(section).queryByRole("link", { name: "recent.com" })).toBeNull();
   });
 
+  test("asks \"Remember these?\" next to a drawing that screen readers skip", () => {
+    render(<LinkManager initialLinks={[old]} now={now} />);
+
+    const section = screen.getByRole("region", { name: "Rediscover" });
+    expect(within(section).getByText(/^Remember these\?/)).toBeDefined();
+    expect(section.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
   test("is hidden when there is nothing to rediscover", () => {
     render(<LinkManager initialLinks={[recent]} now={now} />);
 

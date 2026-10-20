@@ -166,12 +166,13 @@ Later, once real people use Linkwell:
 
 **You'll learn:** a new column end to end (schema, migration, action, UI, tests), and editing lists.
 
-## v1.6: Our own style 🎨
+## 🔜 v1.6: Our own style 🎨 (in progress)
 
 Give Linkwell a personality of its own, while the app itself stays calm and minimal: hand-drawn touches in a few chosen places, not everywhere. Use our own (or properly licensed) drawings, never someone else's characters.
 
 **Folders**
-- [ ] Each folder gets a colour from a small palette and a hand-drawn icon (book, coffee cup, plane, code brackets, ...), like a sticker
+- [x] Each folder gets a colour from a small palette (Apple's 8 system colours, with dark-mode shades), shown as a dot on its pill. New folders take the next colour; pick another under the folder bar
+- [x] A hand-drawn icon instead of the dot: 12 to choose from (book, coffee, plane, code, music, heart, star, briefcase, home, cart, camera, leaf), drawn in the folder's colour
 - [ ] Folders look like paper folders or notebook tabs in the Folders tile
 
 **Bookmarks**
@@ -182,9 +183,16 @@ Give Linkwell a personality of its own, while the app itself stays calm and mini
 **Illustrated moments** (simple ink drawings: black lines with one or two flat colours)
 - [ ] No links yet: a character holding an empty box, "Save your first link"
 - [ ] No search results: a character with a magnifying glass
-- [ ] Rediscover: a character with a telescope, "Remember these?"
+- [x] Rediscover: a character with a telescope, "Remember these?"
 - [ ] Sign-in screen: a friendly welcome illustration
 - [ ] Account deleted (v1.2): a goodbye wave
+
+**Illustration style guide** (so every drawing looks like it belongs to the same app):
+- Our own drawings, written as SVG in `components/illustrations/` (one component per drawing) and `components/FolderIcon.tsx`
+- Ink lines in `currentColor` (`text-ink`), round ends and joins, slightly uneven curves like a quick pen sketch. About 2.5 units wide on a 160×120 drawing, 1.8 on a 24×24 icon
+- At most two flat fills, from the colour tokens (`fill-highlight`, `fill-folder-yellow`, ...), and `fill-surface` for bodies, so dark mode works without extra code
+- Characters are small and round, with dot or line eyes and a simple smile
+- Decoration only: `aria-hidden="true"`, and the words around it still say everything. Hidden on phones when it would squeeze the text
 
 **You'll learn:** working with SVG, a small illustration style guide (line weight, palette), adding columns for folder colour and icon, and keeping drawings readable in light and dark mode.
 

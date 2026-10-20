@@ -9,8 +9,8 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 | Folder | Holds | Rule of thumb |
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
-| `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules, `bookmarks.ts` writes and reads bookmarks files (`parseBookmarksHtml` uses the browser's `DOMParser`, so only client code and tests call it) and `share.ts` helps `/share` and the bookmarklet (all pure) |
+| `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions. `components/illustrations/` holds the drawings (one SVG component each, decoration only) |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules, `bookmarks.ts` writes and reads bookmarks files (`parseBookmarksHtml` uses the browser's `DOMParser`, so only client code and tests call it) and `share.ts` helps `/share` and the bookmarklet, `folders.ts` holds the folder palette and icon list (all pure) |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`, plus `auth-schema.ts` for Better Auth's `user`, `session`, `account` and `verification` tables) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -139,10 +139,12 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/LinkManager.tsx` | Client | Holds `useState` for links, folders, folder and tag filters, search text and sort order; calls the Server Actions. Lays out the bento grid: the dashboard tiles and the grid of `LinkCard`s |
 | `components/ImportBanner.tsx` | Client | Reads old links from `localStorage` after the first render (`useEffect`), offers to import them |
 | `components/CheckLinksButton.tsx` | Client | Calls `checkAllLinks`, shows "Checking..." while it runs and a summary when it's done |
-| `components/Rediscover.tsx` | Client (imported by `LinkManager`) | No state: shows the links it's given in a named `<section>`. Takes a `className` so the grid can make it wide. Has no `"use client"` of its own |
+| `components/Rediscover.tsx` | Client (imported by `LinkManager`) | No state: shows the links it's given in a named `<section>`, with "Remember these?" and the `Stargazer` drawing (hidden below `sm`). Takes a `className` so the grid can make it wide. Has no `"use client"` of its own |
+| `components/illustrations/Stargazer.tsx` | Server or client | Rediscover's drawing: a character looking through a violet telescope at a yellow star. Plain SVG, `aria-hidden` |
+| `components/FolderIcon.tsx` | Server or client | The 12 hand-drawn folder icons, as SVG paths on a 24×24 grid. Draws in `currentColor`, so `FOLDER_TEXT_CLASS` colours it |
 | `components/Overview.tsx` | Client (imported by `LinkManager`) | No state: shows `countLinks(links)` (saved, unread, broken) as a `<dl>`, plus the `CheckLinksButton`. Has no `"use client"` of its own |
-| `components/FolderBar.tsx` | Client | Folder pills (select a folder) and the "+ New folder" form with its own input and error state |
-| `components/FolderActions.tsx` | Client | Rename form and Delete button for the selected folder; asks `window.confirm` before deleting |
+| `components/FolderBar.tsx` | Client | Folder pills (select a folder), each with its icon or coloured dot, and the "+ New folder" form with its own input and error state |
+| `components/FolderActions.tsx` | Client | For the selected folder: the icon picker ("Dot" plus 12 icons, labelled "Coffee icon", ...), the colour picker (8 circles), the rename form and Delete (asks `window.confirm` first). Pickers use `aria-pressed` on the current choice |
 | `components/LinkForm.tsx` | Client | Holds input state, handles submit. The **Paste** button reads the clipboard (`navigator.clipboard.readText()`) and takes the link out with `findSharedUrl`; it never saves by itself. Whether to show it comes from `useSyncExternalStore` (the server says `false`), so the server and browser renders match |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, and `draft` with the Edit form's title, tags and note as text), handles Edit/Save/Cancel and tag clicks. Shows the note under the URL (`whitespace-pre-line`, at most 3 lines) |
 
@@ -184,6 +186,8 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 |---|---|---|
 | `id` | `uuid`, primary key, default random | Made by the database (unlike links, the browser doesn't need the id before the server answers) |
 | `name` | `text`, required | Trimmed. Unique ignoring case, checked by the actions, not the database |
+| `color` | `text`, can be `null` | One of `FOLDER_COLORS` (migration `0010`). `null` = gray, for folders made before v1.6. `toFolder` ignores anything not in the palette |
+| `icon` | `text`, can be `null` | One of `FOLDER_ICONS` (migration `0011`). `null` = show the coloured dot |
 | `created_at` | `timestamp with time zone`, required, default `now()` | Folders are listed oldest first, so new ones appear at the end |
 
 **`lib/data.ts`** (server-only, all `async`):
@@ -201,6 +205,7 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 | `insertFolder(name)` | Creates a folder and returns it, with the id the database made (`.returning()`) |
 | `insertLinks(userId, links)` | Saves many links in **one** `INSERT` (used by the bookmarks import), including their `folderId` |
 | `updateFolderName(id, name)` | Renames a folder |
+| `updateFolderColor(userId, id, color)` / `updateFolderIcon(userId, id, icon)` | Change a folder's colour, or its icon (`null` = dot) |
 | `deleteFolderById(id)` | Deletes a folder; Postgres sets its links' `folder_id` to `null` |
 
 **`app/actions.ts`** (Server Actions, called by `LinkManager`):
@@ -215,6 +220,7 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 | `moveToFolder(id, folderId)` | Moves a link into a folder (`null` = no folder) |
 | `createFolder(name)` | Returns `"Please give the folder a name."` for a blank name, `You already have a folder called "X".` for a duplicate (ignoring case). Otherwise saves the trimmed name and returns the new `Folder` |
 | `renameFolder(id, name)` | Same checks as `createFolder`, but only against the *other* folders (renaming "Work" to "work" is fine). Returns an error message, or `null` when it worked |
+| `setFolderColor(id, color)` / `setFolderIcon(id, icon)` | Save a folder's colour or icon. Anything outside `FOLDER_COLORS` / `FOLDER_ICONS` (or `null` for the icon) is ignored. `createFolder` and `importBookmarks` give new folders `nextFolderColor(number of folders)` |
 | `deleteFolder(id)` | Deletes the folder; its links stay, without a folder |
 | `importBookmarks(batch)` | Refuses more than `IMPORT_BATCH_SIZE` bookmarks. Runs each through `cleanBookmark` (http/https only, trimmed and cut texts, tags through `parseTags`, no future dates), skips links already saved or repeated in the batch (a `Set` of `normalizeUrl` addresses), finds each folder by name ignoring case or makes it, then saves everything with `insertLinks`. Returns `{ added, skipped }` |
 | `checkAllLinks()` | Checks every link **at the same time** (`Promise.all`), saves each result, and returns the list fresh from the database |
@@ -341,6 +347,8 @@ Never edit a migration that has already been applied. Make a new one instead.
   | `text-warning` | Archived copies | amber | light amber |
   | `text-highlight` | Rediscover | violet | light violet |
   | `text-success` | Mark read (hover) | green | light green |
+
+  | `bg-folder-blue` ... `bg-folder-gray`, `text-folder-*`, `fill-folder-*` | Folder colours (8, Apple's system colours) | system colour | brighter dark-mode shade |
 
   Opacity works as usual (`bg-danger/15`). To add a colour: add a `--name` variable to both `:root` blocks and a `--color-name` line to `@theme inline`. No component uses `dark:` classes.
 - **Fixed colours, on purpose:** the blue `btn-primary` (`#0071e3` works in both modes), and the favicon tile, which stays white like an app icon so dark logos stay visible.
@@ -554,3 +562,11 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | `cleanBookmark` checks every imported field again on the server | `importBookmarks` is a public address like every Server Action; the browser's parsing proves nothing |
 | 2026-10-20 | The import screen is one `step` state with a union type, not several booleans | The screen is always in exactly one state, and each state carries only its own data, so impossible mixes (importing and finished at once) can't happen |
 | 2026-10-20 | Sharing the iPhone Shortcut as an iCloud link moved to "later" | Only useful once other people use Linkwell; the Paste button already makes iPhone saving easy |
+| 2026-10-20 | Folder colours are 8 named colours (Apple's system colours), stored by name (`"green"`), not as hex codes | Names keep every colour readable in light and dark mode (each has two shades in `globals.css`); a free hex picker would allow colours that vanish on one of them |
+| 2026-10-20 | Each colour's class is written out in full (`FOLDER_DOT_CLASS`, `FOLDER_TEXT_CLASS`) | Tailwind only builds classes it can find in the code; `"bg-folder-" + color` would produce no CSS |
+| 2026-10-20 | `setFolderColor` and `setFolderIcon` accept only palette names | They're public Server Actions, and the value ends up in a class name and decides which drawing to show |
+| 2026-10-20 | New folders get the next palette colour; folders from before v1.6 are gray (`null`) | Colourful without anyone choosing; old folders didn't need a data migration, only a new column |
+| 2026-10-20 | The 📁 emoji is gone, from the pills and the card's folder menu | The coloured dot or icon replaces it; menu options can't show a coloured dot, so they show the name only |
+| 2026-10-20 | Folder icons are our own SVG drawings in code (`FolderIcon.tsx`), not an icon library or image files | They match the hand-drawn style, take the folder colour through `currentColor`, cost no download, and are ours to use |
+| 2026-10-20 | The "work" icon became "briefcase", and icon buttons are labelled "Coffee icon", ... | A folder named "Work" and an icon button named "Work" were two buttons with the same name, which screen readers (and the tests) can't tell apart |
+| 2026-10-20 | Illustrations are decoration (`aria-hidden`), and Rediscover's is hidden on phones | The words already say everything; on a narrow screen the drawing squeezed link titles to a few letters |
