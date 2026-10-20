@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
@@ -8,6 +8,7 @@ import { getUserId } from "@/lib/session";
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
   insertLink: vi.fn(async () => {}),
+  insertLinks: vi.fn(async () => {}),
   deleteLinkById: vi.fn(async () => {}),
   updateLinkDetails: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
@@ -50,6 +51,7 @@ describe("signed out", () => {
     await expect(saveReadStatus("1", true)).rejects.toThrow("Not signed in");
     await expect(moveToFolder("1", null)).rejects.toThrow("Not signed in");
     await expect(importLinks([link])).rejects.toThrow("Not signed in");
+    await expect(importBookmarks([])).rejects.toThrow("Not signed in");
     await expect(checkAllLinks()).rejects.toThrow("Not signed in");
     await expect(createFolder("Work")).rejects.toThrow("Not signed in");
     await expect(renameFolder("f1", "Job")).rejects.toThrow("Not signed in");
@@ -59,6 +61,7 @@ describe("signed out", () => {
     expect(getLinks).not.toHaveBeenCalled();
     expect(getFolders).not.toHaveBeenCalled();
     expect(insertLink).not.toHaveBeenCalled();
+    expect(insertLinks).not.toHaveBeenCalled();
     expect(deleteLinkById).not.toHaveBeenCalled();
     expect(insertFolder).not.toHaveBeenCalled();
     expect(deleteFolderById).not.toHaveBeenCalled();
@@ -288,5 +291,55 @@ describe("saveUsername", () => {
 
     expect(await saveUsername("ada")).toBe("@ada is already taken.");
     expect(updateUsername).not.toHaveBeenCalled();
+  });
+});
+
+describe("importBookmarks", () => {
+  const soup = { url: "https://example.com/soup", title: "Soup", tags: ["food"], folder: "Recipes", addDate: "2020-01-01T00:00:00.000Z" };
+
+  test("saves the links with their title, tags and date", async () => {
+    const result = await importBookmarks([{ ...soup, folder: undefined }]);
+
+    expect(result).toEqual({ added: 1, skipped: 0 });
+    expect(insertLinks).toHaveBeenCalledWith("u1", [
+      expect.objectContaining({ url: "https://example.com/soup", title: "Soup", tags: ["food"], createdAt: "2020-01-01T00:00:00.000Z", folderId: undefined }),
+    ]);
+  });
+
+  test("makes a missing folder once, and reuses folders you have (ignoring case)", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "w1", name: "Work" }]);
+
+    await importBookmarks([
+      soup,
+      { ...soup, url: "https://example.com/bread" },
+      { ...soup, url: "https://example.com/job", folder: "work" },
+    ]);
+
+    expect(insertFolder).toHaveBeenCalledTimes(1);
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Recipes");
+    const saved = vi.mocked(insertLinks).mock.calls[0][1];
+    expect(saved.map((l) => l.folderId)).toEqual(["f1", "f1", "w1"]);
+  });
+
+  test("skips links you already have, and repeats in the file", async () => {
+    vi.mocked(getLinks).mockResolvedValueOnce([{ ...link, url: "https://example.com/soup" }]);
+
+    const result = await importBookmarks([soup, { ...soup, url: "https://example.com/a" }, { ...soup, url: "https://example.com/a" }]);
+
+    expect(result).toEqual({ added: 1, skipped: 2 });
+  });
+
+  test("skips bookmarks that aren't web addresses", async () => {
+    const result = await importBookmarks([{ ...soup, url: "javascript:alert(1)" }]);
+
+    expect(result).toEqual({ added: 0, skipped: 1 });
+    expect(insertFolder).not.toHaveBeenCalled();
+  });
+
+  test("refuses batches that are too big", async () => {
+    const tooMany = Array.from({ length: 201 }, (_, i) => ({ ...soup, url: `https://example.com/${i}` }));
+
+    await expect(importBookmarks(tooMany)).rejects.toThrow("Too many bookmarks");
+    expect(insertLinks).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ import {
   getFolders,
   insertFolder,
   insertLink,
+  insertLinks,
   updateFolderName,
   updateLinkFolder,
   updateLinkStatus,
@@ -18,9 +19,16 @@ import {
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
-import { cleanDetails, isDuplicate } from "@/lib/links";
+import { cleanDetails, isDuplicate, normalizeUrl } from "@/lib/links";
+import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
 import { normalizeUsername, usernameError } from "@/lib/username";
-import type { Folder, Link, LinkDetails, LinkDetailsInput } from "@/types/link";
+import type {
+  Folder,
+  ImportedBookmark,
+  Link,
+  LinkDetails,
+  LinkDetailsInput,
+} from "@/types/link";
 
 // Server Actions are public addresses, so each one asks who is calling first
 // (getUserId throws when nobody is signed in) and only touches that user's data.
@@ -44,7 +52,10 @@ export async function removeLink(id: string) {
 
 // Saves the Edit form. The server cleans the text itself (never trust the
 // browser) and returns the cleaned details, so the card shows what was stored.
-export async function saveLinkDetails(id: string, input: LinkDetailsInput): Promise<LinkDetails> {
+export async function saveLinkDetails(
+  id: string,
+  input: LinkDetailsInput
+): Promise<LinkDetails> {
   const userId = await getUserId();
   const details = cleanDetails(input);
   await updateLinkDetails(userId, id, details);
@@ -57,7 +68,10 @@ export async function saveReadStatus(id: string, read: boolean) {
 
 export async function moveToFolder(id: string, folderId: string | null) {
   const userId = await getUserId();
-  if (folderId && !(await getFolders(userId)).some((folder) => folder.id === folderId)) {
+  if (
+    folderId &&
+    !(await getFolders(userId)).some((folder) => folder.id === folderId)
+  ) {
     return;
   }
   await updateLinkFolder(userId, id, folderId);
@@ -93,6 +107,52 @@ export async function checkAllLinks(): Promise<Link[]> {
 
   return getLinks(userId);
 }
+// Saves one batch of bookmarks from a bookmarks file. Skips links you already
+// have, and puts each link in the folder with the same name (made if needed).
+export async function importBookmarks(
+  input: ImportedBookmark[]
+): Promise<{ added: number; skipped: number }> {
+  const userId = await getUserId();
+  if (!Array.isArray(input) || input.length > IMPORT_BATCH_SIZE) {
+    throw new Error("Too many bookmarks in one batch.");
+  }
+
+  const known = new Set(
+    (await getLinks(userId)).map((link) => normalizeUrl(link.url))
+  );
+  const folders = await getFolders(userId);
+  const added: Link[] = [];
+
+  for (const bookmark of input.map((item) => cleanBookmark(item))) {
+    if (!bookmark || known.has(normalizeUrl(bookmark.url))) continue;
+    known.add(normalizeUrl(bookmark.url));
+
+    let folderId: string | undefined;
+    if (bookmark.folder) {
+      const name = bookmark.folder;
+      let folder = folders.find(
+        (f) => f.name.toLowerCase() === name.toLowerCase()
+      );
+      if (!folder) {
+        folder = await insertFolder(userId, name);
+        folders.push(folder);
+      }
+      folderId = folder.id;
+    }
+
+    added.push({
+      id: crypto.randomUUID(),
+      url: bookmark.url,
+      title: bookmark.title,
+      tags: bookmark.tags,
+      createdAt: bookmark.addDate ?? new Date().toISOString(),
+      folderId,
+    });
+  }
+
+  await insertLinks(userId, added);
+  return { added: added.length, skipped: input.length - added.length };
+}
 
 export async function createFolder(name: string): Promise<Folder | string> {
   const userId = await getUserId();
@@ -120,7 +180,9 @@ export async function renameFolder(
   if (!trimmed) {
     return "Please give the folder a name.";
   }
-  const others = (await getFolders(userId)).filter((folder) => folder.id !== id);
+  const others = (await getFolders(userId)).filter(
+    (folder) => folder.id !== id
+  );
   if (
     others.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())
   ) {

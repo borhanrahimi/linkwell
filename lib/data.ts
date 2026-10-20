@@ -38,6 +38,21 @@ export async function insertLink(userId: string, link: Link) {
     createdAt: new Date(link.createdAt),
   });
 }
+// Many links in one INSERT: one trip to the database instead of hundreds.
+export async function insertLinks(userId: string, newLinks: Link[]) {
+  if (newLinks.length === 0) return;
+  await db.insert(links).values(
+    newLinks.map((link) => ({
+      id: link.id,
+      userId,
+      url: link.url,
+      title: link.title ?? null,
+      tags: link.tags ?? [],
+      folderId: link.folderId ?? null,
+      createdAt: new Date(link.createdAt),
+    }))
+  );
+}
 
 export async function deleteLinkById(userId: string, id: string) {
   await db.delete(links).where(ownLink(userId, id));

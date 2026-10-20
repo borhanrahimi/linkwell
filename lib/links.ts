@@ -60,7 +60,7 @@ export function getDomain(url: string) {
   }
 }
 
-function normalizeUrl(url: string) {
+export function normalizeUrl(url: string) {
   try {
     return new URL(url).href;
   } catch {

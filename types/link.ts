@@ -30,3 +30,12 @@ export type LinkDetails = {
   tags: string[];
   note?: string;
 };
+
+// One link read from a browser's bookmarks file, before it is saved.
+export type ImportedBookmark = {
+  url: string;
+  title?: string;
+  tags: string[];
+  folder?: string;
+  addDate?: string;
+};
