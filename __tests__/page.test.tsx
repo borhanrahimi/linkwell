@@ -868,3 +868,57 @@ describe("renaming and deleting folders", () => {
     expect(screen.getByRole("button", { name: "📁 Work" })).toBeDefined();
   });
 });
+
+
+describe("paste button", () => {
+  function fakeClipboard(readText: () => Promise<string>) {
+    Object.defineProperty(navigator, "clipboard", { value: { readText }, configurable: true });
+  }
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  });
+
+  async function clickPaste() {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Paste" }));
+    });
+  }
+
+  test("is hidden when the browser can't read the clipboard", () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    expect(screen.queryByRole("button", { name: "Paste" })).toBeNull();
+  });
+
+  test("fills in the link from the clipboard", async () => {
+    fakeClipboard(async () => "Look at this https://example.com/pasted");
+    render(<LinkManager initialLinks={[]} />);
+
+    await clickPaste();
+
+    expect(screen.getByPlaceholderText("Paste a link...")).toHaveProperty("value", "https://example.com/pasted");
+    expect(saveLink).not.toHaveBeenCalled();
+  });
+
+  test("says so when the clipboard has no link", async () => {
+    fakeClipboard(async () => "just some words");
+    render(<LinkManager initialLinks={[]} />);
+
+    await clickPaste();
+
+    expect(screen.getByRole("alert").textContent).toBe("There's no link on your clipboard.");
+    expect(screen.getByPlaceholderText("Paste a link...")).toHaveProperty("value", "");
+  });
+
+  test("explains when the browser says no", async () => {
+    fakeClipboard(async () => {
+      throw new DOMException("Denied", "NotAllowedError");
+    });
+    render(<LinkManager initialLinks={[]} />);
+
+    await clickPaste();
+
+    expect(screen.getByRole("alert").textContent).toMatch(/can't read your clipboard/);
+  });
+});

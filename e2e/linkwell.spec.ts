@@ -220,3 +220,14 @@ test("Android's share format (link inside text) opens the save card", async ({ p
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue("A video");
   await expect(page.getByText("example.com")).toBeVisible();
 });
+
+test("the Paste button fills in a copied link", async ({ page, context, signIn }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await signIn();
+  await page.goto("/");
+  await page.evaluate(() => navigator.clipboard.writeText("https://example.com/copied"));
+
+  await page.getByRole("button", { name: "Paste" }).click();
+
+  await expect(page.getByPlaceholder("Paste a link...")).toHaveValue("https://example.com/copied");
+});

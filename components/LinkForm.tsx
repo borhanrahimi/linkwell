@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { findSharedUrl } from "@/lib/share";
+
+// Whether this browser lets a page read the clipboard. It never changes, so
+// there's nothing to subscribe to. The server can't know and says false; React
+// then asks the browser after hydration, so both first renders match.
+const noSubscription = () => () => {};
+const browserCanPaste = () => typeof navigator.clipboard?.readText === "function";
+const serverCanPaste = () => false;
 
 type LinkFormProps = {
   onAdd: (url: string, title: string, tags: string) => Promise<string | null>;
@@ -11,6 +19,7 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const canPaste = useSyncExternalStore(noSubscription, browserCanPaste, serverCanPaste);
 
   useEffect(() => {
     if (error) {
@@ -18,6 +27,22 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  async function pasteLink() {
+    try {
+      // Browsers only allow this right after a tap or click, and may ask first,
+      // so a website can't read what you copied behind your back.
+      const link = findSharedUrl(await navigator.clipboard.readText());
+      if (link) {
+        setUrl(link);
+        setError(null);
+      } else {
+        setError("There's no link on your clipboard.");
+      }
+    } catch {
+      setError("Linkwell can't read your clipboard. Paste the link into the box instead.");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,16 +66,23 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
   return (
     <div className="mt-3">
       <form onSubmit={handleSubmit} className="flex flex-col gap-2 lg:flex-row">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => {
-            setUrl(e.target.value);
-            setError(null);
-          }}
-          placeholder="Paste a link..."
-          className="field min-w-0 flex-1"
-        />
+        <div className="flex min-w-0 flex-1 gap-2">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              setError(null);
+            }}
+            placeholder="Paste a link..."
+            className="field min-w-0 flex-1"
+          />
+          {canPaste && (
+            <button type="button" onClick={pasteLink} className="btn-secondary">
+              Paste
+            </button>
+          )}
+        </div>
         <input
           type="text"
           value={title}
