@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
+import Bookmarklet from "@/components/Bookmarklet";
 import DeleteAccount from "@/components/DeleteAccount";
 import Header from "@/components/Header";
 import UsernameForm from "@/components/UsernameForm";
@@ -41,6 +42,14 @@ export default async function AccountPage() {
 
             <div className="mt-6 border-t border-line pt-6">
               <UsernameForm initialUsername={user.username} />
+            </div>
+
+            <div className="mt-6 border-t border-line pt-6">
+              <h2 className="text-sm font-medium text-ink">Save from anywhere</h2>
+              <p className="text-sm text-muted">
+                Drag this button to your bookmarks bar. Then click it on any page to save that page to Linkwell.
+              </p>
+              <Bookmarklet />
             </div>
 
             <div className="mt-6 border-t border-line pt-6">

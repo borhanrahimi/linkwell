@@ -26,7 +26,16 @@ describe("SignInButton", () => {
   test("starts signing in with Google", () => {
     render(<SignInButton />);
     fireEvent.click(screen.getByRole("button", { name: "Sign in with Google" }));
-    expect(authClient.signIn.social).toHaveBeenCalledWith({ provider: "google" });
+    expect(authClient.signIn.social).toHaveBeenCalledWith({ provider: "google", callbackURL: "/" });
+  });
+
+  test("comes back to the given page after signing in", () => {
+    render(<SignInButton callbackURL="/share?url=https%3A%2F%2Fexample.com%2F" />);
+    fireEvent.click(screen.getByRole("button", { name: "Sign in with Google" }));
+    expect(authClient.signIn.social).toHaveBeenCalledWith({
+      provider: "google",
+      callbackURL: "/share?url=https%3A%2F%2Fexample.com%2F",
+    });
   });
 });
 

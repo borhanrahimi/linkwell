@@ -155,3 +155,43 @@ test("a user can edit a link's title, tags and note", async ({ page, signIn }) =
   await expect(page.getByRole("button", { name: "#docs" })).toBeVisible();
   await expect(page.getByText("For the interview")).toBeVisible();
 });
+
+test("a link sent to /share is saved after one click", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto(
+    "/share?text=" + encodeURIComponent("Read this https://example.com/shared later")
+  );
+
+  await page.getByLabel("Title", { exact: true }).fill("Shared link");
+  await page.getByRole("button", { name: "Save link" }).click();
+  await expect(page.getByText("Saved to Linkwell.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Go to my links" }).click();
+  await expect(page.getByRole("link", { name: "Shared link" })).toBeVisible();
+});
+
+test("/share asks a signed-out visitor to sign in first", async ({ page }) => {
+  await page.goto("/share?url=" + encodeURIComponent("https://example.com/x"));
+
+  await expect(page.getByText("Sign in to save https://example.com/x")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save link" })).toHaveCount(0);
+});
+
+test("the bookmarklet opens /share for the page it's clicked on", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/account");
+
+  const button = page.getByRole("link", { name: "Save to Linkwell" });
+  await expect(button).toHaveAttribute("href", /^javascript:/);
+  const code = (await button.getAttribute("href"))!.replace(/^javascript:/, "");
+
+  // Run it like the browser does when you click the bookmark.
+  const [popup] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.evaluate((body) => new Function(body)(), code),
+  ]);
+
+  await expect(popup.getByRole("heading", { name: "Save to Linkwell" })).toBeVisible();
+  await expect(popup.getByLabel("Title", { exact: true })).toHaveValue("Your account · Linkwell");
+});
