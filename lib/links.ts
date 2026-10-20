@@ -1,6 +1,6 @@
 import type { Folder, Link, LinkDetails, LinkDetailsInput } from "@/types/link";
 import type { FolderRow, LinkRow } from "@/db/schema";
-import { isFolderColor } from "@/lib/folders";
+import { isFolderColor, isFolderIcon } from "@/lib/folders";
 
 export const STORAGE_KEY = "linkwell:links";
 
@@ -208,7 +208,12 @@ export function toLink(row: LinkRow): Link {
 }
 
 export function toFolder(row: FolderRow): Folder {
-  return { id: row.id, name: row.name, color: isFolderColor(row.color) ? row.color : undefined };
+  return {
+    id: row.id,
+    name: row.name,
+    color: isFolderColor(row.color) ? row.color : undefined,
+    icon: isFolderIcon(row.icon) ? row.icon : undefined,
+  };
 }
 
 export function countLinks(links: Link[]) {

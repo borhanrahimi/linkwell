@@ -8,9 +8,9 @@ import Overview from "@/components/Overview";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
 import FolderActions from "@/components/FolderActions";
-import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails, deleteFolder, renameFolder, setFolderColor } from "@/app/actions";
+import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails, deleteFolder, renameFolder, setFolderColor, setFolderIcon } from "@/app/actions";
 import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, cleanDetails, updateDetails, parseTags, clearFolder, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
-import type { Folder, FolderColor, Link, LinkDetailsInput } from "@/types/link";
+import type { Folder, FolderColor, FolderIcon, Link, LinkDetailsInput } from "@/types/link";
 
 type LinkManagerProps = {
   initialLinks: Link[];
@@ -101,6 +101,11 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     await setFolderColor(id, color);
   }
 
+  async function changeFolderIcon(id: string, icon: FolderIcon | null) {
+    setFolders((current) => current.map((folder) => (folder.id === id ? { ...folder, icon: icon ?? undefined } : folder)));
+    await setFolderIcon(id, icon);
+  }
+
   async function removeFolder(id: string) {
     setFolders((current) => current.filter((folder) => folder.id !== id));
     setLinks((current) => clearFolder(current, id));
@@ -134,7 +139,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
           </h2>
           <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
           {selectedFolder && (
-            <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onRecolor={changeFolderColor} onDelete={removeFolder} />
+            <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onRecolor={changeFolderColor} onChangeIcon={changeFolderIcon} onDelete={removeFolder} />
           )}
         </section>
       </div>

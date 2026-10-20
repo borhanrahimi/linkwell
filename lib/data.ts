@@ -4,7 +4,7 @@ import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { folders, links, user } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
-import type { Folder, FolderColor, Link, LinkDetails, LinkStatus } from "@/types/link";
+import type { Folder, FolderColor, FolderIcon, Link, LinkDetails, LinkStatus } from "@/types/link";
 
 // Every function takes the signed-in user's id and only touches that user's rows.
 // Updates and deletes match on id AND user_id, so a guessed id from someone
@@ -131,6 +131,14 @@ export async function updateFolderColor(
   color: FolderColor
 ) {
   await db.update(folders).set({ color }).where(ownFolder(userId, id));
+}
+
+export async function updateFolderIcon(
+  userId: string,
+  id: string,
+  icon: FolderIcon | null
+) {
+  await db.update(folders).set({ icon }).where(ownFolder(userId, id));
 }
 
 export async function deleteFolderById(userId: string, id: string) {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
@@ -16,6 +16,7 @@ vi.mock("@/lib/data", () => ({
   updateLinkFolder: vi.fn(async () => {}),
   updateFolderName: vi.fn(async () => {}),
   updateFolderColor: vi.fn(async () => {}),
+  updateFolderIcon: vi.fn(async () => {}),
   deleteFolderById: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
   insertFolder: vi.fn(async (_userId: string, name: string) => ({ id: "f1", name })),
@@ -58,6 +59,7 @@ describe("signed out", () => {
     await expect(renameFolder("f1", "Job")).rejects.toThrow("Not signed in");
     await expect(deleteFolder("f1")).rejects.toThrow("Not signed in");
     await expect(setFolderColor("f1", "green")).rejects.toThrow("Not signed in");
+    await expect(setFolderIcon("f1", "book")).rejects.toThrow("Not signed in");
     await expect(saveUsername("ada")).rejects.toThrow("Not signed in");
 
     expect(getLinks).not.toHaveBeenCalled();
@@ -359,5 +361,25 @@ describe("setFolderColor", () => {
     await setFolderColor("f1", "rainbow; background:url(x)" as never);
 
     expect(updateFolderColor).not.toHaveBeenCalled();
+  });
+});
+
+describe("setFolderIcon", () => {
+  test("saves a drawn icon", async () => {
+    await setFolderIcon("f1", "coffee");
+
+    expect(updateFolderIcon).toHaveBeenCalledWith("u1", "f1", "coffee");
+  });
+
+  test("null takes the icon away", async () => {
+    await setFolderIcon("f1", null);
+
+    expect(updateFolderIcon).toHaveBeenCalledWith("u1", "f1", null);
+  });
+
+  test("refuses anything else", async () => {
+    await setFolderIcon("f1", "<script>" as never);
+
+    expect(updateFolderIcon).not.toHaveBeenCalled();
   });
 });

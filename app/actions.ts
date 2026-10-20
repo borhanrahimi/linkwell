@@ -10,6 +10,7 @@ import {
   insertLinks,
   updateFolderName,
   updateFolderColor,
+  updateFolderIcon,
   updateLinkFolder,
   updateLinkStatus,
   updateLinkDetails,
@@ -22,11 +23,12 @@ import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
 import { cleanDetails, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
-import { isFolderColor, nextFolderColor } from "@/lib/folders";
+import { isFolderColor, isFolderIcon, nextFolderColor } from "@/lib/folders";
 import { normalizeUsername, usernameError } from "@/lib/username";
 import type {
   Folder,
   FolderColor,
+  FolderIcon,
   ImportedBookmark,
   Link,
   LinkDetails,
@@ -202,6 +204,15 @@ export async function setFolderColor(id: string, color: FolderColor) {
     return;
   }
   await updateFolderColor(userId, id, color);
+}
+
+// null takes the icon away, and the folder shows its dot again.
+export async function setFolderIcon(id: string, icon: FolderIcon | null) {
+  const userId = await getUserId();
+  if (icon !== null && !isFolderIcon(icon)) {
+    return;
+  }
+  await updateFolderIcon(userId, id, icon);
 }
 
 export async function deleteFolder(id: string) {

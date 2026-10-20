@@ -16,10 +16,16 @@ export type Link = {
 // The palette in lib/folders.ts (FOLDER_COLORS).
 export type FolderColor = "blue" | "green" | "yellow" | "orange" | "red" | "purple" | "pink" | "gray";
 
+// The hand-drawn icons in components/FolderIcon.tsx (FOLDER_ICONS).
+export type FolderIcon =
+  | "book" | "coffee" | "plane" | "code" | "music" | "heart"
+  | "star" | "briefcase" | "home" | "cart" | "camera" | "leaf";
+
 export type Folder = {
   id: string;
   name: string;
   color?: FolderColor;
+  icon?: FolderIcon;
 };
 // What the Edit form sends: the raw text from its three boxes.
 export type LinkDetailsInput = {

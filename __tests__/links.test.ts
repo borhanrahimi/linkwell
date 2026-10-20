@@ -547,6 +547,7 @@ describe("toFolder", () => {
     id: "f1",
     name: "Work",
     color: null,
+    icon: null,
     createdAt: new Date("2026-10-09T12:00:00.000Z"),
     userId: "u1",
   };
@@ -561,6 +562,11 @@ describe("toFolder", () => {
 
   test("ignores a colour that isn't in the palette", () => {
     expect(toFolder({ ...row, color: "rainbow" }).color).toBeUndefined();
+  });
+
+  test("keeps a drawn icon, and ignores unknown ones", () => {
+    expect(toFolder({ ...row, icon: "coffee" }).icon).toBe("coffee");
+    expect(toFolder({ ...row, icon: "rocket" }).icon).toBeUndefined();
   });
 });
 

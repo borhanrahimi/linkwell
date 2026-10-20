@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, setFolderColor, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
+import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, setFolderColor, setFolderIcon, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -11,6 +11,7 @@ vi.mock("@/app/actions", () => ({
   moveToFolder: vi.fn(async () => {}),
   renameFolder: vi.fn(async () => null),
   setFolderColor: vi.fn(async () => {}),
+  setFolderIcon: vi.fn(async () => {}),
   deleteFolder: vi.fn(async () => {}),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
@@ -952,5 +953,31 @@ describe("folder colours", () => {
     expect(setFolderColor).toHaveBeenCalledWith("f1", "purple");
     expect(dotOf("Work")?.className).toContain("bg-folder-purple");
     expect(within(colours).getByRole("button", { name: "Purple", pressed: true })).toBeDefined();
+  });
+});
+
+describe("folder icons", () => {
+  const work = { id: "f1", name: "Work", color: "blue" as const };
+
+  test("picking an icon draws it on the pill in the folder's colour, and Dot takes it away", async () => {
+    render(<LinkManager initialLinks={[]} initialFolders={[work]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    const icons = screen.getByRole("group", { name: "Folder icon" });
+
+    expect(within(icons).getByRole("button", { name: "Dot", pressed: true })).toBeDefined();
+    await act(async () => {
+      fireEvent.click(within(icons).getByRole("button", { name: "Coffee icon" }));
+    });
+
+    expect(setFolderIcon).toHaveBeenCalledWith("f1", "coffee");
+    const pill = screen.getByRole("button", { name: "Work" });
+    expect(pill.querySelector("svg")?.getAttribute("class")).toContain("text-folder-blue");
+
+    await act(async () => {
+      fireEvent.click(within(icons).getByRole("button", { name: "Dot" }));
+    });
+
+    expect(setFolderIcon).toHaveBeenLastCalledWith("f1", null);
+    expect(screen.getByRole("button", { name: "Work" }).querySelector("svg")).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ export const folders = pgTable("folders", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   color: text("color"), // one of FOLDER_COLORS; null = gray (folders made before v1.6)
+  icon: text("icon"), // one of FOLDER_ICONS; null = a coloured dot
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
