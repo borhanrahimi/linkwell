@@ -8,9 +8,9 @@ import Overview from "@/components/Overview";
 import Rediscover from "@/components/Rediscover";
 import FolderBar from "@/components/FolderBar";
 import FolderActions from "@/components/FolderActions";
-import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails, deleteFolder, renameFolder } from "@/app/actions";
+import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails, deleteFolder, renameFolder, setFolderColor } from "@/app/actions";
 import { createLink, filterByFolder, isDuplicate, pickRediscover, setFolder, setReadAt, cleanDetails, updateDetails, parseTags, clearFolder, filterByTag, searchLinks, type SortOrder, sortLinks } from "@/lib/links";
-import type { Folder, Link, LinkDetailsInput } from "@/types/link";
+import type { Folder, FolderColor, Link, LinkDetailsInput } from "@/types/link";
 
 type LinkManagerProps = {
   initialLinks: Link[];
@@ -95,6 +95,12 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
     return null;
   }
 
+  // Shows the new colour at once; saving happens in the background.
+  async function changeFolderColor(id: string, color: FolderColor) {
+    setFolders((current) => current.map((folder) => (folder.id === id ? { ...folder, color } : folder)));
+    await setFolderColor(id, color);
+  }
+
   async function removeFolder(id: string) {
     setFolders((current) => current.filter((folder) => folder.id !== id));
     setLinks((current) => clearFolder(current, id));
@@ -128,7 +134,7 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
           </h2>
           <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
           {selectedFolder && (
-            <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onDelete={removeFolder} />
+            <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onRecolor={changeFolderColor} onDelete={removeFolder} />
           )}
         </section>
       </div>

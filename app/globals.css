@@ -20,6 +20,15 @@
   --color-warning: var(--warning); /* archived copies */
   --color-highlight: var(--highlight); /* Rediscover */
   --color-success: var(--success);
+  /* Folder colours (see FOLDER_COLORS in lib/folders.ts) */
+  --color-folder-blue: var(--folder-blue);
+  --color-folder-green: var(--folder-green);
+  --color-folder-yellow: var(--folder-yellow);
+  --color-folder-orange: var(--folder-orange);
+  --color-folder-red: var(--folder-red);
+  --color-folder-purple: var(--folder-purple);
+  --color-folder-pink: var(--folder-pink);
+  --color-folder-gray: var(--folder-gray);
 }
 
 :root {
@@ -37,6 +46,15 @@
   --warning: #b45309;
   --highlight: #6d28d9;
   --success: #15803d;
+
+  --folder-blue: #007aff;
+  --folder-green: #34c759;
+  --folder-yellow: #ffcc00;
+  --folder-orange: #ff9500;
+  --folder-red: #ff3b30;
+  --folder-purple: #af52de;
+  --folder-pink: #ff2d55;
+  --folder-gray: #8e8e93;
 
   --glass-bg: rgb(255 255 255 / 0.72);
   --glass-border: rgb(255 255 255 / 0.8);
@@ -59,6 +77,15 @@
     --warning: #ffb340;
     --highlight: #c4b5fd;
     --success: #4ade80;
+
+    --folder-blue: #0a84ff;
+    --folder-green: #30d158;
+    --folder-yellow: #ffd60a;
+    --folder-orange: #ff9f0a;
+    --folder-red: #ff453a;
+    --folder-purple: #bf5af2;
+    --folder-pink: #ff375f;
+    --folder-gray: #98989d;
 
     --glass-bg: rgb(28 28 30 / 0.72);
     --glass-border: rgb(255 255 255 / 0.08);

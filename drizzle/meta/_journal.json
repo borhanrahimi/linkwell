@@ -71,6 +71,13 @@
       "when": 1792437584174,
       "tag": "0009_add_link_note",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792520323270,
+      "tag": "0010_add_folder_color",
+      "breakpoints": true
     }
   ]
 }

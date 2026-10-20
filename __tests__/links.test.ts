@@ -543,15 +543,24 @@ describe("pickRediscover", () => {
 });
 
 describe("toFolder", () => {
-  test("keeps the id and name", () => {
-    const row = {
-      id: "f1",
-      name: "Work",
-      createdAt: new Date("2026-10-09T12:00:00.000Z"),
-      userId: "u1",
-    };
+  const row = {
+    id: "f1",
+    name: "Work",
+    color: null,
+    createdAt: new Date("2026-10-09T12:00:00.000Z"),
+    userId: "u1",
+  };
 
+  test("keeps the id and name", () => {
     expect(toFolder(row)).toEqual({ id: "f1", name: "Work" });
+  });
+
+  test("keeps a colour from the palette", () => {
+    expect(toFolder({ ...row, color: "green" }).color).toBe("green");
+  });
+
+  test("ignores a colour that isn't in the palette", () => {
+    expect(toFolder({ ...row, color: "rainbow" }).color).toBeUndefined();
   });
 });
 

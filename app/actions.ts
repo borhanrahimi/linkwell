@@ -9,6 +9,7 @@ import {
   insertLink,
   insertLinks,
   updateFolderName,
+  updateFolderColor,
   updateLinkFolder,
   updateLinkStatus,
   updateLinkDetails,
@@ -21,9 +22,11 @@ import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
 import { cleanDetails, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
+import { isFolderColor, nextFolderColor } from "@/lib/folders";
 import { normalizeUsername, usernameError } from "@/lib/username";
 import type {
   Folder,
+  FolderColor,
   ImportedBookmark,
   Link,
   LinkDetails,
@@ -134,7 +137,7 @@ export async function importBookmarks(
         (f) => f.name.toLowerCase() === name.toLowerCase()
       );
       if (!folder) {
-        folder = await insertFolder(userId, name);
+        folder = await insertFolder(userId, name, nextFolderColor(folders.length));
         folders.push(folder);
       }
       folderId = folder.id;
@@ -168,7 +171,7 @@ export async function createFolder(name: string): Promise<Folder | string> {
   ) {
     return `You already have a folder called "${trimmed}".`;
   }
-  return insertFolder(userId, trimmed);
+  return insertFolder(userId, trimmed, nextFolderColor(existing.length));
 }
 
 export async function renameFolder(
@@ -190,6 +193,15 @@ export async function renameFolder(
   }
   await updateFolderName(userId, id, trimmed);
   return null;
+}
+
+export async function setFolderColor(id: string, color: FolderColor) {
+  const userId = await getUserId();
+  // Only colours from the palette: anything else could end up in a class name.
+  if (!isFolderColor(color)) {
+    return;
+  }
+  await updateFolderColor(userId, id, color);
 }
 
 export async function deleteFolder(id: string) {

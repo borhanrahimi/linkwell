@@ -13,9 +13,13 @@ export type Link = {
   folderId?: string;
 };
 
+// The palette in lib/folders.ts (FOLDER_COLORS).
+export type FolderColor = "blue" | "green" | "yellow" | "orange" | "red" | "purple" | "pink" | "gray";
+
 export type Folder = {
   id: string;
   name: string;
+  color?: FolderColor;
 };
 // What the Edit form sends: the raw text from its three boxes.
 export type LinkDetailsInput = {

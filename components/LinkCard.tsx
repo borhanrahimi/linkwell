@@ -185,7 +185,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
               <option value="">No folder</option>
               {folders.map((folder) => (
                 <option key={folder.id} value={folder.id}>
-                  📁 {folder.name}
+                  {folder.name}
                 </option>
               ))}
             </select>

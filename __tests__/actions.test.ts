@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
+import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
@@ -15,6 +15,7 @@ vi.mock("@/lib/data", () => ({
   updateLinkReadAt: vi.fn(async () => {}),
   updateLinkFolder: vi.fn(async () => {}),
   updateFolderName: vi.fn(async () => {}),
+  updateFolderColor: vi.fn(async () => {}),
   deleteFolderById: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
   insertFolder: vi.fn(async (_userId: string, name: string) => ({ id: "f1", name })),
@@ -56,6 +57,7 @@ describe("signed out", () => {
     await expect(createFolder("Work")).rejects.toThrow("Not signed in");
     await expect(renameFolder("f1", "Job")).rejects.toThrow("Not signed in");
     await expect(deleteFolder("f1")).rejects.toThrow("Not signed in");
+    await expect(setFolderColor("f1", "green")).rejects.toThrow("Not signed in");
     await expect(saveUsername("ada")).rejects.toThrow("Not signed in");
 
     expect(getLinks).not.toHaveBeenCalled();
@@ -198,7 +200,8 @@ describe("saveReadStatus", () => {
 describe("createFolder", () => {
   test("creates a folder with a trimmed name", async () => {
     expect(await createFolder("  Work  ")).toEqual({ id: "f1", name: "Work" });
-    expect(insertFolder).toHaveBeenCalledWith("u1", "Work");
+    // The first folder gets the first palette colour.
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Work", "blue");
   });
 
   test("refuses an empty name", async () => {
@@ -316,7 +319,8 @@ describe("importBookmarks", () => {
     ]);
 
     expect(insertFolder).toHaveBeenCalledTimes(1);
-    expect(insertFolder).toHaveBeenCalledWith("u1", "Recipes");
+    // The user already has one folder (Work), so Recipes gets the second colour.
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Recipes", "green");
     const saved = vi.mocked(insertLinks).mock.calls[0][1];
     expect(saved.map((l) => l.folderId)).toEqual(["f1", "f1", "w1"]);
   });
@@ -341,5 +345,19 @@ describe("importBookmarks", () => {
 
     await expect(importBookmarks(tooMany)).rejects.toThrow("Too many bookmarks");
     expect(insertLinks).not.toHaveBeenCalled();
+  });
+});
+
+describe("setFolderColor", () => {
+  test("saves a colour from the palette", async () => {
+    await setFolderColor("f1", "green");
+
+    expect(updateFolderColor).toHaveBeenCalledWith("u1", "f1", "green");
+  });
+
+  test("refuses anything else", async () => {
+    await setFolderColor("f1", "rainbow; background:url(x)" as never);
+
+    expect(updateFolderColor).not.toHaveBeenCalled();
   });
 });

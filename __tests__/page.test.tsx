@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
+import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, setFolderColor, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -10,6 +10,7 @@ vi.mock("@/app/actions", () => ({
   createFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
   moveToFolder: vi.fn(async () => {}),
   renameFolder: vi.fn(async () => null),
+  setFolderColor: vi.fn(async () => {}),
   deleteFolder: vi.fn(async () => {}),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
@@ -694,7 +695,7 @@ describe("folders", () => {
     render(<LinkManager initialLinks={[]} initialFolders={[{ id: "f1", name: "Work" }]} />);
 
     const list = screen.getByRole("list", { name: "Folders" });
-    expect(within(list).getByText("📁 Work")).toBeDefined();
+    expect(within(list).getByText("Work")).toBeDefined();
   });
 
   test("creates a new folder", async () => {
@@ -703,7 +704,7 @@ describe("folders", () => {
     await createFolderNamed("Recipes");
 
     expect(createFolder).toHaveBeenCalledWith("Recipes");
-    expect(within(screen.getByRole("list", { name: "Folders" })).getByText("📁 Recipes")).toBeDefined();
+    expect(within(screen.getByRole("list", { name: "Folders" })).getByText("Recipes")).toBeDefined();
     expect(screen.queryByRole("textbox", { name: "Folder name" })).toBeNull();
   });
 
@@ -770,17 +771,17 @@ describe("showing one folder", () => {
   test("shows only the links in the clicked folder", () => {
     render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
 
     expect(screen.getByRole("link", { name: "github.com" })).toBeDefined();
     expect(screen.queryByRole("link", { name: "react.dev" })).toBeNull();
-    expect(screen.getByRole("button", { name: "📁 Work", pressed: true })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Work", pressed: true })).toBeDefined();
   });
 
   test("All links shows every link again", () => {
     render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
     fireEvent.click(screen.getByRole("button", { name: "All links" }));
 
     expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
@@ -790,8 +791,8 @@ describe("showing one folder", () => {
   test("clicking the chosen folder again shows every link", () => {
     render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
-    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
 
     expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
   });
@@ -799,7 +800,7 @@ describe("showing one folder", () => {
   test("says when a folder is empty", () => {
     render(<LinkManager initialLinks={[github, react]} initialFolders={[work, recipes]} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "📁 Recipes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Recipes" }));
 
     expect(screen.getByText("No links in this folder yet.")).toBeDefined();
   });
@@ -811,7 +812,7 @@ describe("renaming and deleting folders", () => {
 
   function openWork() {
     render(<LinkManager initialLinks={[github]} initialFolders={[work]} />);
-    fireEvent.click(screen.getByRole("button", { name: "📁 Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
   }
 
   test("only offers rename and delete when a folder is selected", () => {
@@ -830,7 +831,7 @@ describe("renaming and deleting folders", () => {
     });
 
     expect(renameFolder).toHaveBeenCalledWith("f1", "Job");
-    expect(screen.getByRole("button", { name: "📁 Job" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Job" })).toBeDefined();
   });
 
   test("shows the server's error when renaming fails", async () => {
@@ -854,7 +855,7 @@ describe("renaming and deleting folders", () => {
     });
 
     expect(deleteFolder).toHaveBeenCalledWith("f1");
-    expect(screen.queryByRole("button", { name: "📁 Work" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Work" })).toBeNull();
     expect(screen.getByRole("link", { name: "github.com" })).toBeDefined();
   });
 
@@ -865,7 +866,7 @@ describe("renaming and deleting folders", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
 
     expect(deleteFolder).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "📁 Work" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Work" })).toBeDefined();
   });
 });
 
@@ -920,5 +921,36 @@ describe("paste button", () => {
     await clickPaste();
 
     expect(screen.getByRole("alert").textContent).toMatch(/can't read your clipboard/);
+  });
+});
+
+
+describe("folder colours", () => {
+  const work = { id: "f1", name: "Work", color: "green" as const };
+
+  function dotOf(name: string) {
+    return screen.getByRole("button", { name }).querySelector("span");
+  }
+
+  test("each folder pill shows its colour, and gray when it has none", () => {
+    render(<LinkManager initialLinks={[]} initialFolders={[work, { id: "f2", name: "Old" }]} />);
+
+    expect(dotOf("Work")?.className).toContain("bg-folder-green");
+    expect(dotOf("Old")?.className).toContain("bg-folder-gray");
+  });
+
+  test("picking a colour changes the pill at once and saves it", async () => {
+    render(<LinkManager initialLinks={[]} initialFolders={[work]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    const colours = screen.getByRole("group", { name: "Folder colour" });
+
+    expect(within(colours).getByRole("button", { name: "Green", pressed: true })).toBeDefined();
+    await act(async () => {
+      fireEvent.click(within(colours).getByRole("button", { name: "Purple" }));
+    });
+
+    expect(setFolderColor).toHaveBeenCalledWith("f1", "purple");
+    expect(dotOf("Work")?.className).toContain("bg-folder-purple");
+    expect(within(colours).getByRole("button", { name: "Purple", pressed: true })).toBeDefined();
   });
 });

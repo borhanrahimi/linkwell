@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FOLDER_DOT_CLASS } from "@/lib/folders";
 import type { Folder } from "@/types/link";
 
 type FolderBarProps = {
@@ -57,7 +58,11 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
                 aria-pressed={folder.id === activeFolder}
                 className={pill(folder.id === activeFolder)}
               >
-                📁 {folder.name}
+                <span
+                  aria-hidden="true"
+                  className={`mr-1.5 inline-block size-2.5 rounded-full ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`}
+                />
+                {folder.name}
               </button>
             </li>
           ))}
