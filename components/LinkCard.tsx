@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import type { Folder, Link, LinkDetailsInput } from "@/types/link";
+import Checkmark from "@/components/illustrations/Checkmark";
+import SnappedChain from "@/components/illustrations/SnappedChain";
 import { getArchiveUrl, getDomain, getFaviconUrl, NOTE_MAX_LENGTH, timeAgo } from "@/lib/links";
 
 
@@ -118,23 +120,29 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
             {/* Read links get a grey title and a label instead of fading the
                 whole card, because faded text became too hard to read. */}
             {link.readAt && (
-              <span className="shrink-0 rounded-full bg-hover px-2 py-0.5 text-xs font-semibold text-muted">Read</span>
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-hover px-2 py-0.5 text-xs font-semibold text-muted">
+                <Checkmark className="size-3.5 text-success" />
+                Read
+              </span>
             )}
             {link.status === "broken" && (
               <span
                 title={link.checkedAt && `Checked ${timeAgo(link.checkedAt, now)}`}
-                className="shrink-0 rounded-full bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger"
+                className="flex shrink-0 items-center gap-1 rounded-full bg-danger/15 px-2 py-0.5 text-xs font-semibold text-danger"
               >
+                <SnappedChain className="size-3.5" />
                 Broken
               </span>
             )}
           </div>
           <p className="truncate text-sm text-muted">{link.url}</p>
           {link.note && (
-            // whitespace-pre-line keeps the line breaks typed in the note.
-            <p className="mt-1 line-clamp-3 whitespace-pre-line border-l-2 border-line pl-2 text-sm text-ink">
-              {link.note}
-            </p>
+            // A small sticky note: paper colour, a slight tilt, and a strip of
+            // tape on top. whitespace-pre-line keeps the line breaks typed in it.
+            <div className="relative mt-3 mb-1 w-fit max-w-full -rotate-1 rounded-sm bg-paper px-3 pt-2.5 pb-2 shadow-sm">
+              <span aria-hidden="true" className="absolute -top-1.5 left-1/2 h-3 w-10 -translate-x-1/2 rotate-2 bg-tape shadow-sm" />
+              <p className="line-clamp-3 whitespace-pre-line text-sm text-ink">{link.note}</p>
+            </div>
           )}
           {link.status === "broken" && (
             <a

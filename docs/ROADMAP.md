@@ -166,32 +166,32 @@ Later, once real people use Linkwell:
 
 **You'll learn:** a new column end to end (schema, migration, action, UI, tests), and editing lists.
 
-## 🔜 v1.6: Our own style 🎨 (in progress)
+## ✅ v1.6: Our own style 🎨 (done)
 
 Give Linkwell a personality of its own, while the app itself stays calm and minimal: hand-drawn touches in a few chosen places, not everywhere. Use our own (or properly licensed) drawings, never someone else's characters.
 
 **Folders**
 - [x] Each folder gets a colour from a small palette (Apple's 8 system colours, with dark-mode shades), shown as a dot on its pill. New folders take the next colour; pick another under the folder bar
 - [x] A hand-drawn icon instead of the dot: 12 to choose from (book, coffee, plane, code, music, heart, star, briefcase, home, cart, camera, leaf), drawn in the folder's colour
-- [ ] Folders look like paper folders or notebook tabs in the Folders tile
+- [x] Folders look like notebook tabs in the Folders tile: a strip of the folder colour on top, standing on a line, and the open tab joins the page with its settings
 
 **Bookmarks**
-- [ ] A hand-drawn checkmark for read links
-- [ ] A doodle "snapped chain" on broken links
-- [ ] Notes (from v1.5) shown as a small paper sticky note on the card
+- [x] A hand-drawn checkmark for read links, in green in the Read label
+- [x] A doodle "snapped chain" on broken links, in the red Broken badge
+- [x] Notes (from v1.5) shown as a small paper sticky note on the card: paper colour, a slight tilt and a strip of tape
 
-**Illustrated moments** (simple ink drawings: black lines with one or two flat colours)
-- [ ] No links yet: a character holding an empty box, "Save your first link"
-- [ ] No search results: a character with a magnifying glass
-- [x] Rediscover: a character with a telescope, "Remember these?"
-- [ ] Sign-in screen: a friendly welcome illustration
-- [ ] Account deleted (v1.2): a goodbye wave
+**Illustrated moments** (minimal character line art, black and white for now). Every drawing stars the same **Linkwell character, drawn after Linkwell's creator**: curly black hair, square black glasses, a moustache, stubble and a black T-shirt
+- [x] No links yet: holding up an open, empty box, with a bookmark floating down
+- [x] No search results: a magnifying glass making one eye huge, and question marks
+- [x] Rediscover: "Remember these?", peering through a spyglass at a bookmark among the stars
+- [x] Sign-in screen: waving hello
+- [x] Account deleted (v1.2): waving goodbye while a paper plane flies off
 
 **Illustration style guide** (so every drawing looks like it belongs to the same app):
-- Our own drawings, written as SVG in `components/illustrations/` (one component per drawing) and `components/FolderIcon.tsx`
-- Ink lines in `currentColor` (`text-ink`), round ends and joins, slightly uneven curves like a quick pen sketch. About 2.5 units wide on a 160×120 drawing, 1.8 on a 24×24 icon
-- At most two flat fills, from the colour tokens (`fill-highlight`, `fill-folder-yellow`, ...), and `fill-surface` for bodies, so dark mode works without extra code
-- Characters are small and round, with dot or line eyes and a simple smile
+- Our own drawings, written as SVG in `components/illustrations/` (one component per drawing) and `components/FolderIcon.tsx`. The character's parts (`Head`, `Tee`, `Arm`, `Fist`, `Palm`) and shared bits (`Sparkle`, `Bookmark`, the `Drawing` frame) live in `components/illustrations/Character.tsx`, so every scene shows the same person
+- Ink lines in `currentColor` (`text-ink`), round ends and joins. About 1.8 units wide on a 160×120 drawing, 1.8 on a 24×24 icon
+- **Illustrations are black and white only** (for now): ink lines, solid ink shapes (`fill-ink`, like hair or trousers) and white fills (`fill-surface`) where shapes overlap. Both swap in dark mode without extra code. Small UI doodles (folder icons, the snapped chain) may use the colour of what they sit on
+- Characters are minimal line-art people, often half-body portraits: bold even outlines, solid black hair, faces with personality (dot eyes, a raised eyebrow, a small hooked nose, freckles, glasses or a moustache), and patterned clothes (polka dots, stripes)
 - Decoration only: `aria-hidden="true"`, and the words around it still say everything. Hidden on phones when it would squeeze the text
 
 **You'll learn:** working with SVG, a small illustration style guide (line weight, palette), adding columns for folder colour and icon, and keeping drawings readable in light and dark mode.

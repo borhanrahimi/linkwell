@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import LinkManager from "@/components/LinkManager";
 import SignInButton from "@/components/SignInButton";
 import Header from "@/components/Header";
+import Wave from "@/components/illustrations/Wave";
 import { auth } from "@/lib/auth";
 import { getFolders, getLinks } from "@/lib/data";
 
@@ -14,6 +15,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     return (
       <main className="min-h-screen p-8">
         <div className="glass mx-auto mt-16 max-w-md rounded-2xl p-8 text-center">
+          {/* Waving hello, or goodbye after an account was deleted. */}
+          <Wave goodbye={Boolean(deleted)} className="mx-auto mb-4 w-44" />
           <h1 className="text-3xl font-bold text-ink">Linkwell</h1>
           <p className="mt-1 text-muted">
             Save links. Keep them alive. Actually come back to them.

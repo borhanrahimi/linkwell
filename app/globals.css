@@ -29,6 +29,8 @@
   --color-folder-purple: var(--folder-purple);
   --color-folder-pink: var(--folder-pink);
   --color-folder-gray: var(--folder-gray);
+  --color-paper: var(--paper); /* sticky notes */
+  --color-tape: var(--tape); /* the tape holding them */
 }
 
 :root {
@@ -55,6 +57,9 @@
   --folder-purple: #af52de;
   --folder-pink: #ff2d55;
   --folder-gray: #8e8e93;
+
+  --paper: #fff4c2;
+  --tape: rgb(214 208 190 / 0.8);
 
   --glass-bg: rgb(255 255 255 / 0.72);
   --glass-border: rgb(255 255 255 / 0.8);
@@ -86,6 +91,9 @@
     --folder-purple: #bf5af2;
     --folder-pink: #ff375f;
     --folder-gray: #98989d;
+
+    --paper: #3b3524;
+    --tape: rgb(255 255 255 / 0.18);
 
     --glass-bg: rgb(28 28 30 / 0.72);
     --glass-border: rgb(255 255 255 / 0.08);

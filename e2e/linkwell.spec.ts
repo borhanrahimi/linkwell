@@ -149,9 +149,12 @@ test("a user can edit a link's title, tags and note", async ({ page, signIn }) =
   await page.getByRole("button", { name: "Save" }).nth(1).click();
   await expect(page.getByText("For the interview")).toBeVisible();
 
-  // Still there after a reload: it was saved on the server.
-  await page.reload();
-  await expect(page.getByRole("link", { name: "Edited" })).toBeVisible();
+  // Still there after a reload: it was saved on the server. The card shows the
+  // edit before the server has finished saving, so reload until it's there.
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByRole("link", { name: "Edited" })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(page.getByRole("button", { name: "#docs" })).toBeVisible();
   await expect(page.getByText("For the interview")).toBeVisible();
 });

@@ -12,9 +12,14 @@ type FolderBarProps = {
   onCreate: (name: string) => Promise<string | null>;
 };
 
-function pill(active: boolean) {
-  return `rounded-full px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-    active ? "bg-ink text-canvas" : "bg-surface text-ink ring-1 ring-line hover:bg-canvas"
+// Folders look like the tabs on notebook dividers: rounded on top, standing on
+// a line. Every tab carries its own piece of that line (the border under each
+// <li>), so when tabs wrap onto a second row, that row stands on a line too.
+// The open tab is white and covers the line (-mb-px), so it joins the page
+// below it, where the folder's icon, colour and name are changed.
+function tab(active: boolean) {
+  return `relative -mb-px flex items-center overflow-hidden rounded-t-lg border border-line px-3 pt-2.5 pb-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400 ${
+    active ? "border-b-surface bg-surface font-semibold text-ink" : "bg-hover font-medium text-muted hover:text-ink"
   }`;
 }
 
@@ -43,31 +48,28 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
 
   return (
     <div className="mt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <ul aria-label="Folders" className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-end gap-y-2">
+        <ul aria-label="Folders" className="flex flex-wrap gap-y-2">
           {folders.length > 0 && (
-            <li>
-              <button onClick={() => onSelect(null)} aria-pressed={activeFolder === null} className={pill(activeFolder === null)}>
+            <li className="border-b border-line pr-1">
+              <button onClick={() => onSelect(null)} aria-pressed={activeFolder === null} className={tab(activeFolder === null)}>
                 All links
               </button>
             </li>
           )}
           {folders.map((folder) => (
-            <li key={folder.id}>
+            <li key={folder.id} className="border-b border-line pr-1">
               <button
                 onClick={() => onSelect(folder.id === activeFolder ? null : folder.id)}
                 aria-pressed={folder.id === activeFolder}
-                className={pill(folder.id === activeFolder)}
+                className={tab(folder.id === activeFolder)}
               >
-                {folder.icon ? (
+                {/* The folder's colour, as a strip along the top of the tab. */}
+                <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`} />
+                {folder.icon && (
                   <FolderIcon
                     name={folder.icon}
-                    className={`mr-1.5 inline-block size-4 align-[-3px] ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`}
-                  />
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    className={`mr-1.5 inline-block size-2.5 rounded-full ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`}
+                    className={`mr-1.5 size-4 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`}
                   />
                 )}
                 {folder.name}
@@ -75,14 +77,17 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
             </li>
           ))}
         </ul>
-        {!isCreating && (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="rounded-full border border-dashed border-line px-3 py-1.5 text-sm font-medium text-muted hover:border-muted hover:text-ink"
-          >
-            + New folder
-          </button>
-        )}
+        {/* Carries the line on to the end of the row, under "+ New folder". */}
+        <div className="flex-1 border-b border-line pb-1 pl-1">
+          {!isCreating && (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="whitespace-nowrap rounded-lg border border-dashed border-line px-3 py-1 text-sm font-medium text-muted hover:border-muted hover:text-ink"
+            >
+              + New folder
+            </button>
+          )}
+        </div>
       </div>
       {isCreating && (
         <form onSubmit={handleSubmit} className="mt-2 flex gap-2">

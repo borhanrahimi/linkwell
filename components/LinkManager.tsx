@@ -6,6 +6,8 @@ import LinkCard from "@/components/LinkCard";
 import ImportBanner from "@/components/ImportBanner";
 import Overview from "@/components/Overview";
 import Rediscover from "@/components/Rediscover";
+import EmptyBox from "@/components/illustrations/EmptyBox";
+import Magnifier from "@/components/illustrations/Magnifier";
 import FolderBar from "@/components/FolderBar";
 import FolderActions from "@/components/FolderActions";
 import { createFolder, moveToFolder, removeLink, saveLink, saveReadStatus, saveLinkDetails, deleteFolder, renameFolder, setFolderColor, setFolderIcon } from "@/app/actions";
@@ -139,7 +141,10 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
           </h2>
           <FolderBar folders={folders} activeFolder={activeFolder} onSelect={setActiveFolder} onCreate={addFolder} />
           {selectedFolder && (
-            <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onRecolor={changeFolderColor} onChangeIcon={changeFolderIcon} onDelete={removeFolder} />
+            // The page under the open tab: no top border, the tab row's line is its top edge.
+            <div className="rounded-b-xl border border-t-0 border-line bg-surface px-3 pb-3 pt-1">
+              <FolderActions key={selectedFolder.id} folder={selectedFolder} onRename={changeFolderName} onRecolor={changeFolderColor} onChangeIcon={changeFolderIcon} onDelete={removeFolder} />
+            </div>
           )}
         </section>
       </div>
@@ -174,12 +179,18 @@ export default function LinkManager({ initialLinks, initialFolders = [], now }: 
         </div>
       )}
       {links.length === 0 && (
-        <p className="mt-6 text-muted">No links yet. Add your first one above.</p>
+        <div className="mt-6 text-center">
+          <EmptyBox className="mx-auto w-48" />
+          <p className="mt-2 text-muted">No links yet. Add your first one above.</p>
+        </div>
       )}
       {links.length > 0 && visibleLinks.length === 0 && (
-        <p className="mt-6 text-muted">
-          {activeFolder && !activeTag && !query ? "No links in this folder yet." : "No links match your search."}
-        </p>
+        <div className="mt-6 text-center">
+          <Magnifier className="mx-auto w-48" />
+          <p className="mt-2 text-muted">
+            {activeFolder && !activeTag && !query ? "No links in this folder yet." : "No links match your search."}
+          </p>
+        </div>
       )}
 
       {visibleLinks.length > 0 && (

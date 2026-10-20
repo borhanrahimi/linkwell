@@ -62,6 +62,8 @@ describe("Home page", () => {
     render(<LinkManager initialLinks={[]} />);
 
     expect(screen.getByText("No links yet. Add your first one above.")).toBeDefined();
+    // With a drawing that screen readers skip.
+    expect(document.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
   });
 
   test("adds a link to the list", async () => {
@@ -584,6 +586,8 @@ describe("broken badge", () => {
     render(<LinkManager initialLinks={[{ ...base, status: "broken", checkedAt: "2026-10-07T12:00:00.000Z" }]} />);
 
     expect(screen.getByText("Broken")).toBeDefined();
+    // The snapped-chain doodle is decoration, hidden from screen readers.
+    expect(screen.getByText("Broken").querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 
   test("shows no badge on a working link", () => {
@@ -636,6 +640,8 @@ describe("read and unread", () => {
 
     expect(screen.getByRole("button", { name: "Mark unread" })).toBeDefined();
     expect(saveReadStatus).toHaveBeenCalledWith("1", true);
+    // A "Read" label with a hand-drawn tick that screen readers skip.
+    expect(screen.getByText("Read").querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 
   test("marks a read link as unread again", async () => {

@@ -20,9 +20,20 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("textbox", { name: "Note" }).fill("Why I saved this");
       await page.getByRole("button", { name: "Save" }).nth(1).click();
       await page.getByText("Why I saved this").waitFor();
+      // Two folder tabs.
+      for (const name of ["Work", "Reading"]) {
+        await page.getByRole("button", { name: "+ New folder" }).click();
+        await page.getByRole("textbox", { name: "Folder name" }).fill(name);
+        await page.getByRole("button", { name: "Create" }).click();
+        await page.getByRole("button", { name, exact: true }).waitFor();
+      }
       await page.getByRole("button", { name: "Edit" }).nth(1).click();
 
       const results = await measureContrast(page);
+      // Then again with a folder's tab open (it shows only that folder's links).
+      await page.getByRole("button", { name: "Work", exact: true }).click();
+      await page.getByRole("button", { name: "Rename folder" }).waitFor();
+      results.push(...(await measureContrast(page)));
       const tooLow = results.filter((result) => result.ratio < result.needed);
 
       expect(results.length).toBeGreaterThan(10);

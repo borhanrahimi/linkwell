@@ -40,7 +40,7 @@ export default function Rediscover({ links, now, className = "" }: RediscoverPro
         </ul>
       </div>
       {/* Hidden on phones: there, every bit of width goes to the link titles. */}
-      <Stargazer className="hidden w-32 shrink-0 self-end sm:block" />
+      <Stargazer className="hidden w-44 shrink-0 self-center sm:block" />
     </section>
   );
 }
