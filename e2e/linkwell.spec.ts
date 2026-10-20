@@ -195,3 +195,28 @@ test("the bookmarklet opens /share for the page it's clicked on", async ({ page,
   await expect(popup.getByRole("heading", { name: "Save to Linkwell" })).toBeVisible();
   await expect(popup.getByLabel("Title", { exact: true })).toHaveValue("Your account · Linkwell");
 });
+
+test("the app can be installed: the page links to a manifest with a share target", async ({ page }) => {
+  await page.goto("/");
+
+  const href = await page.locator('link[rel="manifest"]').getAttribute("href");
+  const response = await page.request.get(href!);
+  expect(response.ok()).toBe(true);
+  const manifest = await response.json();
+  expect(manifest.share_target.action).toBe("/share");
+
+  for (const icon of manifest.icons) {
+    expect((await page.request.get(icon.src)).ok()).toBe(true);
+  }
+});
+
+test("Android's share format (link inside text) opens the save card", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto(
+    "/share?title=" + encodeURIComponent("A video") +
+      "&text=" + encodeURIComponent("Watch this! https://example.com/video")
+  );
+
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("A video");
+  await expect(page.getByText("example.com")).toBeVisible();
+});
