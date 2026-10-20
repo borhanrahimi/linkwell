@@ -5,6 +5,7 @@ import Avatar from "@/components/Avatar";
 import Bookmarklet from "@/components/Bookmarklet";
 import DeleteAccount from "@/components/DeleteAccount";
 import Header from "@/components/Header";
+import ImportBookmarks from "@/components/ImportBookmarks";
 import UsernameForm from "@/components/UsernameForm";
 import { auth } from "@/lib/auth";
 
@@ -63,6 +64,16 @@ export default async function AccountPage() {
                 Download bookmarks file
               </a>
             </div>
+
+            <div className="mt-6 border-t border-line pt-6">
+              <h2 className="text-sm font-medium text-ink">Import bookmarks</h2>
+              <p className="text-sm text-muted">
+                Bring in links from Chrome, Safari, Firefox or Raindrop: export your bookmarks there as a file, then
+                choose it here. Browser folders become Linkwell folders.
+              </p>
+              <ImportBookmarks />
+            </div>
+
             <div className="mt-6 border-t border-line pt-6">
               <DeleteAccount />
             </div>

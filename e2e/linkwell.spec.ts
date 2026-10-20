@@ -231,3 +231,32 @@ test("the Paste button fills in a copied link", async ({ page, context, signIn }
 
   await expect(page.getByPlaceholder("Paste a link...")).toHaveValue("https://example.com/copied");
 });
+
+test("a user can import a bookmarks file, folders and all", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/account");
+
+  const file = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>Recipes</H3>
+    <DL><p>
+        <DT><A HREF="https://example.com/soup" TAGS="food">Imported soup</A>
+    </DL><p>
+    <DT><A HREF="https://example.com/loose">Imported loose link</A>
+</DL><p>`;
+  await page.getByLabel("Choose bookmarks file").setInputFiles({
+    name: "bookmarks.html",
+    mimeType: "text/html",
+    buffer: Buffer.from(file),
+  });
+  await expect(page.getByText("Found 2 links in 1 folder.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Import 2 links" }).click();
+  await expect(page.getByText("Imported 2 links.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Go to my links" }).click();
+  await expect(page.getByRole("link", { name: "Imported loose link" })).toBeVisible();
+  await page.getByRole("button", { name: "Recipes" }).click();
+  await expect(page.getByRole("link", { name: "Imported soup" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Imported loose link" })).toHaveCount(0);
+});
