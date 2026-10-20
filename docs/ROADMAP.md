@@ -141,7 +141,7 @@ Small things to tidy up before other people sign up.
 
 **You'll learn:** race conditions in forms, and separate environments (development, test, production).
 
-## 🔜 v1.4: Easier saving 📲 (almost done)
+## ✅ v1.4: Easier saving 📲 (done)
 
 Saving should take one tap, wherever you find a link. Every way of saving opens the same page, `/share?url=...&title=...`, which shows a small save card.
 
@@ -150,13 +150,14 @@ Saving should take one tap, wherever you find a link. Every way of saving opens 
 - [x] Browser extension (Chrome, Edge, Brave, Arc): a toolbar button next to the ⭐, or Alt+Shift+S, in `extension/`. Installed with "Load unpacked" for now; not on the Chrome Web Store yet
 - [x] iPhone: a "Save to Linkwell" Shortcut in the Share menu (built in the Shortcuts app, no code), and "Add to Home Screen" to use Linkwell like an app
 - [x] Installable app (PWA, `app/manifest.ts`): on Android, the installed app appears in the Share menu (`share_target`)
-- [ ] A **Paste** button next to the link box (the easiest way on an iPhone: copy a link anywhere, open Linkwell, tap Paste)
-- [ ] Share the iPhone Shortcut as an iCloud link on the account page, so nobody has to build it
-- [ ] Import bookmarks from Chrome, Safari or Firefox (the same bookmarks file format as the export in v1.2)
+- [x] A **Paste** button next to the link box (the easiest way on an iPhone: copy a link anywhere, open Linkwell, tap Paste). Only shown where the browser can read the clipboard
+- [x] Import bookmarks from Chrome, Safari, Firefox or Raindrop (the same bookmarks file format as the export in v1.2): browser folders become Linkwell folders, tags come along, links you already have are skipped, and you see a preview ("Found 248 links in 12 folders") before anything is saved
 
-**You'll learn:** web app manifests and share targets, bookmarklets, browser extensions (Manifest V3), redirecting back after sign-in, parsing files.
+**You'll learn:** web app manifests and share targets, bookmarklets, browser extensions (Manifest V3), redirecting back after sign-in, the Clipboard API and `useSyncExternalStore`, reading files in the browser (`DOMParser`), sending big imports in batches, and one-state-at-a-time screens with a union type.
 
-Later, once real people use Linkwell: publish the extension on the Chrome Web Store (a one-time $5 fee and a review), and maybe Safari (needs Xcode and an Apple developer account).
+Later, once real people use Linkwell:
+- Share the iPhone Shortcut as an iCloud link on the account page, so nobody has to build it
+- Publish the extension on the Chrome Web Store (a one-time $5 fee and a review), and maybe Safari (needs Xcode and an Apple developer account)
 
 ## ✅ v1.5: Better notes and tags 📝 (done)
 

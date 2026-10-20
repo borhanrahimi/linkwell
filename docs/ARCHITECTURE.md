@@ -10,7 +10,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules, `bookmarks.ts` builds the bookmarks file and `share.ts` helps `/share` and the bookmarklet (all pure) |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules, `bookmarks.ts` writes and reads bookmarks files (`parseBookmarksHtml` uses the browser's `DOMParser`, so only client code and tests call it) and `share.ts` helps `/share` and the bookmarklet (all pure) |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`, plus `auth-schema.ts` for Better Auth's `user`, `session`, `account` and `verification` tables) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
@@ -126,6 +126,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google", callbackURL })` on click. `callbackURL` is `/` unless a page passes another, like `/share?url=...` |
 | `app/share/page.tsx` | Server | The save card for saving from anywhere. Reads `url`, `text` and `title` from `searchParams` (`findSharedUrl` takes the first http(s) link from `url`, then `text`). No link: says so. Signed out: `SignInButton` with `callbackURL={shareAddress(url, title)}`, so you come back to the same link. Signed in: `ShareForm` |
 | `components/ShareForm.tsx` | Client | Title and Tags boxes and **Save link**, which calls the existing `saveLink` action; then "Saved to Linkwell." or the action's error ("You already saved this link!") |
+| `components/ImportBookmarks.tsx` | Client | Import on the account page. One `step` state (a union type): **choose** a file → **preview** ("Found N links in M folders") → **importing** (progress) → **finished** (added and skipped counts). Reads the file in the browser with `parseBookmarksHtml`, then calls `importBookmarks` once per batch of `IMPORT_BATCH_SIZE` (200). Refuses files over 10 MB |
 | `components/Bookmarklet.tsx` | Client | The draggable "Save to Linkwell" link on the account page. Sets its `javascript:` address in a `useEffect` (`bookmarkletCode(window.location.origin)`), because React blocks `javascript:` URLs in JSX. Clicking it on the account page does nothing |
 | `app/manifest.ts` | Metadata file | Served as `/manifest.webmanifest` and linked from every page by Next.js. Name, colours, icons, `display: "standalone"`, and `share_target` (GET `/share` with `title`, `text`, `url`) |
 | `app/account/page.tsx` | Server | The account page. Reads the session; with none, `redirect("/")` sends the visitor to the sign-in screen. Shows the picture, name, email, join date and the `UsernameForm` |
@@ -142,7 +143,7 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/Overview.tsx` | Client (imported by `LinkManager`) | No state: shows `countLinks(links)` (saved, unread, broken) as a `<dl>`, plus the `CheckLinksButton`. Has no `"use client"` of its own |
 | `components/FolderBar.tsx` | Client | Folder pills (select a folder) and the "+ New folder" form with its own input and error state |
 | `components/FolderActions.tsx` | Client | Rename form and Delete button for the selected folder; asks `window.confirm` before deleting |
-| `components/LinkForm.tsx` | Client | Holds input state, handles submit |
+| `components/LinkForm.tsx` | Client | Holds input state, handles submit. The **Paste** button reads the clipboard (`navigator.clipboard.readText()`) and takes the link out with `findSharedUrl`; it never saves by itself. Whether to show it comes from `useSyncExternalStore` (the server says `false`), so the server and browser renders match |
 | `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, and `draft` with the Edit form's title, tags and note as text), handles Edit/Save/Cancel and tag clicks. Shows the note under the URL (`whitespace-pre-line`, at most 3 lines) |
 
 **Keep `"use client"` as low in the tree as possible.** The page fetches data on the server and hands it to one client component that handles everything interactive.
@@ -198,6 +199,7 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 | `updateLinkFolder(id, folderId)` | Moves a link into a folder, or out of it with `null` |
 | `getFolders()` | All folders, oldest first, converted with `toFolder` |
 | `insertFolder(name)` | Creates a folder and returns it, with the id the database made (`.returning()`) |
+| `insertLinks(userId, links)` | Saves many links in **one** `INSERT` (used by the bookmarks import), including their `folderId` |
 | `updateFolderName(id, name)` | Renames a folder |
 | `deleteFolderById(id)` | Deletes a folder; Postgres sets its links' `folder_id` to `null` |
 
@@ -214,6 +216,7 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 | `createFolder(name)` | Returns `"Please give the folder a name."` for a blank name, `You already have a folder called "X".` for a duplicate (ignoring case). Otherwise saves the trimmed name and returns the new `Folder` |
 | `renameFolder(id, name)` | Same checks as `createFolder`, but only against the *other* folders (renaming "Work" to "work" is fine). Returns an error message, or `null` when it worked |
 | `deleteFolder(id)` | Deletes the folder; its links stay, without a folder |
+| `importBookmarks(batch)` | Refuses more than `IMPORT_BATCH_SIZE` bookmarks. Runs each through `cleanBookmark` (http/https only, trimmed and cut texts, tags through `parseTags`, no future dates), skips links already saved or repeated in the batch (a `Set` of `normalizeUrl` addresses), finds each folder by name ignoring case or makes it, then saves everything with `insertLinks`. Returns `{ added, skipped }` |
 | `checkAllLinks()` | Checks every link **at the same time** (`Promise.all`), saves each result, and returns the list fresh from the database |
 
 **`lib/checkLink.ts`** (server-side, talks to the internet):
@@ -519,7 +522,7 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-18 | The blue button gets darker on hover (`#0062c4`) instead of lighter (`#0077ed`) | Found by the contrast test on the account page: white on the lighter blue was 4.32:1, below 4.5:1 |
 | 2026-10-18 | The contrast test skips disabled controls | WCAG doesn't require contrast for inactive controls, like the half-faded "Saving..." button |
 | 2026-10-19 | Local development moved to its own Neon branch (`dev`); the production URL is kept as `PROD_DATABASE_URL`, only for migrations | Building "delete account" means pressing delete buttons while testing; on the shared database one mistake would delete real data. The app reads `DATABASE_URL` everywhere, so nothing in the code changed |
-| 2026-10-19 | Export uses the Netscape bookmarks file format (HTML), with folders as `<H3>` + `<DL>` and tags in a `TAGS` attribute | Every browser and Raindrop can import it, so people can leave Linkwell with everything; v1.4's bookmark import will read the same format |
+| 2026-10-19 | Export uses the Netscape bookmarks file format (HTML), with folders as `<H3>` + `<DL>` and tags in a `TAGS` attribute | Every browser and Raindrop can import it, so people can leave Linkwell with everything; v1.4's bookmark import reads the same format |
 | 2026-10-19 | Titles, URLs, tags and folder names are escaped (`escapeHtml`) in the exported file | Titles come from other websites; a title like `<script>` must stay text, never become code in the file |
 | 2026-10-19 | The export is a Route Handler (`GET /api/export`) linked with a plain `<a download>`, not a Server Action | A download is a file response with headers (`Content-Disposition`), which a normal address does well; it needs no JavaScript in the page |
 | 2026-10-19 | Delete account uses Better Auth's built-in `deleteUser` (`user.deleteUser.enabled: true`), called from the browser | Better Auth removes the user, their sessions and the sign-in cookie; the database deletes their links and folders through `ON DELETE CASCADE`. No delete code of our own to get wrong |
@@ -543,3 +546,11 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-19 | iPhone saving uses a Shortcut (and Add to Home Screen), not `share_target` | Safari doesn't support Web Share Target, so an installed web app can't appear in the iPhone Share menu. A Shortcut can, and needs no code. A native app would need Xcode and a $99/year Apple account |
 | 2026-10-19 | The installable app has no service worker | Chrome no longer requires one to install an app or receive shares; offline support isn't needed for a link saver that talks to the server anyway |
 | 2026-10-19 | A separate maskable icon (`icon-maskable-512.png`), a full square without rounded corners | Android cuts app icons into its own shape; an icon with its own rounded corners would get a white frame |
+| 2026-10-20 | The Paste button fills in the link but doesn't save | You still see the link, and can add a title and tags, before saving; reading the clipboard should never change data on its own |
+| 2026-10-20 | `useSyncExternalStore` decides whether to show Paste, not `useEffect` + `useState` | The linter refuses setting state inside an effect (an extra render). `useSyncExternalStore` reads a browser-only value, with a server answer (`false`) so hydration matches |
+| 2026-10-20 | Bookmarks files are read in the browser (`DOMParser`), not uploaded | The browser already has an HTML reader; only the links travel to the server, never a whole file, so there's no upload size or file storage to handle |
+| 2026-10-20 | Folders in a file are found by position: the `<H3>` right before the `<DL>` around a link. The browser's own folders (`PERSONAL_TOOLBAR_FOLDER`, `UNFILED_BOOKMARKS_FOLDER`) are skipped. Nested folders keep only the innermost name | Linkwell folders are flat (one level), and a "Bookmarks bar" folder holding everything would be useless |
+| 2026-10-20 | The import is sent in batches of 200 (`IMPORT_BATCH_SIZE`), one after another, and the server refuses bigger batches | A Server Action accepts about 1 MB per request. Batches also give a progress count, and a failed batch loses nothing: trying again skips what was saved |
+| 2026-10-20 | `cleanBookmark` checks every imported field again on the server | `importBookmarks` is a public address like every Server Action; the browser's parsing proves nothing |
+| 2026-10-20 | The import screen is one `step` state with a union type, not several booleans | The screen is always in exactly one state, and each state carries only its own data, so impossible mixes (importing and finished at once) can't happen |
+| 2026-10-20 | Sharing the iPhone Shortcut as an iCloud link moved to "later" | Only useful once other people use Linkwell; the Paste button already makes iPhone saving easy |
