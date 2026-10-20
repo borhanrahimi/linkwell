@@ -141,15 +141,22 @@ Small things to tidy up before other people sign up.
 
 **You'll learn:** race conditions in forms, and separate environments (development, test, production).
 
-## 🔜 v1.4: Easier saving 📲
+## 🔜 v1.4: Easier saving 📲 (almost done)
 
-Saving should take one tap, wherever you find a link.
+Saving should take one tap, wherever you find a link. Every way of saving opens the same page, `/share?url=...&title=...`, which shows a small save card.
 
-- [ ] Installable app (PWA) that appears in your phone's Share menu: share a page to Linkwell and it's saved
+- [x] A `/share` page that every saving tool opens: it finds the link (in `url`, or inside `text`), asks you to sign in first if needed (and brings you back), and saves only after you click **Save link**
+- [x] Bookmarklet: a "Save to Linkwell" button on the account page that you drag to your bookmarks bar
+- [x] Browser extension (Chrome, Edge, Brave, Arc): a toolbar button next to the ⭐, or Alt+Shift+S, in `extension/`. Installed with "Load unpacked" for now; not on the Chrome Web Store yet
+- [x] iPhone: a "Save to Linkwell" Shortcut in the Share menu (built in the Shortcuts app, no code), and "Add to Home Screen" to use Linkwell like an app
+- [x] Installable app (PWA, `app/manifest.ts`): on Android, the installed app appears in the Share menu (`share_target`)
+- [ ] A **Paste** button next to the link box (the easiest way on an iPhone: copy a link anywhere, open Linkwell, tap Paste)
+- [ ] Share the iPhone Shortcut as an iCloud link on the account page, so nobody has to build it
 - [ ] Import bookmarks from Chrome, Safari or Firefox (the same bookmarks file format as the export in v1.2)
-- [ ] Browser extension: a button that saves the current tab
 
-**You'll learn:** web app manifests and share targets, parsing files, and browser extensions.
+**You'll learn:** web app manifests and share targets, bookmarklets, browser extensions (Manifest V3), redirecting back after sign-in, parsing files.
+
+Later, once real people use Linkwell: publish the extension on the Chrome Web Store (a one-time $5 fee and a review), and maybe Safari (needs Xcode and an Apple developer account).
 
 ## ✅ v1.5: Better notes and tags 📝 (done)
 

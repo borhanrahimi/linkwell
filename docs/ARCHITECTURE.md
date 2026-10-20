@@ -10,12 +10,14 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 |---|---|---|
 | `app/` | Pages, layouts, Server Actions (`actions.ts`) | If it isn't tied to a URL or called from the browser as an action, it doesn't belong here |
 | `components/` | React components | Only UI. Gets data through props, reports user actions through callback props or Server Actions |
-| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules and `bookmarks.ts` builds the bookmarks file (both pure) |
+| `lib/` | Plain TypeScript functions | No JSX and no React. `links.ts` is pure and easy to test; `data.ts` is the only file that queries the database; `checkLink.ts` and `fetchTitle.ts` are the only files that fetch other websites, and they always go through `safeFetch` in `safeUrl.ts`; `auth.ts` sets up Better Auth on the server, `auth-client.ts` is its browser half, `session.ts` tells Server Actions who is signed in, `username.ts` holds the username rules, `bookmarks.ts` builds the bookmarks file and `share.ts` helps `/share` and the bookmarklet (all pure) |
 | `db/` | Database connection (`index.ts`) and table definitions (`schema.ts`, plus `auth-schema.ts` for Better Auth's `user`, `session`, `account` and `verification` tables) | Server-only. Never imported by a client component |
 | `drizzle/` | Generated SQL migrations | Created by `drizzle-kit generate`. Committed, never edited by hand |
 | `types/` | Shared type definitions | Only types, no runtime code |
 | `__tests__/` | Automated tests | One test file per module (`links.test.ts`, `actions.test.ts`, `page.test.tsx`) |
 | `docs/` | Project documentation | |
+| `public/` | Files served as they are (`public/icon-192.png` → `/icon-192.png`) | The installable app's icons. Favicons and the iPhone icon stay in `app/` (`icon.svg`, `apple-icon.png`) |
+| `extension/` | The Chrome extension: `manifest.json`, `background.js`, `icons/` | Plain JavaScript, not part of the Next.js app. It only opens `/share`; it never saves anything itself |
 
 Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `CRON_SECRET`, never committed), and `vercel.json` (the daily cron schedule).
 
@@ -121,7 +123,11 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `app/api/auth/[...all]/route.ts` | Route Handler | Hands every `/api/auth/*` request (sign in, Google callback, sign out) to Better Auth |
 | `app/api/export/route.ts` | Route Handler | `GET /api/export`: checks the session (401 without one), then sends `toBookmarksHtml(links, folders)` as a download (`Content-Disposition: attachment`, `Cache-Control: no-store`). The account page links to it with a plain `<a download>` |
 | `app/api/cron/check-links/route.ts` | Route Handler | Called daily by Vercel Cron. Checks the secret, then checks every user's links with `getLinksToCheck()` and saves each result for its owner |
-| `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google" })` on click |
+| `components/SignInButton.tsx` | Client | Calls `authClient.signIn.social({ provider: "google", callbackURL })` on click. `callbackURL` is `/` unless a page passes another, like `/share?url=...` |
+| `app/share/page.tsx` | Server | The save card for saving from anywhere. Reads `url`, `text` and `title` from `searchParams` (`findSharedUrl` takes the first http(s) link from `url`, then `text`). No link: says so. Signed out: `SignInButton` with `callbackURL={shareAddress(url, title)}`, so you come back to the same link. Signed in: `ShareForm` |
+| `components/ShareForm.tsx` | Client | Title and Tags boxes and **Save link**, which calls the existing `saveLink` action; then "Saved to Linkwell." or the action's error ("You already saved this link!") |
+| `components/Bookmarklet.tsx` | Client | The draggable "Save to Linkwell" link on the account page. Sets its `javascript:` address in a `useEffect` (`bookmarkletCode(window.location.origin)`), because React blocks `javascript:` URLs in JSX. Clicking it on the account page does nothing |
+| `app/manifest.ts` | Metadata file | Served as `/manifest.webmanifest` and linked from every page by Next.js. Name, colours, icons, `display: "standalone"`, and `share_target` (GET `/share` with `title`, `text`, `url`) |
 | `app/account/page.tsx` | Server | The account page. Reads the session; with none, `redirect("/")` sends the visitor to the sign-in screen. Shows the picture, name, email, join date and the `UsernameForm` |
 | `components/Header.tsx` | Server | The floating glass bar on every signed-in page: "Linkwell" (a link home), your `Avatar` and `@username` (or name) linking to `/account`, and `SignOutButton`. Has no `"use client"`; only the sign-out button inside it is a client component |
 | `components/Avatar.tsx` | Server or client | The Google profile picture (`next/image`, `unoptimized`, `referrerPolicy="no-referrer"` because Google's image server can refuse requests that say where they came from), or the name's first letter |
@@ -367,6 +373,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - `npm run check` (types + lint + tests) must pass before committing.
 - **Write the test first** when you can: watch it fail (🔴), then write the code (🟢). A test that never failed hasn't proven anything.
 - **Time-dependent code takes `now` as a parameter** (with a default), so tests pass a fixed date and give the same result every day. Pick dates far from today (for example 2020), so a test can't pass by accident because the real clock gives the same answer.
+- **Code that runs outside the app** (the bookmarklet and the extension) is run in the test with fakes: `bookmarkletCode(...)` is run with `new Function("location", "document", "window", body)` and a fake page, and `extension.test.ts` sets a fake `chrome` (`vi.stubGlobal`) before importing `extension/background.js`, then calls the click listener it registered.
 - **Never copy values like storage keys or error messages from one module into another's code.** Import shared values, so a typo can't make a test pass for the wrong reason.
 
 **Browser tests (Playwright, `npm run e2e`):**
@@ -379,6 +386,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - Each test signs in its own new user, and the users are deleted afterwards (their links and folders go with them through `ON DELETE CASCADE`). Tests can run in parallel and never see each other's data.
 - Find elements the same way as in Vitest tests: by role, label or placeholder. Type a title when saving a link, so the server doesn't fetch the page.
 - When you add a migration, apply it to the test branch too: `DATABASE_URL="$(grep '^E2E_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`.
+- **New tabs:** the bookmarklet test runs the link's real code in the page and waits for the new tab with `page.waitForEvent("popup")`.
 - Vitest skips `e2e/` (`exclude` in `vitest.config.mts`), so `npm run check` stays fast and doesn't need the test database.
 
 ## 8. Decision log
@@ -525,3 +533,13 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-19 | Notes are plain text, at most 500 characters (`NOTE_MAX_LENGTH`, cut on the server, `maxLength` in the form) | "Why I saved this" is short; a limit stops anyone from filling the database through the public Server Action |
 | 2026-10-19 | Search also looks in notes | Notes are often the words you remember ("interview"), not the page title |
 | 2026-10-19 | Browser tests match field names with `exact: true` | Playwright matches names partly by default, so "Title" also found the save form's "Title (optional)" box |
+| 2026-10-19 | One `/share?url=...&title=...` page receives links from every saving tool (extension, bookmarklet, Android Share menu, iPhone Shortcut) | Saving rules live in one place (`saveLink`); each tool is only a few lines that open an address |
+| 2026-10-19 | `/share` saves only after a click on **Save link**, never when the page opens | Any website can open `/share?url=...` in your browser; saving on load would let strangers add links to your account (a CSRF-style attack). The card also lets you fix the title and add tags |
+| 2026-10-19 | `findSharedUrl` takes the first `http(s)://` link from `url`, then from `text` | Android apps often put the link inside `text` ("Watch this! https://..."). Only http and https count, so a `javascript:` link can't get in |
+| 2026-10-19 | Signing in from `/share` passes `callbackURL` to Better Auth | Otherwise Google sends you to the home page and the shared link is lost |
+| 2026-10-19 | The bookmarklet's address is built from `window.location.origin` | The same code works on localhost and on the live site; a bookmarklet dragged from one saves to that one |
+| 2026-10-19 | The extension asks only for `activeTab` and opens `/share` in a new tab next to the page | `activeTab` shows it the current tab only when you click the button: no access to other tabs or history. Opening `/share` reuses the sign-in cookie and the save card, so the extension needs no login or API of its own |
+| 2026-10-19 | The extension points at the live site (`LINKWELL` in `background.js`) and is loaded unpacked, not published | One person uses it for now; publishing on the Chrome Web Store waits for real users |
+| 2026-10-19 | iPhone saving uses a Shortcut (and Add to Home Screen), not `share_target` | Safari doesn't support Web Share Target, so an installed web app can't appear in the iPhone Share menu. A Shortcut can, and needs no code. A native app would need Xcode and a $99/year Apple account |
+| 2026-10-19 | The installable app has no service worker | Chrome no longer requires one to install an app or receive shares; offline support isn't needed for a link saver that talks to the server anyway |
+| 2026-10-19 | A separate maskable icon (`icon-maskable-512.png`), a full square without rounded corners | Android cuts app icons into its own shape; an icon with its own rounded corners would get a white frame |
