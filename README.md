@@ -34,7 +34,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Read / unread status for each link
 - [x] Rediscover old unread links ("actually come back to them")
 - [x] Folders (each link in one folder), each with a colour and an optional hand-drawn icon
-- [x] Bento grid layout with an Overview tile (saved, unread and broken counts)
+- [x] A sidebar with All links, Unread and Broken (with counts), your folders and your tags; the save box in the top bar
 - [x] Minimal Apple-style look: glass cards and a liquid glass header, with every text checked for readable contrast
 - [x] Dark mode (follows the system setting)
 - [x] Account page with your profile picture and a username
@@ -161,7 +161,7 @@ linkwell/
 │   ├── manifest.ts   # Web app manifest: makes Linkwell installable, and puts it in Android's Share menu
 │   ├── actions.ts    # Server Actions: save, delete, edit, import and check links; manage folders
 │   └── api/          # auth/ (Better Auth sign-in and sign-out), cron/ (daily link check), export/ (bookmarks download)
-├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton, Overview, Rediscover, FolderBar, FolderActions, SignInButton, SignOutButton, Header, Avatar, UsernameForm, DeleteAccount, ShareForm, Bookmarklet, ImportBookmarks, FolderIcon); illustrations/ holds the drawings (Stargazer)
+├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton, Sidebar, Rediscover, FolderBar, FolderActions, SignInButton, SignOutButton, Header, Avatar, UsernameForm, DeleteAccount, ShareForm, Bookmarklet, ImportBookmarks, FolderIcon); illustrations/ holds the drawings (Stargazer)
 ├── lib/
 │   ├── auth.ts       # Better Auth setup: Google sign-in, sessions in Postgres (server-only)
 │   ├── auth-client.ts # Better Auth for the browser (sign in, sign out)

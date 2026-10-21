@@ -235,7 +235,7 @@ Signed-out visitors see only a small sign-in card today. Give them a real welcom
 
 **You'll learn:** marketing pages vs. app pages, metadata and Open Graph images, and writing for people who don't know Linkwell yet.
 
-## v1.9: A better layout 🗂️
+## 🔜 v1.9: A better layout 🗂️ (in progress)
 
 As the list of links grows, the dashboard tiles get in the way: you scroll past them every time, and folders, tags and counts live in different places. Give Linkwell the layout of a real app, while keeping what's Linkwell's own (Rediscover, coming back to links) front and centre.
 
@@ -257,12 +257,12 @@ As the list of links grows, the dashboard tiles get in the way: you scroll past 
 ```
 
 **Step 1: the top bar**
-- [ ] The save box moves into the top bar, always there, next to the account menu
+- [x] The save box moves into the top bar, always there, next to the account menu. Title and tags fold out in a second row once a link is typed, so the bar stays slim; on phones the save box gets its own row inside the bar
 
 **Step 2: the sidebar**
-- [ ] Smart lists with counts: All links, Unread, Broken (replacing the Overview tile; the numbers become filters)
-- [ ] Folders with their colours and icons, their link counts, and "+ New folder" (replacing the notebook tabs; rename, colour, icon and delete stay with the selected folder)
-- [ ] Tags, as filters
+- [x] Smart lists with counts: All links, Unread, Broken (replacing the Overview tile; the numbers become filters), with Check links under them
+- [x] Folders with their colours and icons, their link counts, and "+ New folder" (replacing the notebook tabs). The chosen folder's name heads the list, with its icon, colour, rename and delete under it
+- [x] Tags, as filters (most used first, with counts); a tag combines with a smart list or a folder
 
 **Step 3: views**
 - [ ] A choice of Cards (today's grid) or List (one compact row per link, for scanning many links), remembered per device

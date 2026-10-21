@@ -65,9 +65,9 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
   }
 
   return (
-    <div className="mt-3">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 lg:flex-row">
-        <div className="flex min-w-0 flex-1 gap-2">
+    <div>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <div className="flex min-w-0 gap-2">
           <input
             type="url"
             value={url}
@@ -84,29 +84,33 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
               Paste
             </button>
           )}
+          <button type="submit" className="btn-primary">
+            Save
+          </button>
         </div>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title (optional)"
-          maxLength={TITLE_MAX_LENGTH}
-          className="field min-w-0 flex-1"
-        />
-        <input
-          type="text"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="Tags, comma separated"
-          className="field min-w-0 flex-1"
-        />
-
-        <button type="submit" className="btn-primary">
-          Save
-        </button>
+        {/* Title and tags only appear once there's a link, so the bar stays slim. */}
+        {url && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title (optional)"
+              maxLength={TITLE_MAX_LENGTH}
+              className="field min-w-0 flex-1"
+            />
+            <input
+              type="text"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="Tags, comma separated"
+              className="field min-w-0 flex-1"
+            />
+          </div>
+        )}
       </form>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-danger">
+        <p role="alert" className="mt-2 px-1 text-sm text-danger">
           {error}
         </p>
       )}

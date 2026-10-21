@@ -8,23 +8,16 @@ import type { Folder } from "@/types/link";
 
 type FolderBarProps = {
   folders: Folder[];
+  // How many links each folder holds, by folder id.
+  counts: Record<string, number>;
   activeFolder: string | null;
   onSelect: (folderId: string | null) => void;
   onCreate: (name: string) => Promise<string | null>;
 };
 
-// Folders look like the tabs on notebook dividers: rounded on top, standing on
-// a line. Every tab carries its own piece of that line (the border under each
-// <li>), so when tabs wrap onto a second row, that row stands on a line too.
-// The open tab is white and covers the line (-mb-px), so it joins the page
-// below it, where the folder's icon, colour and name are changed.
-function tab(active: boolean) {
-  return `relative -mb-px flex items-center overflow-hidden rounded-t-lg border border-line px-3 pt-2.5 pb-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400 ${
-    active ? "border-b-surface bg-surface font-semibold text-ink" : "bg-hover font-medium text-muted hover:text-ink"
-  }`;
-}
-
-export default function FolderBar({ folders, activeFolder, onSelect, onCreate }: FolderBarProps) {
+// The folders in the sidebar: one row each, with the folder's icon (or its
+// coloured dot), its name and how many links are in it, then "+ New folder".
+export default function FolderBar({ folders, counts, activeFolder, onSelect, onCreate }: FolderBarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -48,50 +41,32 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
   }
 
   return (
-    <div className="mt-3">
-      <div className="flex flex-wrap items-end gap-y-2">
-        <ul aria-label="Folders" className="flex flex-wrap gap-y-2">
-          {folders.length > 0 && (
-            <li className="border-b border-line pr-1">
-              <button onClick={() => onSelect(null)} aria-pressed={activeFolder === null} className={tab(activeFolder === null)}>
-                All links
-              </button>
-            </li>
-          )}
-          {folders.map((folder) => (
-            <li key={folder.id} className="border-b border-line pr-1">
-              <button
-                onClick={() => onSelect(folder.id === activeFolder ? null : folder.id)}
-                aria-pressed={folder.id === activeFolder}
-                className={tab(folder.id === activeFolder)}
-              >
-                {/* The folder's colour, as a strip along the top of the tab. */}
-                <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1 ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`} />
-                {folder.icon && (
-                  <FolderIcon
-                    name={folder.icon}
-                    className={`mr-1.5 size-4 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`}
-                  />
-                )}
-                {folder.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-        {/* Carries the line on to the end of the row, under "+ New folder". */}
-        <div className="flex-1 border-b border-line pb-1 pl-1">
-          {!isCreating && (
+    <div>
+      <ul aria-label="Folders" className="space-y-0.5">
+        {folders.map((folder) => (
+          <li key={folder.id}>
             <button
-              onClick={() => setIsCreating(true)}
-              className="whitespace-nowrap rounded-lg border border-dashed border-line px-3 py-1 text-sm font-medium text-muted hover:border-muted hover:text-ink"
+              onClick={() => onSelect(folder.id === activeFolder ? null : folder.id)}
+              aria-pressed={folder.id === activeFolder}
+              className={`sidebar-item ${folder.id === activeFolder ? "sidebar-item-active" : ""}`}
             >
-              + New folder
+              {folder.icon ? (
+                <FolderIcon name={folder.icon} className={`size-4 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`} />
+              ) : (
+                // mx-[3px]: the dot takes the same width as an icon, so names line up.
+                <span aria-hidden="true" className={`mx-[3px] size-2.5 shrink-0 rounded-full ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`} />
+              )}
+              <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+              {/* Counts are for the eye: in the button's name they'd turn "Work" into "Work 3". */}
+              <span aria-hidden="true" className="text-xs text-muted">
+                {counts[folder.id] ?? 0}
+              </span>
             </button>
-          )}
-        </div>
-      </div>
-      {isCreating && (
-        <form onSubmit={handleSubmit} className="mt-2 flex gap-2">
+          </li>
+        ))}
+      </ul>
+      {isCreating ? (
+        <form onSubmit={handleSubmit} className="mt-2 space-y-2">
           <input
             type="text"
             value={name}
@@ -103,18 +78,24 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
             maxLength={FOLDER_NAME_MAX_LENGTH}
             placeholder="Folder name"
             autoFocus
-            className="field min-w-0 flex-1"
+            className="field w-full"
           />
-          <button type="submit" className="btn-secondary">
-            Create
-          </button>
-          <button type="button" onClick={cancel} className="btn-quiet">
-            Cancel
-          </button>
+          <div className="flex gap-2">
+            <button type="submit" className="btn-secondary">
+              Create
+            </button>
+            <button type="button" onClick={cancel} className="btn-quiet">
+              Cancel
+            </button>
+          </div>
         </form>
+      ) : (
+        <button onClick={() => setIsCreating(true)} className="sidebar-item text-muted">
+          + New folder
+        </button>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-sm text-danger">
+        <p role="alert" className="mt-2 px-2 text-sm text-danger">
           {error}
         </p>
       )}

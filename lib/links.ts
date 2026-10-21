@@ -302,3 +302,25 @@ export function countLinks(links: Link[]) {
     broken: links.filter((link) => link.status === "broken").length,
   };
 }
+
+// The sidebar's smart lists.
+export type SmartList = "all" | "unread" | "broken";
+
+export function filterByList(links: Link[], list: SmartList): Link[] {
+  if (list === "unread") return links.filter((link) => !link.readAt);
+  if (list === "broken") return links.filter((link) => link.status === "broken");
+  return links;
+}
+
+// Every tag in use, with how many links have it: most used first, then A to Z.
+export function countTags(links: Link[]): { tag: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const link of links) {
+    for (const tag of link.tags ?? []) {
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  return [...counts]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}

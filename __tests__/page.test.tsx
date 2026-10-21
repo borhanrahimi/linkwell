@@ -5,6 +5,11 @@ import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, 
 import { STORAGE_KEY } from "@/lib/links";
 import type { Link } from "@/types/link";
 
+// The top bar's Sign out button uses the router.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
+
 vi.mock("@/app/actions", () => ({
   checkAllLinks: vi.fn(async () => []),
   createFolder: vi.fn(async (name: string) => ({ id: "f1", name })),
@@ -31,16 +36,30 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// How many link cards are showing (the sidebar has list items too).
+function cardCount() {
+  const list = screen.queryByRole("list", { name: "Links" });
+  return list ? list.children.length : 0;
+}
+
+// The list of link cards.
+function cards() {
+  return within(screen.getByRole("list", { name: "Links" }));
+}
+
 async function addLink(url: string, title = "", tags = "") {
   fireEvent.change(screen.getByPlaceholderText("Paste a link..."), {
     target: { value: url },
   });
-  fireEvent.change(screen.getByPlaceholderText("Title (optional)"), {
-    target: { value: title },
-  });
-  fireEvent.change(screen.getByPlaceholderText("Tags, comma separated"), {
-    target: { value: tags },
-  });
+  // Title and tags only appear once the link box has a link in it.
+  if (title || tags) {
+    fireEvent.change(screen.getByPlaceholderText("Title (optional)"), {
+      target: { value: title },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Tags, comma separated"), {
+      target: { value: tags },
+    });
+  }
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
   });
@@ -51,8 +70,28 @@ test("clears the tags box after saving", async () => {
   render(<LinkManager initialLinks={[]} />);
 
   await addLink("https://example.com", "", "react");
+  // The details row hides with the empty link box, and comes back empty.
+  expect(screen.queryByPlaceholderText("Tags, comma separated")).toBeNull();
+  fireEvent.change(screen.getByPlaceholderText("Paste a link..."), { target: { value: "https://next.com" } });
 
   expect(screen.getByPlaceholderText("Tags, comma separated")).toHaveProperty("value", "");
+});
+
+test("shows title and tags only once a link is typed", () => {
+  render(<LinkManager initialLinks={[]} />);
+
+  expect(screen.queryByPlaceholderText("Title (optional)")).toBeNull();
+  fireEvent.change(screen.getByPlaceholderText("Paste a link..."), { target: { value: "https://example.com" } });
+
+  expect(screen.getByPlaceholderText("Title (optional)")).toBeDefined();
+});
+
+test("puts the save box in the top bar, next to the account", () => {
+  render(<LinkManager initialLinks={[]} user={{ name: "Ada", username: "ada" }} />);
+
+  const bar = screen.getByRole("banner");
+  expect(within(bar).getByPlaceholderText("Paste a link...")).toBeDefined();
+  expect(within(bar).getByRole("link", { name: "@ada" })).toBeDefined();
 });
 
 
@@ -80,7 +119,7 @@ describe("Home page", () => {
 
     await addLink("   ");
 
-    expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+    expect(cardCount()).toBe(0);
   });
 
 
@@ -119,7 +158,7 @@ describe("Home page", () => {
     await addLink("https://example.com");
 
     expect(screen.getByText("You already saved this link!")).toBeDefined();
-    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(cardCount()).toBe(1);
   });
 
   test("keeps the typed link after a duplicate, so it can be fixed", async () => {
@@ -517,28 +556,70 @@ describe("importing links saved in this browser", () => {
   });
 });
 
-describe("overview", () => {
-  test("shows how many links are saved, unread and broken", () => {
-    render(
-      <LinkManager
-        initialLinks={[
-          { id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" },
-          { id: "2", url: "https://b.com", createdAt: "2020-01-01T00:00:00.000Z", readAt: "2020-01-02T00:00:00.000Z" },
-          { id: "3", url: "https://c.com", createdAt: "2020-01-01T00:00:00.000Z", status: "broken" },
-        ]}
-      />
-    );
+describe("sidebar", () => {
+  const links = [
+    { id: "1", url: "https://a.com", title: "A", createdAt: "2020-01-01T00:00:00.000Z", tags: ["react"], folderId: "f1" },
+    { id: "2", url: "https://b.com", title: "B", createdAt: "2020-01-01T00:00:00.000Z", readAt: "2020-01-02T00:00:00.000Z", tags: ["react", "news"] },
+    { id: "3", url: "https://c.com", title: "C", createdAt: "2020-01-01T00:00:00.000Z", status: "broken" as const },
+  ];
+  const folders = [{ id: "f1", name: "Work" }];
+  const sidebar = () => within(screen.getByRole("navigation", { name: "Your lists" }));
+  const shownTitles = () => cards().getAllByRole("link").map((link) => link.textContent).filter((text) => /^[ABC]$/.test(text ?? "")).sort();
 
-    const overview = screen.getByRole("region", { name: "Overview" });
-    expect(within(overview).getByText("links").nextSibling?.textContent).toBe("3");
-    expect(within(overview).getByText("unread").nextSibling?.textContent).toBe("2");
-    expect(within(overview).getByText("broken").nextSibling?.textContent).toBe("1");
+  test("counts all, unread and broken links, and the links in each folder and tag", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+
+    expect(sidebar().getByRole("button", { name: "All links" }).textContent).toContain("3");
+    expect(sidebar().getByRole("button", { name: "Unread" }).textContent).toContain("2");
+    expect(sidebar().getByRole("button", { name: "Broken" }).textContent).toContain("1");
+    expect(sidebar().getByRole("button", { name: "Work" }).textContent).toContain("1");
+    // Tags: most used first.
+    expect(within(sidebar().getByRole("list", { name: "All tags" })).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "#react2",
+      "#news1",
+    ]);
   });
 
-  test("says 'link' when there is only one", () => {
-    render(<LinkManager initialLinks={[{ id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" }]} />);
+  test("Unread and Broken filter the list, and the heading says which list it is", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
 
-    expect(within(screen.getByRole("region", { name: "Overview" })).getByText("link")).toBeDefined();
+    fireEvent.click(sidebar().getByRole("button", { name: "Unread" }));
+    expect(screen.getByRole("heading", { level: 2, name: "Unread" })).toBeDefined();
+    expect(shownTitles()).toEqual(["A", "C"]);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Broken" }));
+    expect(shownTitles()).toEqual(["C"]);
+  });
+
+  test("picking a folder leaves the smart list, and picking a list leaves the folder", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Broken" }));
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    expect(shownTitles()).toEqual(["A"]);
+    expect(sidebar().getByRole("button", { name: "Broken", pressed: false })).toBeDefined();
+
+    fireEvent.click(sidebar().getByRole("button", { name: "All links" }));
+    expect(shownTitles()).toEqual(["A", "B", "C"]);
+    expect(sidebar().getByRole("button", { name: "Work", pressed: false })).toBeDefined();
+  });
+
+  test("a tag in the sidebar filters the list, and works together with a smart list", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "react" }));
+    expect(shownTitles()).toEqual(["A", "B"]);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Unread" }));
+    expect(shownTitles()).toEqual(["A"]);
+  });
+
+  test("says so when there's nothing unread", () => {
+    render(<LinkManager initialLinks={[links[1]]} />);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Unread" }));
+
+    expect(screen.getByText("Nothing unread. You're all caught up.")).toBeDefined();
   });
 });
 
@@ -597,21 +678,21 @@ describe("broken badge", () => {
   test("shows a Broken badge on a broken link", () => {
     render(<LinkManager initialLinks={[{ ...base, status: "broken", checkedAt: "2026-10-07T12:00:00.000Z" }]} />);
 
-    expect(screen.getByText("Broken")).toBeDefined();
+    expect(cards().getByText("Broken")).toBeDefined();
     // The snapped-chain doodle is decoration, hidden from screen readers.
-    expect(screen.getByText("Broken").querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(cards().getByText("Broken").querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
   });
 
   test("shows no badge on a working link", () => {
     render(<LinkManager initialLinks={[{ ...base, status: "ok" }]} />);
 
-    expect(screen.queryByText("Broken")).toBeNull();
+    expect(cards().queryByText("Broken")).toBeNull();
   });
 
   test("shows no badge on a link that was never checked", () => {
     render(<LinkManager initialLinks={[base]} />);
 
-    expect(screen.queryByText("Broken")).toBeNull();
+    expect(cards().queryByText("Broken")).toBeNull();
   });
   test("offers an archived copy of a broken link", () => {
     render(<LinkManager initialLinks={[{ ...base, status: "broken" }]} />);
@@ -636,7 +717,7 @@ describe("broken badge", () => {
       />
     );
 
-    expect(screen.getByText("Broken").getAttribute("title")).toBe("Checked 2 days ago");
+    expect(cards().getByText("Broken").getAttribute("title")).toBe("Checked 2 days ago");
   });
 });
 

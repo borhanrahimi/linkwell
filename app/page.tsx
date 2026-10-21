@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import LinkManager from "@/components/LinkManager";
 import Landing from "@/components/Landing";
-import Header from "@/components/Header";
 import { auth } from "@/lib/auth";
 import { getFolders, getLinks } from "@/lib/data";
 
@@ -21,10 +20,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     <main className="min-h-screen p-4 sm:p-8">
       <div className="mx-auto max-w-6xl">
-        <Header user={session.user} />
-        {/* Visible headings start at the tiles; screen readers still get a page title. */}
-        <h1 className="sr-only">Your links</h1>
-        <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} />
+        {/* LinkManager draws the top bar itself, because the save box in it is part of its state. */}
+        <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} user={session.user} />
       </div>
     </main>
   );
