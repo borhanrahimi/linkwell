@@ -224,7 +224,7 @@ Before the landing page invites strangers in, lock the doors. Already done: ever
 Signed-out visitors see only a small sign-in card today. Give them a real welcome.
 
 - [x] A landing page (`components/Landing.tsx`): the promise in one line, three cards for the three promises (save, keep alive, come back), each with a drawing of the Linkwell character, and a clear **Sign in with Google** button
-- [ ] Real screenshots of the app on the landing page
+- [ ] Real screenshots of the app on the landing page (after v1.9, so they show the new layout)
 - [x] "Save from anywhere" for newcomers: any browser (bookmarklet), your phone, copy and paste, importing old bookmarks. The extension is left out until it's published
 - [x] No other companies' or products' names in what users see: neutral words like "your browser", "your phone" and "other bookmark apps"
 - [x] A short FAQ: Is it free? Who can see my links? Can I take them with me? How is it different from other bookmark apps? Is it safe? (`<details>`, no JavaScript)
@@ -235,7 +235,51 @@ Signed-out visitors see only a small sign-in card today. Give them a real welcom
 
 **You'll learn:** marketing pages vs. app pages, metadata and Open Graph images, and writing for people who don't know Linkwell yet.
 
-## v1.9: Runs on its own 🌱
+## v1.9: A better layout 🗂️
+
+As the list of links grows, the dashboard tiles get in the way: you scroll past them every time, and folders, tags and counts live in different places. Give Linkwell the layout of a real app, while keeping what's Linkwell's own (Rediscover, coming back to links) front and centre.
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│ Linkwell        [ Paste a link…                     ] [Save]  👤 @you │
+├──────────────┬────────────────────────────────────────┬───────────────┤
+│ All links  48│ 🔭 Remember these? (Rediscover)        │ Details       │
+│ Unread     12│ [Search…]   Sort ▾    [▦ Cards][≡ List] │ Title         │
+│ Broken      2│ ┌──────┐ ┌──────┐ ┌──────┐             │ example.com   │
+│              │ │ card │ │ card │ │ card │             │ Note …        │
+│ FOLDERS      │ └──────┘ └──────┘ └──────┘             │ #tags         │
+│ 📖 Reading  9│   … or one compact row per link        │ Folder ▾      │
+│ ☕ Recipes  4│                                        │ Saved, checked│
+│ + New folder │                                        │ [Edit][Delete]│
+│ TAGS         │                                        │               │
+│ #react #news │                                        │               │
+└──────────────┴────────────────────────────────────────┴───────────────┘
+```
+
+**Step 1: the top bar**
+- [ ] The save box moves into the top bar, always there, next to the account menu
+
+**Step 2: the sidebar**
+- [ ] Smart lists with counts: All links, Unread, Broken (replacing the Overview tile; the numbers become filters)
+- [ ] Folders with their colours and icons, their link counts, and "+ New folder" (replacing the notebook tabs; rename, colour, icon and delete stay with the selected folder)
+- [ ] Tags, as filters
+
+**Step 3: views**
+- [ ] A choice of Cards (today's grid) or List (one compact row per link, for scanning many links), remembered per device
+- [ ] Search, sort and the view switch together in one toolbar above the list
+
+**Step 4: the details panel**
+- [ ] Click a link to see everything about it beside the list (note, tags, folder, dates, check status) and edit it there
+
+**Step 5: Rediscover, phones and polish**
+- [ ] Rediscover as a slim banner above the list: still front and centre, but lighter
+- [ ] Phones: the sidebar becomes a menu button, the details panel a full-screen sheet
+- [ ] The selected list, folder, tag and view live in the address (`/?folder=…&view=list`), so the back button works and lists can be bookmarked
+- [ ] The contrast and browser tests cover the new layout in light and dark mode
+
+**You'll learn:** layouts with CSS Grid, responsive navigation, keeping state in the URL (`useSearchParams`), and keyboard-friendly focus handling.
+
+## v2.0: Runs on its own 🌱
 
 Linkwell should keep running, safe and up to date, even when nobody works on it for a year, and be easy to pick up again.
 
@@ -284,7 +328,7 @@ Not planned yet, but worth remembering:
 
 1. **A product page** (now planned as v1.8): what Linkwell does and why, screenshots, help/FAQ and downloads. Writing it means answering "why Linkwell and not Raindrop?" in one sentence
 2. **Real users and their feedback:** find 10 to 20 people who keep using Linkwell every week, and learn what they miss
-3. **A better layout, like Raindrop,** shaped by that feedback: a sidebar with your folders, a choice of views (cards, a compact list, or big previews), and a details panel beside the list. Take the navigation ideas, but keep what's Linkwell's own (Rediscover, coming back to links) front and centre
+3. **A better layout** (now planned as v1.9): a sidebar with your folders, a choice of views (cards, a compact list, or big previews), and a details panel beside the list. Take the navigation ideas, but keep what's Linkwell's own (Rediscover, coming back to links) front and centre
 4. **Later, not now: a paid version (Linkwell Pro).** Only once people clearly use Linkwell and want more. A free plan with the basics, and Pro for features that cost money to run (AI summaries, archive copies, more storage), with a pricing page and payments (for example Stripe). Until then, build costly features with an on/off switch and a limit, so they're ready to become Pro
 
 **Other ideas:**
