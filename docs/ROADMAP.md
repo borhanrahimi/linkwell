@@ -314,8 +314,8 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 - [ ] Error tracking (for example Sentry's free plan), so errors on the live site are reported instead of lost
 
 **Data that survives**
-- [ ] Backups: know how to restore the database (Neon's restore window), plus a regular export kept somewhere else
-- [ ] Keep secrets only in Vercel and `.env.local`, and write down which ones exist (never their values)
+- [x] Backups: `npm run backup` saves users, accounts (no tokens), folders and links to a private file in `backups/` (ignored by Git); `npm run restore` puts one back, only into an empty database, all or nothing. How to use Neon's restore window is in `MAINTENANCE.md`
+- [x] Keep secrets only in Vercel and `.env.local`, and write down which ones exist (never their values): the table in `MAINTENANCE.md`, with where each comes from and how to renew it
 
 **Coming back later**
 - [ ] A `MAINTENANCE.md`: where everything lives (GitHub, Vercel, Neon, Google Cloud), every secret's name and where to renew it, how to update Next.js and other packages safely, and how to run migrations

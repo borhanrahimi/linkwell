@@ -44,3 +44,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# database backups (npm run backup): people's emails and links, never in Git
+/backups/
