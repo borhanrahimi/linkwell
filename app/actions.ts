@@ -74,7 +74,15 @@ export async function saveLink(input: Link): Promise<Link | string> {
   if (saved.length >= MAX_LINKS) {
     return TOO_MANY_LINKS;
   }
-  const withTitle = { ...link, title: link.title ?? (await fetchTitle(link.url)) };
+  // Saving straight into a folder: only into one of the user's own folders.
+  // Anything else (someone else's folder, a made-up id) saves with no folder.
+  const folderId = typeof input?.folderId === "string" ? input.folderId : null;
+  const inOwnFolder = folderId !== null && (await getFolders(userId)).some((folder) => folder.id === folderId);
+  const withTitle = {
+    ...link,
+    ...(inOwnFolder && { folderId }),
+    title: link.title ?? (await fetchTitle(link.url)),
+  };
   await insertLink(userId, withTitle);
   return withTitle;
 }

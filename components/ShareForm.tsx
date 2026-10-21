@@ -2,14 +2,29 @@
 
 import { useState } from "react";
 import NextLink from "next/link";
-import { saveLink } from "@/app/actions";
+import { createFolder, saveLink } from "@/app/actions";
+import FolderPicker, { useLastFolder } from "@/components/FolderPicker";
 import { createLink, getDomain, parseTags, TITLE_MAX_LENGTH } from "@/lib/links";
+import type { Folder } from "@/types/link";
 
 // Saving waits for a click instead of happening when the page opens: any
 // website could open /share?url=... in your browser, and that alone must
 // never add links to your account.
-export default function ShareForm({ url, title }: { url: string; title: string }) {
+export default function ShareForm({
+  url,
+  title,
+  initialFolders = [],
+}: {
+  url: string;
+  title: string;
+  initialFolders?: Folder[];
+}) {
   const [titleInput, setTitleInput] = useState(title);
+  const [folders, setFolders] = useState(initialFolders);
+  // Until you pick one, the folder you saved to last time (if it still exists).
+  const [lastFolder, rememberFolder] = useLastFolder();
+  const [chosenFolder, setChosenFolder] = useState<string | null>(null);
+  const folderId = chosenFolder ?? (folders.some((folder) => folder.id === lastFolder) ? lastFolder : "");
   const [tags, setTags] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -18,19 +33,29 @@ export default function ShareForm({ url, title }: { url: string; title: string }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const result = await saveLink(createLink(url, titleInput, parseTags(tags)));
+    const link = { ...createLink(url, titleInput, parseTags(tags)), folderId: folderId || undefined };
+    const result = await saveLink(link);
     setSaving(false);
     if (typeof result === "string") {
       setMessage(result);
     } else {
+      rememberFolder(folderId);
       setSaved(true);
     }
+  }
+
+  async function addFolder(name: string) {
+    const result = await createFolder(name);
+    if (typeof result !== "string") setFolders((current) => [...current, result]);
+    return result;
   }
 
   if (saved) {
     return (
       <div role="status">
-        <p className="mt-4 text-ink">Saved to Linkwell.</p>
+        <p className="mt-4 text-ink">
+          Saved to Linkwell{folderId && ` in ${folders.find((folder) => folder.id === folderId)?.name}`}.
+        </p>
         <NextLink href="/" className="btn-primary mt-6 inline-block">
           Go to my links
         </NextLink>
@@ -62,6 +87,10 @@ export default function ShareForm({ url, title }: { url: string; title: string }
           className="field"
         />
       </label>
+      <div className="flex flex-col gap-1 text-sm text-ink">
+        <span aria-hidden="true">Folder</span>
+        <FolderPicker folders={folders} value={folderId} onChange={setChosenFolder} onCreate={addFolder} />
+      </div>
       {message && (
         <p role="alert" className="text-sm text-danger">
           {message}

@@ -46,6 +46,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Sign in with Google and sign out
 - [x] Each account has its own links and folders
 - [x] Save from anywhere: browser extension, bookmarklet, Android Share menu, iPhone Shortcut
+- [x] Save straight into a folder (or make a new one) while saving, like a browser bookmark
 - [x] Installable app (Add to Home screen / Install app)
 - [x] Paste button: fills in a copied link with one tap
 - [x] Hand-drawn touches: folder icons, and pen-doodle drawings of the Linkwell character for empty lists, Rediscover and the landing page

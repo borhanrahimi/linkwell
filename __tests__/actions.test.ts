@@ -96,6 +96,23 @@ describe("saveLink", () => {
     expect(insertLink).toHaveBeenCalledWith("u1", { ...link, title: "Example Domain" });
   });
 
+  test("saves straight into one of the user's own folders", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Recipes" }]);
+
+    expect(await saveLink({ ...link, folderId: "f1" })).toMatchObject({ folderId: "f1" });
+    expect(getFolders).toHaveBeenCalledWith("u1");
+    expect(insertLink).toHaveBeenCalledWith("u1", expect.objectContaining({ folderId: "f1" }));
+  });
+
+  test("saves with no folder when the folder isn't the user's", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Recipes" }]);
+
+    const saved = await saveLink({ ...link, folderId: "someone-elses" });
+
+    expect(saved).not.toHaveProperty("folderId");
+    expect(insertLink).toHaveBeenCalledWith("u1", expect.not.objectContaining({ folderId: "someone-elses" }));
+  });
+
   test("keeps the title the user typed", async () => {
     expect(await saveLink({ ...link, title: "My title" })).toMatchObject({ title: "My title" });
     expect(fetchTitle).not.toHaveBeenCalled();

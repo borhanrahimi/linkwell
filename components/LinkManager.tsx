@@ -132,12 +132,12 @@ export default function LinkManager({
   const showRediscover = now !== undefined && rediscover.length > 0;
   const selectedFolder = folders.find((folder) => folder.id === activeFolder);
 
-  async function addLink(url: string, title: string, tags: string) {
+  async function addLink(url: string, title: string, tags: string, folderId = "") {
     if (isDuplicate(links, url)) {
       return "You already saved this link!";
     }
 
-    const link = createLink(url, title, parseTags(tags));
+    const link = { ...createLink(url, title, parseTags(tags)), folderId: folderId || undefined };
     const result = await saveLink(link);
     if (typeof result === "string") {
       return result;
@@ -219,13 +219,18 @@ export default function LinkManager({
     await moveToFolder(id, folderId ?? null);
   }
 
-  async function addFolder(name: string) {
+  // Makes a folder; returns it (for the save box's folder menu) or an error.
+  async function makeFolder(name: string) {
     const result = await createFolder(name);
-    if (typeof result === "string") {
-      return result;
+    if (typeof result !== "string") {
+      setFolders((current) => [...current, result]);
     }
-    setFolders((current) => [...current, result]);
-    return null;
+    return result;
+  }
+
+  async function addFolder(name: string) {
+    const result = await makeFolder(name);
+    return typeof result === "string" ? result : null;
   }
   async function changeFolderName(id: string, name: string) {
     const error = await renameFolder(id, name);
@@ -271,10 +276,10 @@ export default function LinkManager({
       {/* The save box lives in the top bar, so it's always at hand. */}
       {user ? (
         <Header user={user}>
-          <LinkForm onAdd={addLink} />
+          <LinkForm onAdd={addLink} folders={folders} currentFolder={activeFolder} onCreateFolder={makeFolder} />
         </Header>
       ) : (
-        <LinkForm onAdd={addLink} />
+        <LinkForm onAdd={addLink} folders={folders} currentFolder={activeFolder} onCreateFolder={makeFolder} />
       )}
       {/* Visible headings start at the tiles; screen readers still get a page title. */}
       <h1 className="sr-only">Your links</h1>

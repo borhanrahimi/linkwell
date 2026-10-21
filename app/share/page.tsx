@@ -3,6 +3,7 @@ import NextLink from "next/link";
 import ShareForm from "@/components/ShareForm";
 import SignInButton from "@/components/SignInButton";
 import { auth } from "@/lib/auth";
+import { getFolders } from "@/lib/data";
 import { findSharedUrl, firstValue, shareAddress } from "@/lib/share";
 
 // The one place every "save from anywhere" tool sends links to:
@@ -33,7 +34,7 @@ export default async function SharePage({ searchParams }: PageProps<"/share">) {
             <SignInButton callbackURL={shareAddress(url, title)} />
           </>
         ) : (
-          <ShareForm url={url} title={title} />
+          <ShareForm url={url} title={title} initialFolders={await getFolders(session.user.id)} />
         )}
       </div>
     </main>

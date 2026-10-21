@@ -75,6 +75,17 @@ for (const colorScheme of ["light", "dark"] as const) {
       }
     });
 
+    test("every text on the save page is readable, folder menu and new folder box too", async ({ page, signIn }) => {
+      await signIn();
+      await page.goto("/share?url=" + encodeURIComponent("https://example.com/x"));
+      const results = await measureContrast(page);
+      await page.getByRole("combobox", { name: "Save to folder" }).selectOption({ label: "New folder…" });
+      await page.getByRole("button", { name: "Create" }).waitFor();
+      results.push(...(await measureContrast(page)));
+
+      expect(results.filter((result) => result.ratio < result.needed)).toEqual([]);
+    });
+
     test("every text on the account page is readable", async ({
       page,
       signIn,

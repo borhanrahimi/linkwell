@@ -965,6 +965,71 @@ describe("folders", () => {
   });
 });
 
+describe("saving straight into a folder", () => {
+  const folders = [{ id: "f1", name: "Recipes" }, { id: "f2", name: "Work" }];
+  const typeLink = (url: string) =>
+    fireEvent.change(screen.getByPlaceholderText("Paste a link..."), { target: { value: url } });
+  const folderMenu = () => screen.getByRole("combobox", { name: "Save to folder" });
+
+  test("picks a folder in the save box, and the link is saved into it", async () => {
+    render(<LinkManager initialLinks={[]} initialFolders={folders} />);
+    typeLink("https://example.com/soup");
+
+    fireEvent.change(folderMenu(), { target: { value: "f2" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+
+    expect(saveLink).toHaveBeenCalledWith(expect.objectContaining({ url: "https://example.com/soup", folderId: "f2" }));
+    expect(cards().getByText("Work")).toBeDefined();
+  });
+
+  test("starts on the folder being looked at", () => {
+    render(<LinkManager initialLinks={[]} initialFolders={folders} />);
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Recipes" }));
+    typeLink("https://example.com/soup");
+
+    expect(folderMenu()).toHaveProperty("value", "f1");
+  });
+
+  test("makes a new folder from the menu, and picks it", async () => {
+    vi.mocked(createFolder).mockResolvedValueOnce({ id: "f3", name: "Travel" });
+    render(<LinkManager initialLinks={[]} initialFolders={folders} />);
+    typeLink("https://example.com/trip");
+
+    fireEvent.change(folderMenu(), { target: { value: "new-folder" } });
+    const nameBox = screen.getByRole("textbox", { name: "New folder name" });
+    expect(document.activeElement).toBe(nameBox);
+    fireEvent.change(nameBox, { target: { value: "Travel" } });
+    await act(async () => {
+      // Enter makes the folder; it doesn't save the link yet.
+      fireEvent.keyDown(nameBox, { key: "Enter" });
+    });
+
+    expect(createFolder).toHaveBeenCalledWith("Travel");
+    expect(saveLink).not.toHaveBeenCalled();
+    expect(folderMenu()).toHaveProperty("value", "f3");
+    // The new folder is in the sidebar too.
+    expect(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Travel" })).toBeDefined();
+  });
+
+  test("shows why a new folder couldn't be made, and Cancel goes back to the menu", async () => {
+    vi.mocked(createFolder).mockResolvedValueOnce('You already have a folder called "Work".');
+    render(<LinkManager initialLinks={[]} initialFolders={folders} />);
+    typeLink("https://example.com/trip");
+
+    fireEvent.change(folderMenu(), { target: { value: "new-folder" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "New folder name" }), { target: { value: "work" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    });
+    expect(screen.getByRole("alert").textContent).toBe('You already have a folder called "Work".');
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(folderMenu()).toHaveProperty("value", "");
+  });
+});
+
 describe("moving links into folders", () => {
   const link = { id: "1", url: "https://example.com/page", createdAt: "2026-10-01T12:00:00.000Z" };
   const work = { id: "f1", name: "Work", color: "green" as const };

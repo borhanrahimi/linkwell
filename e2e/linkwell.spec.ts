@@ -401,3 +401,26 @@ test("the chosen list lives in the address: back, refresh and bookmarks keep it"
   await expect(page.getByRole("heading", { name: "All links" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Address two" })).toBeVisible();
 });
+
+test("saving from anywhere can make a folder on the spot and save into it, like a browser bookmark", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/share?url=" + encodeURIComponent("https://example.com/trip") + "&title=" + encodeURIComponent("Trip ideas"));
+
+  await page.getByRole("combobox", { name: "Save to folder" }).selectOption({ label: "New folder…" });
+  await page.getByRole("textbox", { name: "New folder name" }).fill("Travel");
+  await page.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("combobox", { name: "Save to folder" })).toHaveValue(/.+/);
+  await page.getByRole("button", { name: "Save link" }).click();
+  await expect(page.getByText("Saved to Linkwell in Travel.")).toBeVisible();
+
+  // The next link offers the same folder, like a browser does.
+  await page.goto("/share?url=" + encodeURIComponent("https://example.com/beach") + "&title=" + encodeURIComponent("Beaches"));
+  await expect(page.getByRole("combobox", { name: "Save to folder" }).locator("option:checked")).toHaveText("Travel");
+  await page.getByRole("button", { name: "Save link" }).click();
+  await expect(page.getByText("Saved to Linkwell in Travel.")).toBeVisible();
+
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Your lists" }).getByRole("button", { name: "Travel" }).click();
+  await expect(page.getByRole("link", { name: "Trip ideas" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Beaches" })).toBeVisible();
+});

@@ -35,6 +35,7 @@ export async function insertLink(userId: string, link: Link) {
     url: link.url,
     title: link.title ?? null,
     tags: link.tags ?? [],
+    folderId: link.folderId ?? null,
     createdAt: new Date(link.createdAt),
   });
 }

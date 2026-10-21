@@ -3,6 +3,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { TITLE_MAX_LENGTH, URL_MAX_LENGTH } from "@/lib/links";
 import { findSharedUrl } from "@/lib/share";
+import FolderPicker from "@/components/FolderPicker";
+import type { Folder } from "@/types/link";
 
 // Whether this browser lets a page read the clipboard. It never changes, so
 // there's nothing to subscribe to. The server can't know and says false; React
@@ -12,13 +14,19 @@ const browserCanPaste = () => typeof navigator.clipboard?.readText === "function
 const serverCanPaste = () => false;
 
 type LinkFormProps = {
-  onAdd: (url: string, title: string, tags: string) => Promise<string | null>;
+  onAdd: (url: string, title: string, tags: string, folderId: string) => Promise<string | null>;
+  folders?: Folder[];
+  // The folder being looked at: new links go there unless you pick another.
+  currentFolder?: string | null;
+  onCreateFolder?: (name: string) => Promise<Folder | string>;
 };
 
-export default function LinkForm({ onAdd }: LinkFormProps) {
+export default function LinkForm({ onAdd, folders = [], currentFolder = null, onCreateFolder }: LinkFormProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
+  const [chosenFolder, setChosenFolder] = useState<string | null>(null);
+  const folderId = chosenFolder ?? currentFolder ?? "";
   const [error, setError] = useState<string | null>(null);
   const canPaste = useSyncExternalStore(noSubscription, browserCanPaste, serverCanPaste);
 
@@ -52,7 +60,7 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
     // Remember what was sent: saving can take a few seconds (the server may
     // fetch the page title), and you may start typing the next link meanwhile.
     const sent = { url, title, tags };
-    const message = await onAdd(url.trim(), title, tags);
+    const message = await onAdd(url.trim(), title, tags, folderId);
     if (message) {
       setError(message);
       return;
@@ -62,6 +70,8 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
     setUrl((current) => (current === sent.url ? "" : current));
     setTitle((current) => (current === sent.title ? "" : current));
     setTags((current) => (current === sent.tags ? "" : current));
+    // The next link goes to the folder being looked at again.
+    setChosenFolder(null);
   }
 
   return (
@@ -106,6 +116,9 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
               placeholder="Tags, comma separated"
               className="field min-w-0 flex-1"
             />
+            {onCreateFolder && (
+              <FolderPicker folders={folders} value={folderId} onChange={setChosenFolder} onCreate={onCreateFolder} />
+            )}
           </div>
         )}
       </form>

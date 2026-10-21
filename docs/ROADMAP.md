@@ -291,6 +291,11 @@ Then the layout:
 - [x] The selected list, folder, tag and view live in the address (`/?list=unread`, `/?folder=…&tag=react&view=list`), so Back, a refresh and bookmarks keep them. Search stays out of it. An address with a folder that's gone falls back to all links
 - [x] The contrast and browser tests cover the new layout in light and dark mode: the details panel, List view, and the phone drawer; browser tests for the drawer and for Back and refresh
 
+**Extra: save straight into a folder, like a browser bookmark**
+- [x] The save page (where the bookmarklet, the extension and phone sharing land) has a **Folder** menu: No folder, your folders, and **New folder…**, which opens a name box right there, creates the folder and picks it. It remembers the last folder on this device, like a browser's bookmark dialog
+- [x] The top bar's save box has the same menu next to Title and Tags; it starts on the folder you're looking at
+- [x] The server only saves into one of your own folders (anything else saves with no folder)
+
 **You'll learn:** layouts with CSS Grid, responsive navigation, keeping state in the URL (`useSearchParams`), and keyboard-friendly focus handling.
 
 ## v2.0: Runs on its own 🌱
