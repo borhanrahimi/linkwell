@@ -219,16 +219,18 @@ Before the landing page invites strangers in, lock the doors. Already done: ever
 
 **You'll learn:** validating input on the server, rate limiting, security headers and CSP, and keeping dependencies safe.
 
-## v1.8: The landing page 🏠
+## 🔜 v1.8: The landing page 🏠 (in progress)
 
 Signed-out visitors see only a small sign-in card today. Give them a real welcome.
 
-- [ ] A landing page: the promise in one line, three short sections for the three promises (save, keep alive, come back), each with a drawing of the Linkwell character, real screenshots, and a clear **Sign in with Google** button
-- [ ] "Save from anywhere" for newcomers: extension, iPhone, Android, bookmarklet
-- [ ] A short FAQ: Is it free? Where is my data? Can I take my links with me (export)? How is it different from Raindrop?
+- [x] A landing page (`components/Landing.tsx`): the promise in one line, three cards for the three promises (save, keep alive, come back), each with a drawing of the Linkwell character, and a clear **Sign in with Google** button
+- [ ] Real screenshots of the app on the landing page
+- [x] "Save from anywhere" for newcomers: any browser (bookmarklet), your phone, copy and paste, importing old bookmarks. The extension is left out until it's published
+- [x] No other companies' or products' names in what users see: neutral words like "your browser", "your phone" and "other bookmark apps"
+- [x] A short FAQ: Is it free? Who can see my links? Can I take them with me? How is it different from other bookmark apps? Is it safe? (`<details>`, no JavaScript)
 - [ ] Privacy policy and terms pages (Google needs a privacy policy before sign-in can leave "testing" mode for everyone)
 - [ ] Sharing previews: page titles and descriptions, and an Open Graph image for when someone shares the link in a chat
-- [ ] New drawings of the Linkwell character for each section, in the same style
+- [x] A new drawing for "Keep them alive": the character as a doctor, listening to Linkwell's chain link with a stethoscope (`LinkDoctor`)
 
 **You'll learn:** marketing pages vs. app pages, metadata and Open Graph images, and writing for people who don't know Linkwell yet.
 

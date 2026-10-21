@@ -2,14 +2,21 @@
 
 import { authClient } from "@/lib/auth-client";
 
-// callbackURL is where Google sends you back to after signing in.
-export default function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
+type SignInButtonProps = {
+  // Where Google sends you back to after signing in.
+  callbackURL?: string;
+  label?: string;
+  className?: string;
+};
+
+export default function SignInButton({
+  callbackURL = "/",
+  label = "Sign in with Google",
+  className = "btn-primary mt-6",
+}: SignInButtonProps) {
   return (
-    <button
-      onClick={() => authClient.signIn.social({ provider: "google", callbackURL })}
-      className="btn-primary mt-6"
-    >
-      Sign in with Google
+    <button onClick={() => authClient.signIn.social({ provider: "google", callbackURL })} className={className}>
+      {label}
     </button>
   );
 }

@@ -42,6 +42,17 @@ for (const colorScheme of ["light", "dark"] as const) {
       expect(tooLow).toEqual([]);
     });
 
+    test("every text on the landing page is readable", async ({ page }) => {
+      await page.goto("/");
+      // Open one answer, so its text is measured too.
+      await page.getByText("Is it safe?").click();
+
+      const results = await measureContrast(page);
+
+      expect(results.length).toBeGreaterThan(20);
+      expect(results.filter((result) => result.ratio < result.needed)).toEqual([]);
+    });
+
     test("every text on the account page is readable", async ({
       page,
       signIn,

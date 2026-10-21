@@ -56,7 +56,7 @@ export default async function AccountPage() {
             <div className="mt-6 border-t border-line pt-6">
               <h2 className="text-sm font-medium text-ink">Export your links</h2>
               <p className="text-sm text-muted">
-                Download all your links and folders as a bookmarks file. Chrome, Safari, Firefox and Raindrop can
+                Download all your links and folders as a bookmarks file. Every browser and most bookmark apps can
                 import it.
               </p>
               {/* A plain <a>, not <Link>: this downloads a file instead of opening a page. */}
@@ -68,8 +68,8 @@ export default async function AccountPage() {
             <div className="mt-6 border-t border-line pt-6">
               <h2 className="text-sm font-medium text-ink">Import bookmarks</h2>
               <p className="text-sm text-muted">
-                Bring in links from Chrome, Safari, Firefox or Raindrop: export your bookmarks there as a file, then
-                choose it here. Browser folders become Linkwell folders.
+                Bring in links from your browser or another bookmark app: export your bookmarks there as a file,
+                then choose it here. Their folders become Linkwell folders.
               </p>
               <ImportBookmarks />
             </div>
