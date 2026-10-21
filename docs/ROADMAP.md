@@ -224,7 +224,7 @@ Before the landing page invites strangers in, lock the doors. Already done: ever
 Signed-out visitors see only a small sign-in card today. Give them a real welcome.
 
 - [x] A landing page (`components/Landing.tsx`): the promise in one line, three cards for the three promises (save, keep alive, come back), each with a drawing of the Linkwell character, and a clear **Sign in with Google** button
-- [ ] Real screenshots of the app on the landing page (after v1.9, so they show the new layout)
+- [x] Real screenshots of the app on the landing page: the computer view with the phone in front of it (just the phone on small screens), in light or dark to match the visitor. `npm run screenshots` retakes them with made-up sample links (`e2e/screenshots.spec.ts`)
 - [x] "Save from anywhere" for newcomers: any browser (bookmarklet), your phone, copy and paste, importing old bookmarks. The extension is left out until it's published
 - [x] No other companies' or products' names in what users see: neutral words like "your browser", "your phone" and "other bookmark apps"
 - [x] A short FAQ: Is it free? Who can see my links? Can I take them with me? How is it different from other bookmark apps? Is it safe? (`<details>`, no JavaScript)

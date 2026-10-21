@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import Landing from "@/components/Landing";
 import { authClient } from "@/lib/auth-client";
 
@@ -43,4 +43,18 @@ test("says goodbye after an account was deleted", () => {
   render(<Landing deleted />);
 
   expect(screen.getByRole("status").textContent).toBe("Your account and all your links were deleted. Goodbye");
+});
+
+test("shows real screenshots of the app, in light and dark versions, described for screen readers", () => {
+  render(<Landing />);
+
+  const section = screen.getByRole("region", { name: "What Linkwell looks like" });
+  const pictures = within(section).getAllByRole("img");
+  const sources = pictures.map((img) => decodeURIComponent(img.getAttribute("src") ?? ""));
+  for (const name of ["app-light", "app-dark", "phone-light", "phone-dark"]) {
+    expect(sources.some((src) => src.includes(`/screenshots/${name}.png`))).toBe(true);
+  }
+  for (const img of pictures) {
+    expect(img.getAttribute("alt")).toMatch(/^Linkwell on a (computer|phone): /);
+  }
 });

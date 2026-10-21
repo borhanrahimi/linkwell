@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import NextLink from "next/link";
+import Image from "next/image";
 import Footer from "@/components/Footer";
 import LogoMark from "@/components/LogoMark";
 import SignInButton from "@/components/SignInButton";
@@ -106,6 +107,35 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
           )}
         </section>
 
+        {/* What it looks like: the app on a computer, with the phone in front of it on
+            wide screens; small screens show just the phone, which they can read. Each picture has a light and a dark version; CSS shows the
+            one that matches the visitor's mode. Made with `npm run screenshots`. */}
+        <section aria-labelledby="look-heading" className="mt-16">
+          <h2 id="look-heading" className="sr-only">
+            What Linkwell looks like
+          </h2>
+          <div className="relative mx-auto max-w-4xl md:pr-16">
+            <figure className="hidden overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/10 md:block">
+              <ThemeScreenshot
+                name="app"
+                width={2560}
+                height={1600}
+                alt="Linkwell on a computer: a sidebar with lists, folders and tags, a Rediscover banner bringing back an old link, and the saved links as cards."
+                sizes="(min-width: 896px) 832px, 100vw"
+              />
+            </figure>
+            <figure className="mx-auto w-60 overflow-hidden rounded-[1.75rem] border-4 border-ink/80 shadow-2xl shadow-black/20 md:absolute md:-bottom-10 md:right-0 md:w-44">
+              <ThemeScreenshot
+                name="phone"
+                width={780}
+                height={1688}
+                alt="Linkwell on a phone: the links come first, with the lists behind a menu button."
+                sizes="(min-width: 768px) 176px, 240px"
+              />
+            </figure>
+          </div>
+        </section>
+
         {/* The three promises. */}
         <section aria-labelledby="promises-heading" className="mt-20">
           <h2 id="promises-heading" className="sr-only">
@@ -164,5 +194,16 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
         <Footer />
       </div>
     </main>
+  );
+}
+
+// A screenshot of the app in light and dark mode: both are in the page, and
+// CSS shows the one matching the visitor's mode (the hidden one isn't loaded).
+function ThemeScreenshot({ name, alt, ...props }: { name: string; width: number; height: number; alt: string; sizes: string }) {
+  return (
+    <>
+      <Image {...props} alt={alt} src={`/screenshots/${name}-light.png`} className="block h-auto w-full dark:hidden" />
+      <Image {...props} alt={alt} src={`/screenshots/${name}-dark.png`} className="hidden h-auto w-full dark:block" />
+    </>
   );
 }

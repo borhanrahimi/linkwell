@@ -148,6 +148,7 @@ On the account page, **Import bookmarks** reads a bookmarks file (Chrome: `chrom
 | `npm test` | Runs the tests in watch mode (re-runs on every save) |
 | `npm run check` | Type-check + lint + tests, once. **Run before every commit.** |
 | `npm run e2e` | Builds the app and runs the Playwright browser tests against the test database (`E2E_DATABASE_URL`). `npx playwright show-report` shows what went wrong |
+| `npm run screenshots` | Retakes the landing page's screenshots of the app (`public/screenshots/`, light and dark, computer and phone) with sample links in the test database. Run it after changing how the app looks, then commit the new pictures |
 | `npx drizzle-kit generate --name <change>` | Writes a new SQL migration in `drizzle/` after you change `db/schema.ts` |
 | `npx drizzle-kit migrate` | Applies new migrations to the database in `DATABASE_URL` |
 

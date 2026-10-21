@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest",
     "check": "tsc --noEmit && eslint && vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "screenshots": "SCREENSHOTS=1 playwright test e2e/screenshots.spec.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
