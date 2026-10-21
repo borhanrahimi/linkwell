@@ -3,7 +3,7 @@
 import { useState } from "react";
 import NextLink from "next/link";
 import { saveLink } from "@/app/actions";
-import { createLink, getDomain, parseTags } from "@/lib/links";
+import { createLink, getDomain, parseTags, TITLE_MAX_LENGTH } from "@/lib/links";
 
 // Saving waits for a click instead of happening when the page opens: any
 // website could open /share?url=... in your browser, and that alone must
@@ -46,6 +46,7 @@ export default function ShareForm({ url, title }: { url: string; title: string }
         <input
           type="text"
           value={titleInput}
+          maxLength={TITLE_MAX_LENGTH}
           onChange={(e) => setTitleInput(e.target.value)}
           placeholder="Optional"
           className="field"

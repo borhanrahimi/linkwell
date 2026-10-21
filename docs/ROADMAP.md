@@ -202,9 +202,9 @@ Give Linkwell a personality of its own, while the app itself stays calm and mini
 Before the landing page invites strangers in, lock the doors. Already done: every Server Action checks who is asking, the link checker refuses private addresses (SSRF), the daily check needs a secret, and deleting an account needs a recent sign-in.
 
 **Check what's sent to the server** (gaps found in the code)
-- [ ] `saveLink` accepts any address and any length: allow only `http`/`https` links, and limit the URL, title and tags (like `cleanBookmark` already does for imports)
-- [ ] `importLinks` (the old localStorage import) has the same gap: add the same checks, or remove it, since browsers from before v0.5 have long been imported
-- [ ] Folder names get a length limit when created or renamed
+- [x] `saveLink` accepts any address and any length: now only `http`/`https` links (no `javascript:`, `data:` or `file:`), with limits on the URL (2048), title (500) and tags (20, of 50 characters each), a real UUID as id, and only the fields a new link may have (`cleanNewLink`)
+- [x] `importLinks` (the old localStorage import) uses the same checks, saves in one INSERT, and refuses more than 1000 links at once
+- [x] Folder names get a 100-character limit when created or renamed (`cleanFolderName`); the Edit form's title is limited too, and odd input (numbers, objects) can't crash an action
 
 **Limits, so one person can't overload Linkwell**
 - [ ] Rate limits on the expensive actions: saving a link and "Check links" both visit other websites

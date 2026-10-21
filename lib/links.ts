@@ -81,17 +81,96 @@ export function setReadAt(
 ): Link[] {
   return links.map((link) => (link.id === id ? { ...link, readAt } : link));
 }
+// Limits for everything saved about a link. Server Actions are public, so the
+// server enforces them whatever the browser sends; forms use them as
+// maxLength too, so people see the limit while typing.
+export const URL_MAX_LENGTH = 2048;
+export const TITLE_MAX_LENGTH = 500;
 export const NOTE_MAX_LENGTH = 500;
+export const TAG_MAX_LENGTH = 50;
+export const TAGS_MAX = 20;
+export const FOLDER_NAME_MAX_LENGTH = 100;
+
+// Text from the browser, or "" for anything that isn't text (a number, an
+// object, nothing at all), so the checks below never crash on odd input.
+export function textOf(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+// Trimmed and cut to maxLength; empty text becomes undefined.
+export function cleanText(value: unknown, maxLength: number): string | undefined {
+  return textOf(value).trim().slice(0, maxLength) || undefined;
+}
+
+// Only http and https addresses: never javascript:, data: or file: links.
+export function isWebAddress(url: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
+// Tags from a form's comma-separated text, or from a list (imports): through
+// parseTags, each cut to TAG_MAX_LENGTH, at most TAGS_MAX.
+export function cleanTags(input: unknown): string[] {
+  const text = Array.isArray(input) ? input.filter((tag) => typeof tag === "string").join(",") : textOf(input);
+  return [...new Set(parseTags(text).map((tag) => tag.slice(0, TAG_MAX_LENGTH)))].slice(0, TAGS_MAX);
+}
+
+// A real date that isn't in the future, as an ISO string; otherwise undefined.
+export function cleanDate(value: unknown, now = new Date()): string | undefined {
+  const date = new Date(textOf(value));
+  return !isNaN(date.getTime()) && date <= now ? date.toISOString() : undefined;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Checks a new link the browser sends (saveLink, importLinks). Returns the
+// cleaned link, or a message saying what's wrong. Only the fields a new link
+// may have are kept: the browser can't set a status, a read date or a folder.
+export function cleanNewLink(input: Link, now = new Date()): Link | string {
+  const url = textOf(input?.url).trim();
+  if (!url) {
+    return "Please paste a link.";
+  }
+  if (url.length > URL_MAX_LENGTH) {
+    return "That link is too long.";
+  }
+  if (!isWebAddress(url)) {
+    return "Only web links (starting with http:// or https://) can be saved.";
+  }
+  return {
+    // The browser makes the id, so the card can show at once; anything that
+    // isn't a real UUID gets a new one.
+    id: UUID.test(textOf(input.id)) ? input.id : crypto.randomUUID(),
+    url,
+    title: cleanText(input.title, TITLE_MAX_LENGTH),
+    tags: cleanTags(input.tags),
+    createdAt: cleanDate(input.createdAt, now) ?? now.toISOString(),
+  };
+}
 
 // Tidies what was typed in the Edit form, with the same rules as saving a new
-// link: trimmed title, tags through parseTags, and a trimmed, length-limited
-// note. Empty text becomes "no title" / "no note".
+// link. Empty text becomes "no title" / "no note".
 export function cleanDetails(input: LinkDetailsInput): LinkDetails {
   return {
-    title: input.title.trim() || undefined,
-    tags: parseTags(input.tags),
-    note: input.note.trim().slice(0, NOTE_MAX_LENGTH) || undefined,
+    title: cleanText(input?.title, TITLE_MAX_LENGTH),
+    tags: cleanTags(input?.tags),
+    note: cleanText(input?.note, NOTE_MAX_LENGTH),
   };
+}
+
+// A folder's name, trimmed, or a message saying what's wrong.
+export function cleanFolderName(input: unknown): { name: string } | { error: string } {
+  const name = textOf(input).trim();
+  if (!name) {
+    return { error: "Please give the folder a name." };
+  }
+  if (name.length > FOLDER_NAME_MAX_LENGTH) {
+    return { error: `Folder names can be at most ${FOLDER_NAME_MAX_LENGTH} characters.` };
+  }
+  return { name };
 }
 
 export function updateDetails(

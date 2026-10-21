@@ -21,7 +21,7 @@ import {
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
-import { cleanDetails, isDuplicate, normalizeUrl } from "@/lib/links";
+import { cleanDetails, cleanFolderName, cleanNewLink, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
 import { isFolderColor, isFolderIcon, nextFolderColor } from "@/lib/folders";
 import { normalizeUsername, usernameError } from "@/lib/username";
@@ -38,10 +38,13 @@ import type {
 // Server Actions are public addresses, so each one asks who is calling first
 // (getUserId throws when nobody is signed in) and only touches that user's data.
 
-export async function saveLink(link: Link): Promise<Link | string> {
+export async function saveLink(input: Link): Promise<Link | string> {
   const userId = await getUserId();
-  if (!link.url.trim()) {
-    return "Please paste a link.";
+  // Never trust what the browser sends: only an http(s) link, within the
+  // length limits, with just the fields a new link may have.
+  const link = cleanNewLink(input);
+  if (typeof link === "string") {
+    return link;
   }
   if (isDuplicate(await getLinks(userId), link.url)) {
     return "You already saved this link!";
@@ -82,20 +85,28 @@ export async function moveToFolder(id: string, folderId: string | null) {
   await updateLinkFolder(userId, id, folderId);
 }
 
+// Links from this browser's localStorage, from before v0.5.
+const OLD_LINKS_MAX = 1000;
+
 export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
   const userId = await getUserId();
-  const saved = await getLinks(userId);
+  if (!Array.isArray(oldLinks) || oldLinks.length > OLD_LINKS_MAX) {
+    throw new Error("Too many links to import at once.");
+  }
+  const known = new Set((await getLinks(userId)).map((link) => normalizeUrl(link.url)));
   const imported: Link[] = [];
 
   for (const old of oldLinks) {
-    if (!old.url?.trim() || isDuplicate([...saved, ...imported], old.url)) {
+    // Same checks as saveLink; a fresh id, but the date it was first saved.
+    const link = cleanNewLink({ ...old, id: "" });
+    if (typeof link === "string" || known.has(normalizeUrl(link.url))) {
       continue;
     }
-    const link = { ...old, id: crypto.randomUUID(), tags: old.tags ?? [] };
-    await insertLink(userId, link);
+    known.add(normalizeUrl(link.url));
     imported.push(link);
   }
 
+  await insertLinks(userId, imported);
   return imported;
 }
 
@@ -161,10 +172,11 @@ export async function importBookmarks(
 
 export async function createFolder(name: string): Promise<Folder | string> {
   const userId = await getUserId();
-  const trimmed = name.trim();
-  if (!trimmed) {
-    return "Please give the folder a name.";
+  const cleaned = cleanFolderName(name);
+  if ("error" in cleaned) {
+    return cleaned.error;
   }
+  const trimmed = cleaned.name;
   const existing = await getFolders(userId);
   if (
     existing.some(
@@ -181,10 +193,11 @@ export async function renameFolder(
   name: string
 ): Promise<string | null> {
   const userId = await getUserId();
-  const trimmed = name.trim();
-  if (!trimmed) {
-    return "Please give the folder a name.";
+  const cleaned = cleanFolderName(name);
+  if ("error" in cleaned) {
+    return cleaned.error;
   }
+  const trimmed = cleaned.name;
   const others = (await getFolders(userId)).filter(
     (folder) => folder.id !== id
   );

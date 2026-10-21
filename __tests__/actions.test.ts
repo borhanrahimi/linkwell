@@ -41,7 +41,7 @@ afterEach(() => {
   vi.mocked(getUserId).mockResolvedValue("u1");
 });
 
-const link = { id: "1", url: "https://example.com", tags: [], createdAt: "2026-10-01T12:00:00.000Z" };
+const link = { id: "5f0c6c1e-1b1a-4c3e-9a7e-2d3b4c5d6e7f", url: "https://example.com", tags: [], createdAt: "2026-10-01T12:00:00.000Z" };
 
 describe("signed out", () => {
   test("every action refuses to run and touches no data", async () => {
@@ -109,6 +109,38 @@ describe("saveLink", () => {
     expect(await saveLink({ ...link, url: "   " })).toBe("Please paste a link.");
     expect(insertLink).not.toHaveBeenCalled();
   });
+
+  test("refuses links that aren't web addresses", async () => {
+    for (const url of ["javascript:alert(1)", "data:text/html,hi", "file:///etc/passwd", "not a link"]) {
+      expect(await saveLink({ ...link, url })).toBe("Only web links (starting with http:// or https://) can be saved.");
+    }
+    expect(insertLink).not.toHaveBeenCalled();
+  });
+
+  test("refuses a link that is too long", async () => {
+    expect(await saveLink({ ...link, url: "https://example.com/" + "a".repeat(3000) })).toBe("That link is too long.");
+    expect(insertLink).not.toHaveBeenCalled();
+  });
+
+  test("cuts a huge title and ignores fields a new link can't have", async () => {
+    const sneaky = { ...link, title: "x".repeat(5000), status: "ok", readAt: "2020-01-01T00:00:00.000Z", folderId: "someone-elses" } as typeof link;
+
+    const saved = await saveLink(sneaky);
+
+    expect(saved).toEqual({ ...link, title: "x".repeat(500) });
+    expect(insertLink).toHaveBeenCalledWith("u1", { ...link, title: "x".repeat(500) });
+  });
+
+  test("gives a link a new id when the browser's isn't a real one", async () => {
+    const saved = await saveLink({ ...link, id: "1' OR 1=1" });
+
+    expect(typeof saved === "object" && saved.id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  test("doesn't crash when the browser sends something that isn't a link", async () => {
+    expect(await saveLink(null as never)).toBe("Please paste a link.");
+    expect(await saveLink({ url: 42 } as never)).toBe("Please paste a link.");
+  });
 });
 
 describe("removeLink", () => {
@@ -138,7 +170,18 @@ describe("importLinks", () => {
     expect(imported).toHaveLength(1);
     expect(imported[0]).toMatchObject({ url: "https://old.com", createdAt: old.createdAt });
     expect(imported[0].id).not.toBe("old-1");
-    expect(insertLink).toHaveBeenCalledWith("u1", imported[0]);
+    expect(insertLinks).toHaveBeenCalledWith("u1", imported);
+  });
+
+  test("skips links that aren't web addresses", async () => {
+    expect(await importLinks([{ ...old, url: "javascript:alert(1)" }])).toEqual([]);
+  });
+
+  test("refuses more than 1000 links at once", async () => {
+    const many = Array.from({ length: 1001 }, (_, i) => ({ ...old, url: `https://old.com/${i}` }));
+
+    await expect(importLinks(many)).rejects.toThrow("Too many links");
+    expect(insertLinks).not.toHaveBeenCalled();
   });
 
   test("gives links saved before tags existed an empty tag list", async () => {
@@ -156,7 +199,6 @@ describe("importLinks", () => {
 
   test("imports the same url only once", async () => {
     expect(await importLinks([old, { ...old, id: "old-2" }])).toHaveLength(1);
-    expect(insertLink).toHaveBeenCalledTimes(1);
   });
 
   test("skips links with an empty url", async () => {
@@ -173,7 +215,7 @@ describe("checkAllLinks", () => {
 
     await checkAllLinks();
 
-    expect(updateLinkStatus).toHaveBeenCalledWith("u1", "1", "ok");
+    expect(updateLinkStatus).toHaveBeenCalledWith("u1", link.id, "ok");
     expect(updateLinkStatus).toHaveBeenCalledWith("u1", "2", "broken");
   });
 
@@ -211,6 +253,15 @@ describe("createFolder", () => {
     expect(insertFolder).not.toHaveBeenCalled();
   });
 
+  test("refuses a name longer than 100 characters", async () => {
+    expect(await createFolder("x".repeat(101))).toBe("Folder names can be at most 100 characters.");
+    expect(insertFolder).not.toHaveBeenCalled();
+  });
+
+  test("treats a name that isn't text as empty", async () => {
+    expect(await createFolder({ evil: true } as never)).toBe("Please give the folder a name.");
+  });
+
   test("refuses a name that already exists, ignoring case", async () => {
     vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Work" }]);
 
@@ -245,6 +296,11 @@ describe("moveToFolder", () => {
 });
 
 describe("renameFolder", () => {
+  test("refuses a name longer than 100 characters", async () => {
+    expect(await renameFolder("f1", "x".repeat(101))).toBe("Folder names can be at most 100 characters.");
+    expect(updateFolderName).not.toHaveBeenCalled();
+  });
+
   test("renames the folder with a trimmed name", async () => {
     expect(await renameFolder("f1", "  Job  ")).toBeNull();
     expect(updateFolderName).toHaveBeenCalledWith("u1", "f1", "Job");

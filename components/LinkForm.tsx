@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { TITLE_MAX_LENGTH, URL_MAX_LENGTH } from "@/lib/links";
 import { findSharedUrl } from "@/lib/share";
 
 // Whether this browser lets a page read the clipboard. It never changes, so
@@ -75,6 +76,7 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
               setError(null);
             }}
             placeholder="Paste a link..."
+            maxLength={URL_MAX_LENGTH}
             className="field min-w-0 flex-1"
           />
           {canPaste && (
@@ -88,6 +90,7 @@ export default function LinkForm({ onAdd }: LinkFormProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional)"
+          maxLength={TITLE_MAX_LENGTH}
           className="field min-w-0 flex-1"
         />
         <input

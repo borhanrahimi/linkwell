@@ -3,6 +3,7 @@
 import { useState } from "react";
 import FolderIcon from "@/components/FolderIcon";
 import { FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
+import { FOLDER_NAME_MAX_LENGTH } from "@/lib/links";
 import type { Folder } from "@/types/link";
 
 type FolderBarProps = {
@@ -99,6 +100,7 @@ export default function FolderBar({ folders, activeFolder, onSelect, onCreate }:
               setError(null);
             }}
             aria-label="Folder name"
+            maxLength={FOLDER_NAME_MAX_LENGTH}
             placeholder="Folder name"
             autoFocus
             className="field min-w-0 flex-1"

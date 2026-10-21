@@ -1,4 +1,4 @@
-import { getDomain, parseTags } from "@/lib/links";
+import { cleanDate, cleanTags, cleanText, FOLDER_NAME_MAX_LENGTH, getDomain, isWebAddress, TITLE_MAX_LENGTH, URL_MAX_LENGTH } from "@/lib/links";
 import type { Folder, ImportedBookmark, Link } from "@/types/link";
 
 // Replaces the characters that mean something in HTML. Titles come from other
@@ -74,14 +74,6 @@ function folderOf(link: Element): string | undefined {
   return heading.textContent?.trim() || undefined;
 }
 
-function isWebAddress(url: string): boolean {
-  try {
-    return ["http:", "https:"].includes(new URL(url).protocol);
-  } catch {
-    return false;
-  }
-}
-
 // Reads a bookmarks file from Chrome, Safari, Firefox, Raindrop or Linkwell.
 // Runs in the browser (DOMParser), so the file never has to be uploaded whole.
 // Only http and https links are kept; javascript: bookmarklets and the like are skipped.
@@ -113,16 +105,6 @@ export function parseBookmarksHtml(html: string): ImportedBookmark[] {
 // several batches, so each request stays well under the 1 MB a Server Action accepts.
 export const IMPORT_BATCH_SIZE = 200;
 
-const TITLE_MAX_LENGTH = 500;
-const FOLDER_MAX_LENGTH = 100;
-const TAGS_MAX = 20;
-
-function cleanText(value: unknown, maxLength: number): string | undefined {
-  return typeof value === "string"
-    ? value.trim().slice(0, maxLength) || undefined
-    : undefined;
-}
-
 // Checks one bookmark the browser sent. Server Actions are public, so nothing
 // here is trusted: wrong types, huge texts, odd links and future dates are
 // fixed or refused (null).
@@ -131,22 +113,13 @@ export function cleanBookmark(
   now = new Date()
 ): ImportedBookmark | null {
   const url = typeof input?.url === "string" ? input.url.trim() : "";
-  if (!isWebAddress(url)) return null;
-
-  const tags = Array.isArray(input.tags)
-    ? input.tags.filter((tag) => typeof tag === "string")
-    : [];
-  const date =
-    typeof input.addDate === "string" ? new Date(input.addDate) : null;
+  if (url.length > URL_MAX_LENGTH || !isWebAddress(url)) return null;
 
   return {
     url,
     title: cleanText(input.title, TITLE_MAX_LENGTH),
-    tags: parseTags(tags.join(",")).slice(0, TAGS_MAX),
-    folder: cleanText(input.folder, FOLDER_MAX_LENGTH),
-    addDate:
-      date && !isNaN(date.getTime()) && date <= now
-        ? date.toISOString()
-        : undefined,
+    tags: cleanTags(input.tags),
+    folder: cleanText(input.folder, FOLDER_NAME_MAX_LENGTH),
+    addDate: cleanDate(input.addDate, now),
   };
 }

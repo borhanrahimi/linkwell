@@ -3,6 +3,7 @@
 import { useState } from "react";
 import FolderIcon from "@/components/FolderIcon";
 import { FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_ICONS, FOLDER_TEXT_CLASS } from "@/lib/folders";
+import { FOLDER_NAME_MAX_LENGTH } from "@/lib/links";
 import type { Folder, FolderColor, FolderIcon as FolderIconName } from "@/types/link";
 
 type FolderActionsProps = {
@@ -52,6 +53,7 @@ export default function FolderActions({ folder, onRename, onRecolor, onChangeIco
                             setError(null);
                         }}
                         aria-label="New folder name"
+                        maxLength={FOLDER_NAME_MAX_LENGTH}
                         autoFocus
                         className="field min-w-0 flex-1"
                     />

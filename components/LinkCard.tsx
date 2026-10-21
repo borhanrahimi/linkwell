@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { Folder, Link, LinkDetailsInput } from "@/types/link";
 import Checkmark from "@/components/illustrations/Checkmark";
 import SnappedChain from "@/components/illustrations/SnappedChain";
-import { getArchiveUrl, getDomain, getFaviconUrl, NOTE_MAX_LENGTH, timeAgo } from "@/lib/links";
+import { getArchiveUrl, getDomain, getFaviconUrl, NOTE_MAX_LENGTH, TITLE_MAX_LENGTH, timeAgo } from "@/lib/links";
 
 
 type LinkCardProps = {
@@ -52,6 +52,7 @@ export default function LinkCard({ link, activeTag, now, folders, onDelete, onEd
             <input
               type="text"
               value={draft.title}
+              maxLength={TITLE_MAX_LENGTH}
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
               placeholder={getDomain(link.url)}
               className="field font-normal"

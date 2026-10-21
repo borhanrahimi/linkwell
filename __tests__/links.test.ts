@@ -24,6 +24,10 @@ import {
   setFolder,
   filterByFolder,
   clearFolder,
+  cleanNewLink,
+  cleanTags,
+  cleanDate,
+  cleanFolderName,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -613,4 +617,53 @@ describe("clearFolder", () => {
     expect(updated[0].folderId).toBeUndefined();
     expect(updated[1]).toBe(inRecipes);
   });
+});
+
+describe("cleanNewLink", () => {
+  const now = new Date("2026-10-20T12:00:00.000Z");
+  const input = { id: "5f0c6c1e-1b1a-4c3e-9a7e-2d3b4c5d6e7f", url: " https://example.com ", tags: [], createdAt: "2026-10-01T12:00:00.000Z" };
+
+  test("trims the address and keeps a real id and a past date", () => {
+    expect(cleanNewLink(input, now)).toEqual({ ...input, url: "https://example.com", title: undefined });
+  });
+
+  test("uses now for a date in the future or that isn't a date", () => {
+    expect(cleanNewLink({ ...input, createdAt: "2099-01-01T00:00:00.000Z" }, now)).toMatchObject({ createdAt: now.toISOString() });
+    expect(cleanNewLink({ ...input, createdAt: "yesterday" }, now)).toMatchObject({ createdAt: now.toISOString() });
+  });
+});
+
+describe("cleanTags", () => {
+  test("cleans a comma-separated text or a list the same way", () => {
+    expect(cleanTags(" React, docs ,react")).toEqual(["react", "docs"]);
+    expect(cleanTags(["React", 7, "docs"])).toEqual(["react", "docs"]);
+  });
+
+  test("cuts long tags and keeps at most 20", () => {
+    expect(cleanTags("x".repeat(80))).toEqual(["x".repeat(50)]);
+    expect(cleanTags(Array.from({ length: 30 }, (_, i) => `t${i}`))).toHaveLength(20);
+  });
+
+  test("anything else gives no tags", () => {
+    expect(cleanTags(undefined)).toEqual([]);
+    expect(cleanTags({ a: 1 })).toEqual([]);
+  });
+});
+
+test("cleanDate keeps only real dates that aren't in the future", () => {
+  const now = new Date("2026-10-20T12:00:00.000Z");
+  expect(cleanDate("2020-01-01T00:00:00.000Z", now)).toBe("2020-01-01T00:00:00.000Z");
+  expect(cleanDate("2099-01-01", now)).toBeUndefined();
+  expect(cleanDate(12345, now)).toBeUndefined();
+});
+
+test("cleanFolderName trims, and refuses empty or long names", () => {
+  expect(cleanFolderName("  Work ")).toEqual({ name: "Work" });
+  expect(cleanFolderName(" ")).toEqual({ error: "Please give the folder a name." });
+  expect(cleanFolderName("x".repeat(101))).toEqual({ error: "Folder names can be at most 100 characters." });
+});
+
+test("cleanDetails cuts a huge title and survives input that isn't text", () => {
+  expect(cleanDetails({ title: "x".repeat(900), tags: "a", note: "" }).title).toHaveLength(500);
+  expect(cleanDetails({ title: 5, tags: null, note: {} } as never)).toEqual({ title: undefined, tags: [], note: undefined });
 });
