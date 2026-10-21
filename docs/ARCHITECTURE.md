@@ -713,3 +713,4 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | `npm run check` runs `next typegen` first | `PageProps` and friends are generated into `.next/`, which isn't in Git; a fresh copy (CI, a new computer) failed the type check without them, and stale types caused errors before |
 | 2026-10-20 | Dependabot groups minor and patch updates, majors come one by one | Fewer pull requests to look at; a major update (like a new Next.js) can need code changes and deserves its own |
 | 2026-10-20 | The health check also checks the database, not just that the server answers | Most real outages would be the database (a paused Neon project, a wrong `DATABASE_URL`); a page that loads but can't show links is down too |
+| 2026-10-21 | Dependabot skips major updates of `@types/node` | The types should match the Node version Linkwell runs on (22); they're raised together, by hand |

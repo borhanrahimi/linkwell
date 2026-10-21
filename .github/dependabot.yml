@@ -13,6 +13,12 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # Node's type definitions follow the Node version Linkwell runs on (22, see
+    # ci.yml); a newer major would let code use features the server lacks.
+    # Raise it together with the Node version, by hand.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   # The workflow's own building blocks (actions/checkout and friends).
   - package-ecosystem: github-actions
