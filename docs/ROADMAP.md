@@ -10,6 +10,31 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ---
 
+## 📌 Next time (written 2026-10-21)
+
+Where we stopped: v2.0 "Runs on its own" is mostly done (checks, Dependabot, `main` protected, health check, uptime monitor, backups). Pick up here:
+
+**You (with Claude walking you through it):**
+- [ ] Neon's restore window: Neon → production project → **Settings** → "Instant restore" / "History retention". Tell Claude the number, for `MAINTENANCE.md`
+- [ ] Copy `backups/linkwell-production-2026-10-21.json` somewhere off this computer (external drive or your own cloud storage)
+- [ ] Two-factor sign-in on GitHub, Vercel, Neon and Google (say "walk me through 2FA")
+- [ ] Decide the contact email for privacy questions (`SITE.contactEmail` in `lib/site.ts`): the last item of v1.8
+- [ ] Optional: the restore fire drill (restore the backup into an empty Neon branch, check the numbers, delete the branch)
+
+**Claude:**
+- [ ] Finish `MAINTENANCE.md`: updating Next.js and packages safely, running migrations, what to do when the uptime monitor emails you, restarting `npm run dev` after `npm install`
+- [ ] Error tracking: decide together (suggestion: mark it "later": it sends data to an outside service and needs privacy-page changes)
+- [ ] The two big upgrades Dependabot found and the checks stopped: ESLint 10 and TypeScript 7 (pull requests #7 and #8 were closed; they need code changes)
+
+**Smaller open questions:**
+- [ ] Add the `/privacy` and `/terms` addresses in Google Cloud's OAuth consent screen (needed before sign-in leaves "testing" mode)
+- [ ] Turn on GitHub's private vulnerability reporting (Settings → Code security)
+- [ ] Keep the "Sign in with Google" button text, or change it?
+
+**Shipping a change now that `main` is protected:** `git switch -c name` → commit → `git push -u origin name` → open the pull request from the link Git prints → wait for ✅ → **Merge** → **Delete branch** → `git switch main && git pull`.
+
+---
+
 ## ✅ v0.1: Foundation (done)
 
 - [x] Add and delete links
@@ -304,13 +329,13 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 
 **Locked accounts** (the most important step: most small projects are broken into through a stolen password, not clever code)
 - [ ] Two-factor sign-in on GitHub, Vercel, Neon and Google Cloud
-- [ ] Protect the `main` branch on GitHub: changes go through a pull request whose tests passed
+- [x] Protect the `main` branch on GitHub (ruleset "Protect main"): changes go through a pull request whose checks passed; no force-pushes or deleting `main`
 
 **Automatic checks**
 - [x] GitHub Actions (`.github/workflows/ci.yml`): `npm run check` and the browser tests on every push to `main` and every pull request, against the test database only (the `E2E_DATABASE_URL` secret), with a fresh random sign-in secret per run. `npm run check` now runs `next typegen` first, so a fresh copy has the route types
 - [x] Dependabot (`.github/dependabot.yml`): weekly pull requests for package updates (small ones grouped into one), monthly for the workflow's actions; the checks test each one before you merge. Security alerts and fixes are switched on in GitHub's settings
 - [x] A health check (`/api/health`): 200 `{"status":"ok"}` when the app reaches the database, 503 `{"status":"down"}` when it can't, never cached
-- [ ] A free uptime monitor that opens `/api/health` every few minutes and emails you when the site is down
+- [x] A free uptime monitor (UptimeRobot, "Linkwell") that opens `/api/health` every 5 minutes and emails you when the site is down
 - [ ] Error tracking (for example Sentry's free plan), so errors on the live site are reported instead of lost
 
 **Data that survives**
