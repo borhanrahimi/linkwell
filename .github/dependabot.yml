@@ -1,0 +1,21 @@
+# Dependabot opens pull requests to update Linkwell's packages, once a week.
+# The Checks workflow tests each one; merge it when the tick is green.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # Small updates come together in one pull request, so there are fewer to
+    # review; big (major) updates come one by one, since they can need changes.
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # The workflow's own building blocks (actions/checkout and friends).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

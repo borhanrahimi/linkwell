@@ -298,7 +298,7 @@ Then the layout:
 
 **You'll learn:** layouts with CSS Grid, responsive navigation, keeping state in the URL (`useSearchParams`), and keyboard-friendly focus handling.
 
-## v2.0: Runs on its own 🌱
+## 🔜 v2.0: Runs on its own 🌱 (in progress)
 
 Linkwell should keep running, safe and up to date, even when nobody works on it for a year, and be easy to pick up again.
 
@@ -307,8 +307,8 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 - [ ] Protect the `main` branch on GitHub: changes go through a pull request whose tests passed
 
 **Automatic checks**
-- [ ] GitHub Actions: run `npm run check` (and the browser tests) on every pull request
-- [ ] Dependabot: weekly pull requests for package updates and security fixes, which the tests check before you merge
+- [x] GitHub Actions (`.github/workflows/ci.yml`): `npm run check` and the browser tests on every push to `main` and every pull request, against the test database only (the `E2E_DATABASE_URL` secret), with a fresh random sign-in secret per run. `npm run check` now runs `next typegen` first, so a fresh copy has the route types
+- [x] Dependabot (`.github/dependabot.yml`): weekly pull requests for package updates (small ones grouped into one), monthly for the workflow's actions; the checks test each one before you merge. Security alerts and fixes are switched on in GitHub's settings
 - [ ] A health check (`/api/health`) and a free uptime monitor that emails you when the site is down
 - [ ] Error tracking (for example Sentry's free plan), so errors on the live site are reported instead of lost
 
