@@ -424,3 +424,10 @@ test("saving from anywhere can make a folder on the spot and save into it, like 
   await expect(page.getByRole("link", { name: "Trip ideas" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Beaches" })).toBeVisible();
 });
+
+test("the health check answers ok, for the uptime monitor", async ({ request }) => {
+  const response = await request.get("/api/health");
+
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual({ status: "ok" });
+});

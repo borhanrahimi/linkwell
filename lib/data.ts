@@ -195,3 +195,14 @@ export async function countAction(
 export async function deleteOldRateLimits(before: Date) {
   await db.delete(rateLimits).where(lt(rateLimits.windowStart, before));
 }
+
+// For the health check: can the app reach the database at all? Touches no
+// one's data, just asks the database to answer "1".
+export async function isDatabaseUp(): Promise<boolean> {
+  try {
+    await db.execute(sql`select 1`);
+    return true;
+  } catch {
+    return false;
+  }
+}

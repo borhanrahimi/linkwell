@@ -309,7 +309,8 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 **Automatic checks**
 - [x] GitHub Actions (`.github/workflows/ci.yml`): `npm run check` and the browser tests on every push to `main` and every pull request, against the test database only (the `E2E_DATABASE_URL` secret), with a fresh random sign-in secret per run. `npm run check` now runs `next typegen` first, so a fresh copy has the route types
 - [x] Dependabot (`.github/dependabot.yml`): weekly pull requests for package updates (small ones grouped into one), monthly for the workflow's actions; the checks test each one before you merge. Security alerts and fixes are switched on in GitHub's settings
-- [ ] A health check (`/api/health`) and a free uptime monitor that emails you when the site is down
+- [x] A health check (`/api/health`): 200 `{"status":"ok"}` when the app reaches the database, 503 `{"status":"down"}` when it can't, never cached
+- [ ] A free uptime monitor that opens `/api/health` every few minutes and emails you when the site is down
 - [ ] Error tracking (for example Sentry's free plan), so errors on the live site are reported instead of lost
 
 **Data that survives**
