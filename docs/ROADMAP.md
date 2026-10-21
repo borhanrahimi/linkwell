@@ -265,8 +265,8 @@ As the list of links grows, the dashboard tiles get in the way: you scroll past 
 - [x] Tags, as filters (most used first, with counts); a tag combines with a smart list or a folder
 
 **Step 3: views**
-- [ ] A choice of Cards (today's grid) or List (one compact row per link, for scanning many links), remembered per device
-- [ ] Search, sort and the view switch together in one toolbar above the list
+- [x] A choice of Cards (today's grid) or List (one compact row per link: title, badges, site, date, tags and actions), remembered per device in `localStorage`
+- [x] Search, sort and the view switch together in one toolbar above the list (search gets its own row on phones)
 
 **Step 4: the details panel**
 - [ ] Click a link to see everything about it beside the list (note, tags, folder, dates, check status) and edit it there

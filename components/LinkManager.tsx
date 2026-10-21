@@ -9,6 +9,7 @@ import Rediscover from "@/components/Rediscover";
 import EmptyBox from "@/components/illustrations/EmptyBox";
 import Magnifier from "@/components/illustrations/Magnifier";
 import Sidebar from "@/components/Sidebar";
+import { useLinkView, type LinkView } from "@/components/useLinkView";
 import FolderIconDrawing from "@/components/FolderIcon";
 import { FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
@@ -50,6 +51,11 @@ import type {
   LinkDetailsInput,
 } from "@/types/link";
 
+const VIEWS: { id: LinkView; label: string }[] = [
+  { id: "cards", label: "Cards" },
+  { id: "list", label: "List" },
+];
+
 const LIST_TITLES: Record<SmartList, string> = {
   all: "All links",
   unread: "Unread",
@@ -80,6 +86,7 @@ export default function LinkManager({
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const [view, setView] = useLinkView();
   const visibleLinks = sortLinks(
     searchLinks(
       filterByTag(
@@ -271,14 +278,15 @@ export default function LinkManager({
             />
           )}
 
-          <div className="mt-4 flex gap-2">
+          {/* The toolbar: search, sort and the view. */}
+          <div className="mt-4 flex flex-wrap gap-2">
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search links..."
               aria-label="Search links"
-              className="field min-w-0 flex-1"
+              className="field min-w-0 flex-1 basis-full sm:basis-0"
             />
             <select
               value={sortOrder}
@@ -290,6 +298,20 @@ export default function LinkManager({
               <option value="oldest">Oldest first</option>
               <option value="title">Title (A–Z)</option>
             </select>
+            <div role="group" aria-label="View" className="flex rounded-full bg-hover p-1">
+              {VIEWS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setView(id)}
+                  aria-pressed={view === id}
+                  className={`rounded-full px-3 py-1 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                    view === id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {activeTag && (
@@ -319,8 +341,15 @@ export default function LinkManager({
           )}
 
           {visibleLinks.length > 0 && (
-            // grid-flow-dense lets later cards fill the gaps that wide (broken) cards leave.
-            <ul aria-label="Links" className="mt-4 grid grid-flow-dense grid-cols-1 gap-4 lg:grid-cols-2">
+            // Cards: a grid. List: one glass panel with a row per link.
+            <ul
+              aria-label="Links"
+              className={
+                view === "list"
+                  ? "glass mt-4 divide-y divide-line rounded-2xl"
+                  : "mt-4 grid grid-flow-dense grid-cols-1 gap-4 lg:grid-cols-2"
+              }
+            >
               {visibleLinks.map((link) => (
                 <LinkCard
                   key={link.id}
@@ -333,6 +362,7 @@ export default function LinkManager({
                   folders={folders}
                   onMove={moveLink}
                   onTagClick={toggleTag}
+                  compact={view === "list"}
                 />
               ))}
             </ul>

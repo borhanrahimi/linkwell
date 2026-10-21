@@ -1088,3 +1088,52 @@ describe("folder icons", () => {
     expect(screen.getByRole("button", { name: "Work" }).querySelector("svg")).toBeNull();
   });
 });
+
+
+describe("views", () => {
+  const links = [
+    { id: "1", url: "https://react.dev", title: "React", tags: ["react"], note: "Hooks", createdAt: "2020-01-01T00:00:00.000Z" },
+    { id: "2", url: "https://nextjs.org", title: "Next", createdAt: "2020-01-02T00:00:00.000Z", status: "broken" as const },
+  ];
+  const views = () => within(screen.getByRole("group", { name: "View" }));
+
+  test("starts with cards, and List shows one compact row per link", () => {
+    render(<LinkManager initialLinks={links} />);
+    expect(views().getByRole("button", { name: "Cards", pressed: true })).toBeDefined();
+    expect(screen.getByText("Hooks")).toBeDefined();
+
+    fireEvent.click(views().getByRole("button", { name: "List" }));
+
+    expect(views().getByRole("button", { name: "List", pressed: true })).toBeDefined();
+    expect(cardCount()).toBe(2);
+    // Rows keep the title, the badges, the tags and the actions, but not the note.
+    expect(cards().getByRole("link", { name: "React" })).toBeDefined();
+    expect(cards().getByText("Broken")).toBeDefined();
+    expect(cards().getByRole("button", { name: "#react" })).toBeDefined();
+    expect(cards().getAllByRole("button", { name: "Mark read" })).toHaveLength(2);
+    expect(screen.queryByText("Hooks")).toBeNull();
+  });
+
+  test("Edit works in a row too", async () => {
+    render(<LinkManager initialLinks={links} />);
+    fireEvent.click(views().getByRole("button", { name: "List" }));
+
+    fireEvent.click(cards().getAllByRole("button", { name: "Edit" })[0]);
+    fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "React docs" } });
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Save" }).at(-1)!);
+    });
+
+    expect(cards().getByRole("link", { name: "React docs" })).toBeDefined();
+  });
+
+  test("remembers the view on this device", () => {
+    const first = render(<LinkManager initialLinks={links} />);
+    fireEvent.click(views().getByRole("button", { name: "List" }));
+    first.unmount();
+
+    render(<LinkManager initialLinks={links} />);
+
+    expect(views().getByRole("button", { name: "List", pressed: true })).toBeDefined();
+  });
+});

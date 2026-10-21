@@ -154,7 +154,8 @@ Anything a client component imports becomes client code as well, so you don't ne
 | `components/FolderBar.tsx` | Client | The folders in the sidebar: one row each (icon or coloured dot, name, link count), selecting a folder (click again to leave it), and the "+ New folder" form with its own input and error state |
 | `components/FolderActions.tsx` | Client | For the selected folder: the icon picker ("Dot" plus 12 icons, labelled "Coffee icon", ...), the colour picker (8 circles), the rename form and Delete (asks `window.confirm` first). Pickers use `aria-pressed` on the current choice |
 | `components/LinkForm.tsx` | Client | The save box in the top bar: the link, Paste (where the browser can read the clipboard) and Save on one row; Title and Tags appear in a second row only while there's text in the link box. Holds input state, handles submit; only clears fields that still hold what was saved. The **Paste** button reads the clipboard (`navigator.clipboard.readText()`) and takes the link out with `findSharedUrl`; whether to show it comes from `useSyncExternalStore` (the server says `false`) |
-| `components/LinkCard.tsx` | Client | Holds edit-mode state (`isEditing`, and `draft` with the Edit form's title, tags and note as text), handles Edit/Save/Cancel and tag clicks. Shows the note under the URL (`whitespace-pre-line`, at most 3 lines) |
+| `components/LinkCard.tsx` | Client | One link, as a card (Cards view) or, with `compact`, a row (List view: title and badges, site, date and tags, and the actions; on phones the actions wrap under the title). Both share the same pieces (`Favicon`, `Badges`, tags, actions) and the same edit-mode state (`isEditing`, and `draft` with the Edit form's title, tags and note as text). Cards also show the note as a sticky note, the archive link and the folder menu |
+| `components/useLinkView.ts` | Client hook | `useLinkView()`: the chosen view (`"cards"` or `"list"`) and a setter, kept in `localStorage` (`linkwell:view`) and read with `useSyncExternalStore` (the server renders cards). Storage that's blocked falls back to cards |
 
 **Keep `"use client"` as low in the tree as possible.** The page fetches data on the server and hands it to one client component that handles everything interactive.
 
@@ -667,3 +668,6 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | Choosing a smart list leaves the folder, and the other way round; tags combine with either | Like mailboxes and labels: you look at one place at a time, then narrow it down |
 | 2026-10-20 | Two card columns next to the sidebar, not three | With the sidebar beside them, three columns cut titles down to a few words |
 | 2026-10-20 | The cards list is named "Links" (`aria-label`) | Screen readers can jump to it, and tests count cards in it instead of every list item on the page |
+| 2026-10-20 | List view is a `compact` mode of `LinkCard`, not a second component | Edit, Mark read, tags and badges behave the same in both views and live in one place |
+| 2026-10-20 | The chosen view is remembered per device (`localStorage`), not per account | A phone and a big screen often want different views; it needs no database column |
+| 2026-10-20 | List rows leave out the note, the folder menu and the archive link | A row is for scanning; the details panel (v1.9 step 4) shows everything about one link |

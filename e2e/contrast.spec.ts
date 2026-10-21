@@ -36,6 +36,10 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "Work", exact: true }).click();
       await page.getByRole("button", { name: "Rename folder" }).waitFor();
       results.push(...(await measureContrast(page)));
+      // And the List view, with its smaller rows.
+      await page.getByRole("button", { name: "All links", exact: true }).click();
+      await page.getByRole("button", { name: "List", exact: true }).click();
+      results.push(...(await measureContrast(page)));
       const tooLow = results.filter((result) => result.ratio < result.needed);
 
       expect(results.length).toBeGreaterThan(10);
