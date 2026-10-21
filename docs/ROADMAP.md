@@ -349,6 +349,9 @@ Not planned yet, but worth remembering:
 
 - AI summary and tag suggestions: when a link is saved, a short summary (two sentences) appears on its card, and Linkwell suggests tags and a folder you can accept or change. Could use Claude through the Anthropic API; it costs a little per link, so it may need a limit or an on/off switch. Builds on the page fetching that already reads titles
 - Keyboard shortcuts
+- A welcome screen (a launch screen), like the big chat and photo apps show while they open: the Linkwell logo mark in the middle of a plain page, and maybe the character waving in the doodle style, for a moment as the app starts. Two parts:
+  - When Linkwell is opened from the Home Screen: phones show a launch screen built from `app/manifest.ts` (`background_color`, `name`, the icons). Some phones need their own start-up images (`apple-touch-startup-image` links, one per screen size)
+  - Inside the app: a short fade-in of the logo the first time the links page loads, skipped for people who turn off animations (`prefers-reduced-motion`), and never slowing down people who open it many times a day
 - Docker: only if Linkwell ever moves off Vercel and Neon to a server we run ourselves. Not needed while Vercel runs the app and Neon runs the database
 - Fetch each page's description (and maybe a preview image) when it's saved
 - Optional: a weekly email digest of forgotten links (needs the deployed app, accounts, a schedule and an email service)
