@@ -196,6 +196,65 @@ Give Linkwell a personality of its own, while the app itself stays calm and mini
 
 **You'll learn:** working with SVG, a small illustration style guide (line weight, palette), adding columns for folder colour and icon, and keeping drawings readable in light and dark mode.
 
+
+## 🔜 v1.7: Safety before strangers 🔒
+
+Before the landing page invites strangers in, lock the doors. Already done: every Server Action checks who is asking, the link checker refuses private addresses (SSRF), the daily check needs a secret, and deleting an account needs a recent sign-in.
+
+**Check what's sent to the server** (gaps found in the code)
+- [ ] `saveLink` accepts any address and any length: allow only `http`/`https` links, and limit the URL, title and tags (like `cleanBookmark` already does for imports)
+- [ ] `importLinks` (the old localStorage import) has the same gap: add the same checks, or remove it, since browsers from before v0.5 have long been imported
+- [ ] Folder names get a length limit when created or renamed
+
+**Limits, so one person can't overload Linkwell**
+- [ ] Rate limits on the expensive actions: saving a link and "Check links" both visit other websites
+- [ ] A maximum number of links and folders per account (for example 10,000 links), to protect the free database plan
+
+**Browser protection**
+- [ ] Security headers in `next.config.ts`: a Content-Security-Policy (which scripts may run), no showing Linkwell inside other sites (clickjacking), no guessing file types, and a strict referrer policy
+
+**Housekeeping**
+- [ ] Fix what `npm audit` reports (5 known issues in development tools: vite, esbuild)
+- [ ] A `SECURITY.md` (how to report a problem), and a security checklist in ARCHITECTURE.md to go through for every new feature
+
+**You'll learn:** validating input on the server, rate limiting, security headers and CSP, and keeping dependencies safe.
+
+## v1.8: The landing page 🏠
+
+Signed-out visitors see only a small sign-in card today. Give them a real welcome.
+
+- [ ] A landing page: the promise in one line, three short sections for the three promises (save, keep alive, come back), each with a drawing of the Linkwell character, real screenshots, and a clear **Sign in with Google** button
+- [ ] "Save from anywhere" for newcomers: extension, iPhone, Android, bookmarklet
+- [ ] A short FAQ: Is it free? Where is my data? Can I take my links with me (export)? How is it different from Raindrop?
+- [ ] Privacy policy and terms pages (Google needs a privacy policy before sign-in can leave "testing" mode for everyone)
+- [ ] Sharing previews: page titles and descriptions, and an Open Graph image for when someone shares the link in a chat
+- [ ] New drawings of the Linkwell character for each section, in the same style
+
+**You'll learn:** marketing pages vs. app pages, metadata and Open Graph images, and writing for people who don't know Linkwell yet.
+
+## v1.9: Runs on its own 🌱
+
+Linkwell should keep running, safe and up to date, even when nobody works on it for a year, and be easy to pick up again.
+
+**Locked accounts** (the most important step: most small projects are broken into through a stolen password, not clever code)
+- [ ] Two-factor sign-in on GitHub, Vercel, Neon and Google Cloud
+- [ ] Protect the `main` branch on GitHub: changes go through a pull request whose tests passed
+
+**Automatic checks**
+- [ ] GitHub Actions: run `npm run check` (and the browser tests) on every pull request
+- [ ] Dependabot: weekly pull requests for package updates and security fixes, which the tests check before you merge
+- [ ] A health check (`/api/health`) and a free uptime monitor that emails you when the site is down
+- [ ] Error tracking (for example Sentry's free plan), so errors on the live site are reported instead of lost
+
+**Data that survives**
+- [ ] Backups: know how to restore the database (Neon's restore window), plus a regular export kept somewhere else
+- [ ] Keep secrets only in Vercel and `.env.local`, and write down which ones exist (never their values)
+
+**Coming back later**
+- [ ] A `MAINTENANCE.md`: where everything lives (GitHub, Vercel, Neon, Google Cloud), every secret's name and where to renew it, how to update Next.js and other packages safely, and how to run migrations
+
+**You'll learn:** CI/CD, dependency management, monitoring, backups, and writing for your future self.
+
 ---
 
 ## 🔭 Long-term vision: Linkwell goes social
@@ -220,7 +279,7 @@ Not planned yet, but worth remembering:
 
 **Growing Linkwell, in this order:**
 
-1. **A product page** for visitors who aren't signed in: what Linkwell does and why ("Actually come back to them"), screenshots, a help/FAQ section, and a download section (installable app, browser extension). Writing it means answering "why Linkwell and not Raindrop?" in one sentence
+1. **A product page** (now planned as v1.8): what Linkwell does and why, screenshots, help/FAQ and downloads. Writing it means answering "why Linkwell and not Raindrop?" in one sentence
 2. **Real users and their feedback:** find 10 to 20 people who keep using Linkwell every week, and learn what they miss
 3. **A better layout, like Raindrop,** shaped by that feedback: a sidebar with your folders, a choice of views (cards, a compact list, or big previews), and a details panel beside the list. Take the navigation ideas, but keep what's Linkwell's own (Rediscover, coming back to links) front and centre
 4. **Later, not now: a paid version (Linkwell Pro).** Only once people clearly use Linkwell and want more. A free plan with the basics, and Pro for features that cost money to run (AI summaries, archive copies, more storage), with a pricing page and payments (for example Stripe). Until then, build costly features with an on/off switch and a limit, so they're ready to become Pro
@@ -229,6 +288,7 @@ Not planned yet, but worth remembering:
 
 - AI summary and tag suggestions: when a link is saved, a short summary (two sentences) appears on its card, and Linkwell suggests tags and a folder you can accept or change. Could use Claude through the Anthropic API; it costs a little per link, so it may need a limit or an on/off switch. Builds on the page fetching that already reads titles
 - Keyboard shortcuts
+- Docker: only if Linkwell ever moves off Vercel and Neon to a server we run ourselves. Not needed while Vercel runs the app and Neon runs the database
 - Fetch each page's description (and maybe a preview image) when it's saved
 - Optional: a weekly email digest of forgotten links (needs the deployed app, accounts, a schedule and an email service)
 
