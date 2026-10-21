@@ -284,7 +284,7 @@ Drawings first:
 
 Then the layout:
 - [x] Rediscover as a slim banner above the list: still front and centre, but lighter. One forgotten link at a time (from up to ten), with "Show another" (a round arrow button on phones)
-- [ ] Phones: the sidebar becomes a menu button, the details panel a full-screen sheet
+- [x] Phones: the sidebar becomes a drawer behind a **Lists** button next to the list's heading (it slides over a dimmed page; Close, Esc, a tap outside or picking something closes it), and the details panel a full-screen sheet
 - [ ] Calmer cards: title, site name (not the full address), date and tags; Mark read and Details up front, the folder menu, Edit and Delete in the details panel
 - [ ] Read links fade a little; one button style instead of pills next to plain text buttons
 - [ ] The sidebar shows the 5 most used tags, with "Show all"; the list's heading says how many links it has ("6 links")

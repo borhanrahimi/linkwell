@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Header from "@/components/Header";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
@@ -96,6 +96,14 @@ export default function LinkManager({
   const detailsLink = links.find((link) => link.id === detailsId);
   // Stable, so the panel's Esc listener isn't re-added on every render.
   const closeDetails = useCallback(() => setDetailsId(null), []);
+  // Phones: whether the sidebar is open as a drawer. Closing it puts focus
+  // back on the Lists button that opened it.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    menuButton.current?.focus();
+  }, []);
   const visibleLinks = sortLinks(
     searchLinks(
       filterByTag(
@@ -127,28 +135,51 @@ export default function LinkManager({
   }
 
   // A smart list and a folder are one choice: picking one leaves the other.
+  // Picking something in the phone drawer also closes it, to show the list.
   function selectList(list: SmartList) {
     setActiveList(list);
     setActiveFolder(null);
+    if (menuOpen) closeMenu();
   }
 
   function selectFolder(folderId: string | null) {
     setActiveFolder(folderId);
     setActiveList("all");
+    if (menuOpen) closeMenu();
   }
 
   // Why the list is empty, in words (and a drawing) that match what was chosen.
   function emptyState() {
     const drawing = "mx-auto w-48";
-    if (query || activeTag) return { text: "No links match your search.", drawing: <Magnifier className={drawing} /> };
-    if (activeFolder) return { text: "No links in this folder yet.", drawing: <EmptyFolder className={drawing} /> };
-    if (activeList === "unread") return { text: "Nothing unread. You're all caught up.", drawing: <CaughtUp className={drawing} /> };
-    if (activeList === "broken") return { text: "No broken links. Every link still works.", drawing: <AllWell className={drawing} /> };
-    return { text: "No links match your search.", drawing: <Magnifier className={drawing} /> };
+    if (query || activeTag)
+      return {
+        text: "No links match your search.",
+        drawing: <Magnifier className={drawing} />,
+      };
+    if (activeFolder)
+      return {
+        text: "No links in this folder yet.",
+        drawing: <EmptyFolder className={drawing} />,
+      };
+    if (activeList === "unread")
+      return {
+        text: "Nothing unread. You're all caught up.",
+        drawing: <CaughtUp className={drawing} />,
+      };
+    if (activeList === "broken")
+      return {
+        text: "No broken links. Every link still works.",
+        drawing: <AllWell className={drawing} />,
+      };
+    return {
+      text: "No links match your search.",
+      drawing: <Magnifier className={drawing} />,
+    };
   }
 
   function toggleTag(tag: string) {
     setActiveTag((current) => (current === tag ? null : tag));
+    if (menuOpen) closeMenu();
   }
 
   async function deleteLink(id: string) {
@@ -260,6 +291,8 @@ export default function LinkManager({
           onSelectTag={toggleTag}
           onCreateFolder={addFolder}
           onChecked={setLinks}
+          open={menuOpen}
+          onClose={closeMenu}
         />
 
         <div className="min-w-0">
@@ -268,21 +301,46 @@ export default function LinkManager({
           )}
 
           {/* What the list is showing: a smart list, or a folder with its own controls. */}
-          <h2 className="flex items-center gap-2 text-xl font-semibold text-ink">
-            {selectedFolder &&
-              (selectedFolder.icon ? (
-                <FolderIconDrawing
-                  name={selectedFolder.icon}
-                  className={`size-5 ${FOLDER_TEXT_CLASS[selectedFolder.color ?? "gray"]}`}
-                />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className={`size-3 rounded-full ${FOLDER_DOT_CLASS[selectedFolder.color ?? "gray"]}`}
-                />
-              ))}
-            {selectedFolder ? selectedFolder.name : LIST_TITLES[activeList]}
-          </h2>
+          {/* On phones, the Lists button next to it opens the sidebar as a drawer. */}
+          <div className="flex items-center gap-2">
+            <h2 className="flex min-w-0 flex-1 items-center gap-2 text-xl font-semibold text-ink">
+              {selectedFolder &&
+                (selectedFolder.icon ? (
+                  <FolderIconDrawing
+                    name={selectedFolder.icon}
+                    className={`size-5 ${FOLDER_TEXT_CLASS[selectedFolder.color ?? "gray"]}`}
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className={`size-3 rounded-full ${FOLDER_DOT_CLASS[selectedFolder.color ?? "gray"]}`}
+                  />
+                ))}
+              <span className="truncate">
+                {selectedFolder ? selectedFolder.name : LIST_TITLES[activeList]}
+              </span>
+            </h2>
+            <button
+              ref={menuButton}
+              onClick={() => setMenuOpen(true)}
+              aria-expanded={menuOpen}
+              aria-controls="sidebar"
+              className="btn-secondary flex items-center gap-1.5 md:hidden"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                aria-hidden="true"
+                className="size-4"
+              >
+                <path d="M4 7h16M4 12h16M4 17h10" />
+              </svg>
+              Lists
+            </button>
+          </div>
           {selectedFolder && (
             <FolderActions
               key={selectedFolder.id}
@@ -314,14 +372,20 @@ export default function LinkManager({
               <option value="oldest">Oldest first</option>
               <option value="title">Title (A–Z)</option>
             </select>
-            <div role="group" aria-label="View" className="flex rounded-full bg-hover p-1">
+            <div
+              role="group"
+              aria-label="View"
+              className="flex rounded-full bg-hover p-1"
+            >
               {VIEWS.map(({ id, label }) => (
                 <button
                   key={id}
                   onClick={() => setView(id)}
                   aria-pressed={view === id}
                   className={`rounded-full px-3 py-1 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
-                    view === id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"
+                    view === id
+                      ? "bg-surface text-ink shadow-sm"
+                      : "text-muted hover:text-ink"
                   }`}
                 >
                   {label}

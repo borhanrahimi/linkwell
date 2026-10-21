@@ -614,6 +614,36 @@ describe("sidebar", () => {
     expect(shownTitles()).toEqual(["A"]);
   });
 
+  test("on phones, the Lists button opens it as a drawer, and picking a list closes it", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+    const menu = screen.getByRole("button", { name: "Lists" });
+    expect(menu.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(menu);
+    expect(menu.getAttribute("aria-expanded")).toBe("true");
+    // Focus moves into the drawer, onto its Close button.
+    expect(document.activeElement).toBe(sidebar().getByRole("button", { name: "Close" }));
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Unread" }));
+    expect(menu.getAttribute("aria-expanded")).toBe("false");
+    expect(shownTitles()).toEqual(["A", "C"]);
+    // And back to the button that opened it.
+    expect(document.activeElement).toBe(menu);
+  });
+
+  test("the drawer closes with its Close button or Esc", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+    const menu = screen.getByRole("button", { name: "Lists" });
+
+    fireEvent.click(menu);
+    fireEvent.click(sidebar().getByRole("button", { name: "Close" }));
+    expect(menu.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(menu);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(menu.getAttribute("aria-expanded")).toBe("false");
+  });
+
   test("says so when there's nothing unread", () => {
     render(<LinkManager initialLinks={[links[1]]} />);
 

@@ -345,3 +345,32 @@ test("pages carry a title, a description and a sharing preview picture", async (
   await page.goto("/privacy");
   await expect(page).toHaveTitle("Privacy · Linkwell");
 });
+
+test("on a phone, the lists open in a drawer and close once one is picked", async ({ page, signIn }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn();
+  await page.goto("/");
+  await saveLink(page, "https://example.com/phone-one", "Phone one");
+  await saveLink(page, "https://example.com/phone-two", "Phone two");
+  // The newest link comes first: "Phone two" is the one marked as read.
+  await expect(page.getByRole("link", { name: "Phone two" })).toBeVisible();
+  await page.getByRole("button", { name: "Mark read" }).first().click();
+  await expect(page.getByRole("button", { name: "Mark unread" })).toBeVisible();
+  const lists = page.getByRole("navigation", { name: "Your lists" });
+
+  // The links come first; the sidebar waits behind the Lists button.
+  await expect(lists).toBeHidden();
+  await page.getByRole("button", { name: "Lists", exact: true }).click();
+  await expect(lists).toBeVisible();
+
+  await lists.getByRole("button", { name: "Unread" }).click();
+  await expect(lists).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Phone two" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Phone one" })).toBeVisible();
+
+  // Esc closes it too.
+  await page.getByRole("button", { name: "Lists", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(lists).toBeHidden();
+});
