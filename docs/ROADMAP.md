@@ -26,6 +26,12 @@ Where we stopped: v2.0 "Runs on its own" is mostly done (checks, Dependabot, `ma
 - [ ] Error tracking: decide together (suggestion: mark it "later": it sends data to an outside service and needs privacy-page changes)
 - [ ] The two big upgrades Dependabot found and the checks stopped: ESLint 10 and TypeScript 7 (pull requests #7 and #8 were closed; they need code changes)
 
+**For the portfolio** (so a reviewer can actually see what Linkwell is):
+- [ ] Let anyone try it. Google sign-in in "testing" mode only lets in accounts you added, so a recruiter hits a wall. Either publish the OAuth consent screen (needs the `/privacy` and `/terms` addresses, below), or add a **demo mode** with sample links that needs no account (or both)
+- [ ] A portfolio-first README: one line on what Linkwell is, the live link, a screenshot, 4–5 highlights (tested accessibility, security, CI and monitoring, its own illustrations), the tech stack, then the details. The long version-by-version paragraph moves down or into the roadmap
+- [ ] A one-page case study (`docs/CASE_STUDY.md`): the problem, the key decisions (from the decision log), what was hard, what was learned, and how AI help was used. Also your study guide for interviews: be able to explain the private-address protection, the Content-Security-Policy, rate limits, address-based filters and the CI setup
+- [ ] Optional: a 30–60 second screen recording (save a link, Rediscover, a broken link with its archived copy)
+
 **Smaller open questions:**
 - [ ] Add the `/privacy` and `/terms` addresses in Google Cloud's OAuth consent screen (needed before sign-in leaves "testing" mode)
 - [ ] Turn on GitHub's private vulnerability reporting (Settings → Code security)
