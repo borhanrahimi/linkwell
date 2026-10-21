@@ -31,6 +31,9 @@
   --color-folder-gray: var(--folder-gray);
   --color-paper: var(--paper); /* sticky notes */
   --color-tape: var(--tape); /* the tape holding them */
+  /* The drawings' grey marker shading: light, and darker for the T-shirt */
+  --color-marker: var(--marker);
+  --color-marker-strong: var(--marker-strong);
 }
 
 :root {
@@ -40,6 +43,8 @@
   --canvas: #f5f5f7;
   --surface: #ffffff;
   --ink: #0f172a;
+  --marker: #dcdce0;
+  --marker-strong: #8e8e96;
   --muted: #475569;
   --line: rgb(0 0 0 / 0.1);
   --hover: rgb(0 0 0 / 0.05);
@@ -74,6 +79,8 @@
     --canvas: #000000;
     --surface: #1c1c1e;
     --ink: #f5f5f7;
+    --marker: #3a3a40;
+    --marker-strong: #6e6e78;
     --muted: #a1a1a6;
     --line: rgb(255 255 255 / 0.15);
     --hover: rgb(255 255 255 / 0.08);

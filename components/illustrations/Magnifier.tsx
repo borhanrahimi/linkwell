@@ -1,28 +1,27 @@
-import { Arm, Drawing, Fist, Head, Tee } from "@/components/illustrations/Character";
+import { Bubble, Drawing, Hand, Head, Legs, Limb, Tee } from "@/components/illustrations/Character";
 
-// No search results: the Linkwell character searches with a magnifying glass,
-// one eye huge behind the lens, and finds only question marks.
+// No search results: the Linkwell character peers through a big magnifying
+// glass, one hand on the hip, and wonders "?".
 export default function Magnifier({ className = "" }: { className?: string }) {
   return (
     <Drawing className={className}>
-      {/* question marks */}
-      <path d="M116 30c0-3.4 2.6-5.6 5.6-5.6s5.4 2.2 5.4 5c0 3.4-4 4-5 7.2" />
-      <path d="M122 43h.01" strokeWidth={3} />
-      <path d="M136 50c0-2.4 1.8-4 4-4s3.8 1.6 3.8 3.6c0 2.4-2.8 2.8-3.6 5" strokeWidth={1.8} />
-      <path d="M140.2 59.6h.01" strokeWidth={2.6} />
+      <Legs x={62} y={40} spread={4} />
+      <Tee x={62} y={40} />
+      <Head x={64} y={27} tilt={8} />
 
-      {/* the arm, from behind the shoulder up to the handle */}
-      <Arm d="M90 108l14-18-8-16" />
-      <Tee x={64} y={50} />
-      <Head x={64} y={50} />
+      {/* one hand on the hip, the other holding the glass out */}
+      <Limb d="M46.4 49.6l-6 10 8 6M77.6 49.6l12 8 8-6" />
+      <Hand x={48} y={65.6} />
 
-      {/* the magnifying glass: a big eye behind the lens, a thick ring, a black handle */}
-      <path d="M86.4 62.4l10 11.6" strokeWidth={6} />
-      <circle cx={72} cy={50} r={13} strokeWidth={3.6} className="fill-surface" />
-      <circle cx={72} cy={50.6} r={4.6} stroke="none" className="fill-ink" />
-      <circle cx={73.8} cy={48.8} r={1.4} stroke="none" className="fill-surface" />
-      <path d="M64.4 44c1.2-2.2 3.2-3.6 5.6-4" strokeWidth={1.6} />
-      <Fist x={96.6} y={75} />
+      {/* the magnifying glass: a handle and a big round lens */}
+      <path d="M98 51.6l7.6-8" strokeWidth={4} />
+      <circle cx={113} cy={35.6} r={11} className="fill-surface" strokeWidth={2.2} />
+      <path d="M106 30c1.4-2.4 3.6-3.6 6-3.8" strokeWidth={1.2} />
+      <Hand x={98.4} y={51.6} />
+
+      <Bubble x={32} y={16} w={22} h={18} tailX={50} tailY={22}>
+        <path d="M-2.6-3.6c0-2 1.4-3 2.8-3s2.8 1 2.8 2.6c0 2.2-2.8 2.4-2.8 4.8M.2 4.4h.01" strokeWidth={1.6} />
+      </Bubble>
     </Drawing>
   );
 }

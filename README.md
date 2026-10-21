@@ -161,7 +161,7 @@ linkwell/
 │   ├── manifest.ts   # Web app manifest: makes Linkwell installable, and puts it in Android's Share menu
 │   ├── actions.ts    # Server Actions: save, delete, edit, import and check links; manage folders
 │   └── api/          # auth/ (Better Auth sign-in and sign-out), cron/ (daily link check), export/ (bookmarks download)
-├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton, Sidebar, Rediscover, FolderBar, FolderActions, SignInButton, SignOutButton, Header, Avatar, UsernameForm, DeleteAccount, ShareForm, Bookmarklet, ImportBookmarks, FolderIcon); illustrations/ holds the drawings (Stargazer)
+├── components/       # UI components (LinkManager, LinkForm, LinkCard, ImportBanner, CheckLinksButton, Sidebar, Rediscover, FolderBar, FolderActions, SignInButton, SignOutButton, Header, Avatar, UsernameForm, DeleteAccount, ShareForm, Bookmarklet, ImportBookmarks, FolderIcon, LogoMark); illustrations/ holds the drawings (the character's parts in Character.tsx, and scenes like Stargazer, CaughtUp, AllWell, EmptyFolder)
 ├── lib/
 │   ├── auth.ts       # Better Auth setup: Google sign-in, sessions in Postgres (server-only)
 │   ├── auth-client.ts # Better Auth for the browser (sign in, sign out)

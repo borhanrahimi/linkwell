@@ -621,6 +621,14 @@ describe("sidebar", () => {
 
     expect(screen.getByText("Nothing unread. You're all caught up.")).toBeDefined();
   });
+
+  test("says so when no link is broken", () => {
+    render(<LinkManager initialLinks={[links[1]]} />);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Broken" }));
+
+    expect(screen.getByText("No broken links. Every link still works.")).toBeDefined();
+  });
 });
 
 describe("checking links", () => {

@@ -188,10 +188,10 @@ Give Linkwell a personality of its own, while the app itself stays calm and mini
 - [x] Account deleted (v1.2): waving goodbye while a paper plane flies off
 
 **Illustration style guide** (so every drawing looks like it belongs to the same app):
-- Our own drawings, written as SVG in `components/illustrations/` (one component per drawing) and `components/FolderIcon.tsx`. The character's parts (`Head`, `Tee`, `Arm`, `Fist`, `Palm`) and shared bits (`Sparkle`, `Bookmark`, the `Drawing` frame) live in `components/illustrations/Character.tsx`, so every scene shows the same person
-- Ink lines in `currentColor` (`text-ink`), round ends and joins. About 1.8 units wide on a 160×120 drawing, 1.8 on a 24×24 icon
-- **Illustrations are black and white only** (for now): ink lines, solid ink shapes (`fill-ink`, like hair or trousers) and white fills (`fill-surface`) where shapes overlap. Both swap in dark mode without extra code. Small UI doodles (folder icons, the snapped chain) may use the colour of what they sit on
-- Characters are minimal line-art people, often half-body portraits: bold even outlines, solid black hair, faces with personality (dot eyes, a raised eyebrow, a small hooked nose, freckles, glasses or a moustache), and patterned clothes (polka dots, stripes)
+- Our own drawings, written as SVG in `components/illustrations/` (one component per drawing) and `components/FolderIcon.tsx`. The character's parts (`Head`, `Tee`, `Legs`, `Limb`, `Hand`, `Shoe`) and shared bits (`Shaded`, `Shadow`, `Bubble`, `Sparkle`, `Bookmark`, `Heart`, `ChainLink`, the `Drawing` frame) live in `components/illustrations/Character.tsx`, so every scene shows the same person
+- **Since v1.9: loose pen doodles, like sketches in a notebook.** Full-body people doing something, with stick arms and legs, round mitten hands, little black shoes and a soft grey shadow under the feet. Speech bubbles for what they say or think ("Hi!", "?", a tick)
+- Thin ink lines in `currentColor` (`text-ink`, about 1.7 units on a 160×120 drawing), round ends and joins, with a little hand wobble: the `Drawing` frame runs every line through an SVG filter (`feTurbulence` + `feDisplacementMap`), so straight lines look drawn by hand
+- **Black, white and grey marker only**: ink lines, `fill-surface` (the paper) where shapes overlap, and two marker greys (`fill-marker`, `fill-marker-strong` for the dark T-shirt). `Shaded` puts the grey slightly off the outline, like a quick marker stroke. All swap in dark mode, where it looks like chalk on a blackboard. Small UI doodles (folder icons, the snapped chain) may use the colour of what they sit on
 - Decoration only: `aria-hidden="true"`, and the words around it still say everything. Hidden on phones when it would squeeze the text
 
 **You'll learn:** working with SVG, a small illustration style guide (line weight, palette), adding columns for folder colour and icon, and keeping drawings readable in light and dark mode.
@@ -271,9 +271,23 @@ As the list of links grows, the dashboard tiles get in the way: you scroll past 
 **Step 4: the details panel**
 - [x] **Details** on any card or row opens everything about the link beside the list (full address, note, saved, read and last-checked dates, folder, tags, archive link) with Mark read, Edit and Delete. A third column on wide screens, a full-screen sheet on smaller ones; Close or Esc closes it, and focus moves into it when it opens
 
-**Step 5: Rediscover, phones and polish**
-- [ ] Rediscover as a slim banner above the list: still front and centre, but lighter
+**Step 5: drawings, Rediscover, phones and polish**
+
+Drawings first:
+- [x] A logo mark: Linkwell's chain link in ink line art before the name, in the top bar and on the privacy and terms pages (`LogoMark`)
+- [x] Each empty list gets its own drawing: nothing unread, the character with a cup of tea next to a big tick (`CaughtUp`); no broken links, a thumbs-up next to a healthy chain link (`AllWell`); an empty folder, the character holding a folder open as a moth flutters out (`EmptyFolder`). Search with no results keeps the magnifying glass
+- [x] A shared `ChainLink` part in `Character.tsx` (the app icon's loops), used by the doctor, the thumbs-up scene and the logo
+- [x] **Every drawing redrawn as loose pen doodles** (after a page of notebook sketches): full-body, stick arms and legs, grey marker shading, a shadow under the feet, speech bubbles. Waving with "Hi!" / "Bye!", holding an empty box, a magnifying glass and "?", a telescope on a tripod for Rediscover, a doctor's coat, sitting at a café table with tea, a thumbs-up, an empty folder
+- [x] The logo mark on the landing page's top bar too
+- [ ] The sharing preview picture (`app/opengraph-image.png`) still shows the old character: redraw it in the new style
+- [ ] A Rediscover drawing that fits the slim banner below
+
+Then the layout:
+- [ ] Rediscover as a slim banner above the list: still front and centre, but lighter. One forgotten link at a time, with "Show another"
 - [ ] Phones: the sidebar becomes a menu button, the details panel a full-screen sheet
+- [ ] Calmer cards: title, site name (not the full address), date and tags; Mark read and Details up front, the folder menu, Edit and Delete in the details panel
+- [ ] Read links fade a little; one button style instead of pills next to plain text buttons
+- [ ] The sidebar shows the 5 most used tags, with "Show all"; the list's heading says how many links it has ("6 links")
 - [ ] The selected list, folder, tag and view live in the address (`/?folder=…&view=list`), so the back button works and lists can be bookmarked
 - [ ] The contrast and browser tests cover the new layout in light and dark mode
 

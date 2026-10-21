@@ -7,7 +7,10 @@ import LinkCard from "@/components/LinkCard";
 import LinkDetails from "@/components/LinkDetails";
 import ImportBanner from "@/components/ImportBanner";
 import Rediscover from "@/components/Rediscover";
+import AllWell from "@/components/illustrations/AllWell";
+import CaughtUp from "@/components/illustrations/CaughtUp";
 import EmptyBox from "@/components/illustrations/EmptyBox";
+import EmptyFolder from "@/components/illustrations/EmptyFolder";
 import Magnifier from "@/components/illustrations/Magnifier";
 import Sidebar from "@/components/Sidebar";
 import { useLinkView, type LinkView } from "@/components/useLinkView";
@@ -133,13 +136,14 @@ export default function LinkManager({
     setActiveList("all");
   }
 
-  // Why the list is empty, in words that match what was chosen.
-  function emptyMessage() {
-    if (query || activeTag) return "No links match your search.";
-    if (activeFolder) return "No links in this folder yet.";
-    if (activeList === "unread") return "Nothing unread. You're all caught up.";
-    if (activeList === "broken") return "No broken links.";
-    return "No links match your search.";
+  // Why the list is empty, in words (and a drawing) that match what was chosen.
+  function emptyState() {
+    const drawing = "mx-auto w-48";
+    if (query || activeTag) return { text: "No links match your search.", drawing: <Magnifier className={drawing} /> };
+    if (activeFolder) return { text: "No links in this folder yet.", drawing: <EmptyFolder className={drawing} /> };
+    if (activeList === "unread") return { text: "Nothing unread. You're all caught up.", drawing: <CaughtUp className={drawing} /> };
+    if (activeList === "broken") return { text: "No broken links. Every link still works.", drawing: <AllWell className={drawing} /> };
+    return { text: "No links match your search.", drawing: <Magnifier className={drawing} /> };
   }
 
   function toggleTag(tag: string) {
@@ -346,8 +350,8 @@ export default function LinkManager({
           )}
           {links.length > 0 && visibleLinks.length === 0 && (
             <div className="mt-6 text-center">
-              <Magnifier className="mx-auto w-48" />
-              <p className="mt-2 text-muted">{emptyMessage()}</p>
+              {emptyState().drawing}
+              <p className="mt-2 text-muted">{emptyState().text}</p>
             </div>
           )}
 

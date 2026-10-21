@@ -1,28 +1,33 @@
-import { Arm, Bookmark, Drawing, Fist, Head, Sparkle, Tee } from "@/components/illustrations/Character";
+import { Bookmark, Drawing, Hand, Head, Legs, Limb, Shaded, Shadow, Sparkle, Tee } from "@/components/illustrations/Character";
 
-// Rediscover: the Linkwell character peers through a spyglass at a bookmark
-// shining among the stars: an old link, found again.
+// Rediscover: the Linkwell character bends to a telescope on a tripod and
+// finds a bookmark shining among the stars: an old link, found again.
 export default function Stargazer({ className = "" }: { className?: string }) {
   return (
     <Drawing className={className}>
-      {/* what they see */}
-      <Bookmark x={147} y={16} turn={10} />
-      <path d="M147 4.2V2M157.4 11.4l2-1.2M136.8 11.8l-2-1.4" />
-      <Sparkle x={152} y={40} size={0.8} />
-      <Sparkle x={132} y={44} size={0.55} />
-      <path d="M146 58h.01M108 6h.01M128 2h.01" strokeWidth={3} />
+      {/* what they see: the bookmark with its shine, twinkles and stars */}
+      <Bookmark x={140} y={16} turn={12} />
+      <path d="M140 4V1.6M150 9.6l2.2-1.2M130.4 8.4l-2.2-1.2M150.4 22l2 1" strokeWidth={1.4} />
+      <Sparkle x={124} y={36} size={0.6} />
+      <Sparkle x={152} y={44} size={0.45} />
+      <path d="M112 6h.01M100 18h.01M146 60h.01" strokeWidth={2.6} />
 
-      {/* the arm, from behind the shoulder up to the spyglass */}
-      <Arm d="M84 104l22-32-12-30" />
-      <Tee x={62} y={51} />
-      <Head x={62} y={51} />
+      {/* the tripod and the telescope */}
+      <Shadow x={88} y={99} width={34} />
+      <g transform="translate(-2 5)">
+      <path d="M84 29L72 98M84 29l2 69M84 29l17 69" strokeWidth={1.6} />
+      <Shaded d="M70.6 30.6l36-16-3.2-7.2-36 16Z" />
+      <Shaded strong d="M107.2 15.9l3.6-1.6-3.6-9.8-3.6 1.6Z" />
+      <Shaded strong d="M69.8 28.8l-5 2.2-1.6-3.6 5-2.2Z" />
+      </g>
 
-      {/* the spyglass, pressed to the glasses: three sections and a dark front ring */}
-      <path d="M103 35.66l-7.5-11.82 24.74-15.75 7.52 11.82Z" className="fill-surface" />
-      <path d="M114.74 11.59l5.5-3.5 7.52 11.82-5.5 3.5Z" className="fill-ink" />
-      <path d="M84 45.86l-5.8-9.12 18.15-11.55 5.8 9.12Z" className="fill-surface" />
-      <path d="M71.15 52.38l-4.3-6.76 12.1-7.7 4.3 6.76Z" className="fill-surface" />
-      <Fist x={93.2} y={39.8} />
+      {/* the stargazer, bent to the eyepiece, one hand steadying the tube */}
+      <Legs x={52} y={44} />
+      <Tee x={52} y={44} />
+      <Limb d="M36.4 53.6l-3 17M67.6 53.6l8-4 2-18" />
+      <Hand x={33.4} y={70.6} />
+      <Head x={56} y={30} tilt={10} />
+      <Hand x={77.6} y={31} />
     </Drawing>
   );
 }

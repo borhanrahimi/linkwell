@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import SignOutButton from "@/components/SignOutButton";
+import LogoMark from "@/components/LogoMark";
 
 type HeaderProps = {
   user: { name: string; image?: string | null; username?: string | null };
@@ -19,7 +20,8 @@ export default function Header({ user, children }: HeaderProps) {
         children ? "rounded-[1.75rem]" : "rounded-full"
       }`}
     >
-      <Link href="/" className="shrink-0 text-lg font-semibold tracking-tight text-ink">
+      <Link href="/" className="flex shrink-0 items-center gap-1.5 text-lg font-semibold tracking-tight text-ink">
+        <LogoMark className="size-5" />
         Linkwell
       </Link>
       {children && (

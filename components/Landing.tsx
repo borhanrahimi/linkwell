@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import NextLink from "next/link";
 import Footer from "@/components/Footer";
+import LogoMark from "@/components/LogoMark";
 import SignInButton from "@/components/SignInButton";
 import EmptyBox from "@/components/illustrations/EmptyBox";
 import LinkDoctor from "@/components/illustrations/LinkDoctor";
@@ -67,7 +68,10 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
     <main className="min-h-screen px-4 pb-16 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <nav className="flex items-center justify-between py-5">
-          <span className="text-lg font-semibold text-ink">Linkwell</span>
+          <span className="flex items-center gap-1.5 text-lg font-semibold text-ink">
+            <LogoMark className="size-5" />
+            Linkwell
+          </span>
           <SignInButton label="Sign in" className="btn-secondary" />
         </nav>
 

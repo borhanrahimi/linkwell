@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import NextLink from "next/link";
 import Footer from "@/components/Footer";
 import { SITE } from "@/lib/site";
+import LogoMark from "@/components/LogoMark";
 
 // The frame for the privacy policy and the terms: a way back home, the title,
 // when it last changed, and readable text.
@@ -10,7 +11,8 @@ export default function LegalPage({ title, children }: { title: string; children
     <main className="min-h-screen px-4 pb-16 sm:px-8">
       <div className="mx-auto max-w-2xl">
         <nav className="py-5">
-          <NextLink href="/" className="text-lg font-semibold text-ink">
+          <NextLink href="/" className="inline-flex items-center gap-1.5 text-lg font-semibold text-ink">
+            <LogoMark className="size-5" />
             Linkwell
           </NextLink>
         </nav>
