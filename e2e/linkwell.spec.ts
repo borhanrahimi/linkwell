@@ -279,3 +279,33 @@ test("checking links is rate limited: the sixth check in an hour is refused", as
 
   await expect(page.getByText("You're going a bit fast. Please wait a moment and try again.")).toBeVisible();
 });
+
+test("every page sends security headers, and nothing on it is blocked by them", async ({ page, signIn }) => {
+  // Collect every Content-Security-Policy violation the browser reports.
+  await page.addInitScript(() => {
+    (window as unknown as { cspViolations: string[] }).cspViolations = [];
+    document.addEventListener("securitypolicyviolation", (event) => {
+      (window as unknown as { cspViolations: string[] }).cspViolations.push(`${event.violatedDirective} ${event.blockedURI}`);
+    });
+  });
+  const violations = () => page.evaluate(() => (window as unknown as { cspViolations: string[] }).cspViolations);
+
+  const response = await page.goto("/");
+  const headers = response!.headers();
+  expect(headers["content-security-policy"]).toMatch(/script-src 'self' 'nonce-/);
+  expect(headers["x-frame-options"]).toBe("DENY");
+  expect(headers["x-content-type-options"]).toBe("nosniff");
+  expect(await violations()).toEqual([]);
+
+  await signIn();
+  for (const path of ["/", "/account", "/share?url=https%3A%2F%2Fexample.com%2F"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    expect(await violations(), path).toEqual([]);
+  }
+  // The page still works: React's scripts ran (the save form responds).
+  await page.goto("/");
+  await saveLink(page, "https://example.com/csp", "Scripts still run");
+  await expect(page.getByRole("link", { name: "Scripts still run" })).toBeVisible();
+  expect(await violations()).toEqual([]);
+});

@@ -4,7 +4,9 @@ import { measureContrast } from "./contrast";
 // Run the same check with the system set to light and to dark mode.
 for (const colorScheme of ["light", "dark"] as const) {
   test.describe(`${colorScheme} mode`, () => {
-    test.use({ colorScheme });
+    // measureContrast injects a <style> tag to hide text while measuring; the
+    // Content-Security-Policy rightly blocks that, so this test bypasses it.
+    test.use({ colorScheme, bypassCSP: true });
 
     test("every text is readable (WCAG AA contrast)", async ({
       page,

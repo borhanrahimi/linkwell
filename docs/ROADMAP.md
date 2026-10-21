@@ -211,7 +211,7 @@ Before the landing page invites strangers in, lock the doors. Already done: ever
 - [x] At most 10,000 links and 200 folders per account. Imports stop at the limit (the rest count as skipped); past the folder limit, imported links come in without a folder
 
 **Browser protection**
-- [ ] Security headers in `next.config.ts`: a Content-Security-Policy (which scripts may run), no showing Linkwell inside other sites (clickjacking), no guessing file types, and a strict referrer policy
+- [x] Security headers: a Content-Security-Policy with a fresh nonce for every page (`proxy.ts`, `lib/csp.ts`), so only Linkwell's own scripts run; plus, on every response (`next.config.ts`): no showing Linkwell inside other sites, no guessing file types, a strict referrer policy, HTTPS only, and no camera, microphone or location
 
 **Housekeeping**
 - [ ] Fix what `npm audit` reports (5 known issues in development tools: vite, esbuild)

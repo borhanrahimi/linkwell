@@ -19,7 +19,7 @@ Linkwell follows the "store project files outside of `app`" layout from the Next
 | `public/` | Files served as they are (`public/icon-192.png` → `/icon-192.png`) | The installable app's icons. Favicons and the iPhone icon stay in `app/` (`icon.svg`, `apple-icon.png`) |
 | `extension/` | The Chrome extension: `manifest.json`, `background.js`, `icons/` | Plain JavaScript, not part of the Next.js app. It only opens `/share`; it never saves anything itself |
 
-Root config files: `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `CRON_SECRET`, never committed), and `vercel.json` (the daily cron schedule).
+Root files: `proxy.ts` (runs before every page: makes a nonce and sends the Content-Security-Policy, see `lib/csp.ts`), `next.config.ts` (security headers for every response), `drizzle.config.ts` (tells `drizzle-kit` where the schema and migrations are) and `.env.local` (your `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `CRON_SECRET`, never committed), and `vercel.json` (the daily cron schedule).
 
 ## 2. Layers
 
@@ -414,6 +414,7 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - Find elements the same way as in Vitest tests: by role, label or placeholder. Type a title when saving a link, so the server doesn't fetch the page.
 - When you add a migration, apply it to the test branch too: `DATABASE_URL="$(grep '^E2E_DATABASE_URL=' .env.local | cut -d= -f2-)" npx drizzle-kit migrate`.
 - **New tabs:** the bookmarklet test runs the link's real code in the page and waits for the new tab with `page.waitForEvent("popup")`.
+- **Security headers:** one test collects every `securitypolicyviolation` event while it visits each page signed out and signed in, and fails on any blocked script, style or image. If a new feature loads something from another site, that test says so, and `lib/csp.ts` needs the new address.
 - Vitest skips `e2e/` (`exclude` in `vitest.config.mts`), so `npm run check` stays fast and doesn't need the test database.
 
 ## 8. Decision log
@@ -600,3 +601,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | Every call counts toward a rate limit, even ones that fail | Otherwise someone could send endless invalid requests for free |
 | 2026-10-20 | At most 10,000 links and 200 folders per account (`MAX_LINKS`, `MAX_FOLDERS`) | Far more than a person needs, small enough that one account can't fill the free database plan |
 | 2026-10-20 | Limit messages come back as text (`TOO_FAST`, `TOO_MANY_LINKS`, ...) instead of thrown errors | In production, Next.js hides a thrown error's message from the browser; a returned message can be shown as it is |
+| 2026-10-20 | A Content-Security-Policy with a nonce, set in `proxy.ts`, instead of a fixed policy with `'unsafe-inline'` in `next.config.ts` | With `'unsafe-inline'` any injected `<script>` would still run; a fresh nonce per page means only Next.js's own scripts run. The cost (every page rendered per request) is free here: Linkwell's pages already are, because they read the session |
+| 2026-10-20 | `style-src-attr 'unsafe-inline'`, while `<style>` tags need the nonce | `Avatar` and `next/image` set `style=""` attributes, which a nonce can't cover; injected style attributes can't run code |
+| 2026-10-20 | In development, styles use `'unsafe-inline'` instead of the nonce, and scripts may `eval` | The dev server injects CSS without a nonce, and React's dev error stacks use `eval`; production keeps the strict policy |
+| 2026-10-20 | `img-src` allows Google's favicon service (`www.google.com`, `*.gstatic.com`) and profile pictures (`*.googleusercontent.com`) | Those are the only outside images; everything else must come from Linkwell itself |
+| 2026-10-20 | No `upgrade-insecure-requests` | The browser tests run on `http://localhost`, where it would break every request; on the live site, HTTPS is already enforced by `Strict-Transport-Security` and Vercel |
+| 2026-10-20 | The contrast test uses Playwright's `bypassCSP` | It injects a `<style>` tag to hide text while measuring, which the policy (rightly) blocks; a separate test checks that real pages cause no violations |
