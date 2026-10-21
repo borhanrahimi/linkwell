@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { countAction, deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
+import { MAX_FOLDERS, MAX_LINKS, TOO_FAST, TOO_MANY_FOLDERS, TOO_MANY_LINKS } from "@/lib/limits";
 
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
   insertLink: vi.fn(async () => {}),
   insertLinks: vi.fn(async () => {}),
+  // Rate limits: the first use in every window, unless a test says otherwise.
+  countAction: vi.fn(async () => 1),
   deleteLinkById: vi.fn(async () => {}),
   updateLinkDetails: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
@@ -437,5 +440,68 @@ describe("setFolderIcon", () => {
     await setFolderIcon("f1", "<script>" as never);
 
     expect(updateFolderIcon).not.toHaveBeenCalled();
+  });
+});
+
+describe("rate limits", () => {
+  test("saveLink counts each save, and refuses when there were too many this minute", async () => {
+    await saveLink(link);
+    expect(countAction).toHaveBeenCalledWith("u1", "saveLink", expect.any(Date));
+
+    vi.mocked(countAction).mockResolvedValueOnce(31);
+    expect(await saveLink({ ...link, url: "https://example.com/new" })).toBe(TOO_FAST);
+    expect(fetchTitle).not.toHaveBeenCalledWith("https://example.com/new");
+  });
+
+  test("checkAllLinks refuses a sixth check in the same hour, without visiting any link", async () => {
+    vi.mocked(countAction).mockResolvedValueOnce(6);
+
+    expect(await checkAllLinks()).toBe(TOO_FAST);
+    expect(checkLink).not.toHaveBeenCalled();
+  });
+
+  test("importBookmarks says when there were too many batches this hour", async () => {
+    vi.mocked(countAction).mockResolvedValueOnce(101);
+
+    expect(await importBookmarks([{ url: "https://example.com/a", tags: [] }])).toBe(TOO_FAST);
+    expect(insertLinks).not.toHaveBeenCalled();
+  });
+});
+
+describe("account limits", () => {
+  const full = Array.from({ length: MAX_LINKS }, (_, i) => ({ ...link, id: String(i), url: `https://example.com/${i}` }));
+
+  test("saveLink refuses a new link when the account is full", async () => {
+    vi.mocked(getLinks).mockResolvedValueOnce(full);
+
+    expect(await saveLink({ ...link, url: "https://example.com/one-more" })).toBe(TOO_MANY_LINKS);
+    expect(insertLink).not.toHaveBeenCalled();
+  });
+
+  test("importBookmarks stops at the link limit and counts the rest as skipped", async () => {
+    vi.mocked(getLinks).mockResolvedValueOnce(full.slice(1));
+
+    const result = await importBookmarks([
+      { url: "https://example.com/x", tags: [] },
+      { url: "https://example.com/y", tags: [] },
+    ]);
+
+    expect(result).toEqual({ added: 1, skipped: 1 });
+  });
+
+  test("createFolder refuses a folder past the limit", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce(Array.from({ length: MAX_FOLDERS }, (_, i) => ({ id: `f${i}`, name: `F${i}` })));
+
+    expect(await createFolder("One more")).toBe(TOO_MANY_FOLDERS);
+    expect(insertFolder).not.toHaveBeenCalled();
+  });
+
+  test("importBookmarks keeps links but makes no new folders past the folder limit", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce(Array.from({ length: MAX_FOLDERS }, (_, i) => ({ id: `f${i}`, name: `F${i}` })));
+
+    await importBookmarks([{ url: "https://example.com/z", tags: [], folder: "New one" }]);
+
+    expect(insertFolder).not.toHaveBeenCalled();
+    expect(vi.mocked(insertLinks).mock.calls[0][1][0].folderId).toBeUndefined();
   });
 });

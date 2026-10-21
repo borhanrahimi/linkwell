@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 export const folders = pgTable("folders", {
@@ -38,3 +38,19 @@ export const links = pgTable("links", {
 export type LinkRow = typeof links.$inferSelect;
 export type FolderRow = typeof folders.$inferSelect;
 export * from "./auth-schema";
+
+// Rate limits (lib/limits.ts): how often each user used each limited action in
+// one time window. One row per user, action and window; old rows are deleted
+// by the daily cron job.
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.action, table.windowStart] })]
+);

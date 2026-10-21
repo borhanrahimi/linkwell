@@ -6,6 +6,7 @@ import { checkLink } from "@/lib/checkLink";
 vi.mock("@/lib/data", () => ({
   getLinksToCheck: vi.fn(async () => []),
   updateLinkStatus: vi.fn(async () => {}),
+  deleteOldRateLimits: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/checkLink", () => ({

@@ -83,3 +83,19 @@ test("Cancel goes back without importing", async () => {
   expect(screen.getByLabelText("Choose bookmarks file")).toBeDefined();
   expect(importBookmarks).not.toHaveBeenCalled();
 });
+
+test("stops and says why when the server says it's too fast", async () => {
+  vi.mocked(importBookmarks)
+    .mockResolvedValueOnce({ added: 200, skipped: 0 })
+    .mockResolvedValueOnce("You're going a bit fast. Please wait a moment and try again.");
+  render(<ImportBookmarks />);
+  await choose(bookmarksFile(450));
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Import 450 links" }));
+  });
+
+  expect(importBookmarks).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole("status").textContent).toBe("Imported 200 links.");
+  expect(screen.getByRole("alert").textContent).toBe("You're going a bit fast. Please wait a moment and try again.");
+});

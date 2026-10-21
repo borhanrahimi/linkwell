@@ -263,3 +263,19 @@ test("a user can import a bookmarks file, folders and all", async ({ page, signI
   await expect(page.getByRole("link", { name: "Imported soup" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Imported loose link" })).toHaveCount(0);
 });
+
+test("checking links is rate limited: the sixth check in an hour is refused", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/");
+  await saveLink(page, "https://gone.linkwell-test.invalid/", "Rate limit test");
+
+  const button = page.getByRole("button", { name: "Check links" });
+  for (let i = 0; i < 5; i++) {
+    await button.click();
+    await expect(page.getByText(/^Checked 1 link/)).toBeVisible();
+    await expect(button).toBeEnabled();
+  }
+  await button.click();
+
+  await expect(page.getByText("You're going a bit fast. Please wait a moment and try again.")).toBeVisible();
+});

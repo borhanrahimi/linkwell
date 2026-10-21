@@ -1,4 +1,4 @@
-import { getLinksToCheck, updateLinkStatus } from "@/lib/data";
+import { deleteOldRateLimits, getLinksToCheck, updateLinkStatus } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 
 // Vercel Cron calls this address once a day (see vercel.json) and sends
@@ -18,6 +18,9 @@ export async function GET(request: Request) {
       return status;
     })
   );
+
+  // Rate limit counts older than a day are never needed again.
+  await deleteOldRateLimits(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
   return Response.json({
     checked: results.length,

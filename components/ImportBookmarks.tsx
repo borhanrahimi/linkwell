@@ -41,6 +41,11 @@ export default function ImportBookmarks() {
       setStep({ name: "importing", done: start, total: bookmarks.length });
       try {
         const result = await importBookmarks(bookmarks.slice(start, start + IMPORT_BATCH_SIZE));
+        if (typeof result === "string") {
+          // Too many batches this hour: stop and say how far it got.
+          setStep({ name: "finished", added, skipped, error: result });
+          return;
+        }
         added += result.added;
         skipped += result.skipped;
       } catch {

@@ -17,6 +17,7 @@ import {
   updateLinkReadAt,
   isUsernameTaken,
   updateUsername,
+  countAction,
 } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchTitle } from "@/lib/fetchTitle";
@@ -24,6 +25,16 @@ import { getUserId } from "@/lib/session";
 import { cleanDetails, cleanFolderName, cleanNewLink, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
 import { isFolderColor, isFolderIcon, nextFolderColor } from "@/lib/folders";
+import {
+  MAX_FOLDERS,
+  MAX_LINKS,
+  RATE_LIMITS,
+  TOO_FAST,
+  TOO_MANY_FOLDERS,
+  TOO_MANY_LINKS,
+  windowStart,
+  type RateLimitedAction,
+} from "@/lib/limits";
 import { normalizeUsername, usernameError } from "@/lib/username";
 import type {
   Folder,
@@ -38,20 +49,34 @@ import type {
 // Server Actions are public addresses, so each one asks who is calling first
 // (getUserId throws when nobody is signed in) and only touches that user's data.
 
+// True when this user has used the action more often than RATE_LIMITS allows
+// in the current window. Every call counts, even ones that fail later.
+async function isTooFast(userId: string, action: RateLimitedAction): Promise<boolean> {
+  const { max, windowSeconds } = RATE_LIMITS[action];
+  return (await countAction(userId, action, windowStart(new Date(), windowSeconds))) > max;
+}
+
 export async function saveLink(input: Link): Promise<Link | string> {
   const userId = await getUserId();
+  if (await isTooFast(userId, "saveLink")) {
+    return TOO_FAST;
+  }
   // Never trust what the browser sends: only an http(s) link, within the
   // length limits, with just the fields a new link may have.
   const link = cleanNewLink(input);
   if (typeof link === "string") {
     return link;
   }
-  if (isDuplicate(await getLinks(userId), link.url)) {
+  const saved = await getLinks(userId);
+  if (isDuplicate(saved, link.url)) {
     return "You already saved this link!";
   }
-  const saved = { ...link, title: link.title ?? (await fetchTitle(link.url)) };
-  await insertLink(userId, saved);
-  return saved;
+  if (saved.length >= MAX_LINKS) {
+    return TOO_MANY_LINKS;
+  }
+  const withTitle = { ...link, title: link.title ?? (await fetchTitle(link.url)) };
+  await insertLink(userId, withTitle);
+  return withTitle;
 }
 
 export async function removeLink(id: string) {
@@ -93,10 +118,17 @@ export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
   if (!Array.isArray(oldLinks) || oldLinks.length > OLD_LINKS_MAX) {
     throw new Error("Too many links to import at once.");
   }
-  const known = new Set((await getLinks(userId)).map((link) => normalizeUrl(link.url)));
+  if (await isTooFast(userId, "importLinks")) {
+    return [];
+  }
+  const saved = await getLinks(userId);
+  const known = new Set(saved.map((link) => normalizeUrl(link.url)));
   const imported: Link[] = [];
 
   for (const old of oldLinks) {
+    if (saved.length + imported.length >= MAX_LINKS) {
+      break;
+    }
     // Same checks as saveLink; a fresh id, but the date it was first saved.
     const link = cleanNewLink({ ...old, id: "" });
     if (typeof link === "string" || known.has(normalizeUrl(link.url))) {
@@ -110,8 +142,12 @@ export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
   return imported;
 }
 
-export async function checkAllLinks(): Promise<Link[]> {
+// Returns the links with their new status, or a message when it's too soon.
+export async function checkAllLinks(): Promise<Link[] | string> {
   const userId = await getUserId();
+  if (await isTooFast(userId, "checkLinks")) {
+    return TOO_FAST;
+  }
   const links = await getLinks(userId);
 
   await Promise.all(
@@ -127,19 +163,23 @@ export async function checkAllLinks(): Promise<Link[]> {
 // have, and puts each link in the folder with the same name (made if needed).
 export async function importBookmarks(
   input: ImportedBookmark[]
-): Promise<{ added: number; skipped: number }> {
+): Promise<{ added: number; skipped: number } | string> {
   const userId = await getUserId();
   if (!Array.isArray(input) || input.length > IMPORT_BATCH_SIZE) {
     throw new Error("Too many bookmarks in one batch.");
   }
+  if (await isTooFast(userId, "importBookmarks")) {
+    return TOO_FAST;
+  }
 
-  const known = new Set(
-    (await getLinks(userId)).map((link) => normalizeUrl(link.url))
-  );
+  const saved = await getLinks(userId);
+  const known = new Set(saved.map((link) => normalizeUrl(link.url)));
   const folders = await getFolders(userId);
   const added: Link[] = [];
 
   for (const bookmark of input.map((item) => cleanBookmark(item))) {
+    // Stop at the account's link limit; the rest count as skipped.
+    if (saved.length + added.length >= MAX_LINKS) break;
     if (!bookmark || known.has(normalizeUrl(bookmark.url))) continue;
     known.add(normalizeUrl(bookmark.url));
 
@@ -149,11 +189,12 @@ export async function importBookmarks(
       let folder = folders.find(
         (f) => f.name.toLowerCase() === name.toLowerCase()
       );
-      if (!folder) {
+      // At the folder limit, the link is still imported, just without a folder.
+      if (!folder && folders.length < MAX_FOLDERS) {
         folder = await insertFolder(userId, name, nextFolderColor(folders.length));
         folders.push(folder);
       }
-      folderId = folder.id;
+      folderId = folder?.id;
     }
 
     added.push({
@@ -178,6 +219,9 @@ export async function createFolder(name: string): Promise<Folder | string> {
   }
   const trimmed = cleaned.name;
   const existing = await getFolders(userId);
+  if (existing.length >= MAX_FOLDERS) {
+    return TOO_MANY_FOLDERS;
+  }
   if (
     existing.some(
       (folder) => folder.name.toLowerCase() === trimmed.toLowerCase()

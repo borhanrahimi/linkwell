@@ -17,6 +17,12 @@ export default function CheckLinksButton({ onChecked }: CheckLinksButtonProps) {
     setMessage(null);
 
     const checked = await checkAllLinks();
+    if (typeof checked === "string") {
+      // Checked too often: the server says when to try again.
+      setMessage(checked);
+      setIsChecking(false);
+      return;
+    }
     const broken = checked.filter((link) => link.status === "broken").length;
     const total = `${checked.length} ${checked.length === 1 ? "link" : "links"}`;
 

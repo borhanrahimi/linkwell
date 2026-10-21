@@ -1,8 +1,8 @@
 import "server-only";
 import { connection } from "next/server";
-import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { folders, links, user } from "@/db/schema";
+import { folders, links, rateLimits, user } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
 import type { Folder, FolderColor, FolderIcon, Link, LinkDetails, LinkStatus } from "@/types/link";
 
@@ -169,4 +169,28 @@ export async function isUsernameTaken(
 
 export async function updateUsername(userId: string, username: string) {
   await db.update(user).set({ username }).where(eq(user.id, userId));
+}
+
+// Counts one more use of an action in a time window and returns the new
+// total. One query: a new row with 1, or 1 added to the row that's there.
+// Doing it in the database also works when two requests arrive at once.
+export async function countAction(
+  userId: string,
+  action: string,
+  windowStart: Date
+): Promise<number> {
+  const [row] = await db
+    .insert(rateLimits)
+    .values({ userId, action, windowStart, count: 1 })
+    .onConflictDoUpdate({
+      target: [rateLimits.userId, rateLimits.action, rateLimits.windowStart],
+      set: { count: sql`${rateLimits.count} + 1` },
+    })
+    .returning({ count: rateLimits.count });
+  return row.count;
+}
+
+// Rate limit counts from windows that ended long ago are no longer needed.
+export async function deleteOldRateLimits(before: Date) {
+  await db.delete(rateLimits).where(lt(rateLimits.windowStart, before));
 }

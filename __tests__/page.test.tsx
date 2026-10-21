@@ -546,6 +546,18 @@ describe("checking links", () => {
   const working = { id: "1", url: "https://working.com", createdAt: "2026-10-01T12:00:00.000Z" };
   const dead = { id: "2", url: "https://dead.com", createdAt: "2026-10-02T12:00:00.000Z" };
 
+  test("says so when links were checked too often, and keeps the cards as they are", async () => {
+    vi.mocked(checkAllLinks).mockResolvedValueOnce("You're going a bit fast. Please wait a moment and try again.");
+    render(<LinkManager initialLinks={[working]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Check links" }));
+    });
+
+    expect(screen.getByRole("status").textContent).toBe("You're going a bit fast. Please wait a moment and try again.");
+    expect(screen.getByRole("link", { name: "working.com" })).toBeDefined();
+  });
+
   test("has no Check links button when there are no links", () => {
     render(<LinkManager initialLinks={[]} />);
 

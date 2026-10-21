@@ -207,8 +207,8 @@ Before the landing page invites strangers in, lock the doors. Already done: ever
 - [x] Folder names get a 100-character limit when created or renamed (`cleanFolderName`); the Edit form's title is limited too, and odd input (numbers, objects) can't crash an action
 
 **Limits, so one person can't overload Linkwell**
-- [ ] Rate limits on the expensive actions: saving a link and "Check links" both visit other websites
-- [ ] A maximum number of links and folders per account (for example 10,000 links), to protect the free database plan
+- [x] Rate limits on the expensive actions (`lib/limits.ts`): saving a link 30 a minute, "Check links" 5 an hour, bookmark import 100 batches an hour, the old import 5 an hour. Counted in a `rate_limits` table in Postgres (in-memory counters don't work on serverless); the daily cron job deletes old counts
+- [x] At most 10,000 links and 200 folders per account. Imports stop at the limit (the rest count as skipped); past the folder limit, imported links come in without a folder
 
 **Browser protection**
 - [ ] Security headers in `next.config.ts`: a Content-Security-Policy (which scripts may run), no showing Linkwell inside other sites (clickjacking), no guessing file types, and a strict referrer policy

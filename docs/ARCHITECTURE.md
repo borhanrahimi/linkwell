@@ -193,6 +193,17 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 | `icon` | `text`, can be `null` | One of `FOLDER_ICONS` (migration `0011`). `null` = show the coloured dot |
 | `created_at` | `timestamp with time zone`, required, default `now()` | Folders are listed oldest first, so new ones appear at the end |
 
+**The `rate_limits` table** (`db/schema.ts`, migration `0012`): how often each user used each rate-limited action in one time window.
+
+| Column | Type | Notes |
+|---|---|---|
+| `user_id` | `text`, foreign key → `user.id`, `ON DELETE CASCADE` | |
+| `action` | `text` | A key of `RATE_LIMITS` in `lib/limits.ts` (`saveLink`, `checkLinks`, ...) |
+| `window_start` | `timestamp with time zone` | The start of the window (`windowStart(now, seconds)`: each minute, each hour, ...) |
+| `count` | `integer`, default `0` | Uses in that window |
+
+The primary key is (`user_id`, `action`, `window_start`), so each window has one row. The daily cron job deletes rows older than a day.
+
 **`lib/data.ts`** (server-only, all `async`):
 
 | Function | Job |
@@ -208,6 +219,8 @@ All reading and writing of links and folders goes through **`lib/data.ts`**. Com
 | `insertFolder(name)` | Creates a folder and returns it, with the id the database made (`.returning()`) |
 | `insertLinks(userId, links)` | Saves many links in **one** `INSERT` (used by the bookmarks import), including their `folderId` |
 | `updateFolderName(id, name)` | Renames a folder |
+| `countAction(userId, action, windowStart)` | Adds 1 to that window's count (or starts it at 1) in one `INSERT ... ON CONFLICT DO UPDATE` and returns the new total. Used by `isTooFast` in `app/actions.ts` |
+| `deleteOldRateLimits(before)` | Deletes rate limit rows from windows before that date (the cron job) |
 | `updateFolderColor(userId, id, color)` / `updateFolderIcon(userId, id, icon)` | Change a folder's colour, or its icon (`null` = dot) |
 | `deleteFolderById(id)` | Deletes a folder; Postgres sets its links' `folder_id` to `null` |
 
@@ -581,3 +594,9 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | Every action cleans its input with shared helpers (`cleanNewLink`, `cleanDetails`, `cleanBookmark`, `cleanFolderName`, built on `textOf`, `cleanText`, `cleanTags`, `cleanDate`, `isWebAddress`) | The same rules everywhere, and input that isn't text (a number, an object, `null`) becomes "" instead of crashing the action |
 | 2026-10-20 | Only `http` and `https` links can be saved | `javascript:` links run code when clicked, and `data:`/`file:` links aren't web pages. React already refuses to render `javascript:` links, but the database shouldn't hold them either (the export would carry them on) |
 | 2026-10-20 | `saveLink` keeps only `id`, `url`, `title`, `tags` and `createdAt` from the browser, and replaces an id that isn't a real UUID | A new link can't arrive already "read", "ok" or in some folder; a strange id would otherwise make the database query fail |
+| 2026-10-20 | Rate limits are counted in Postgres (`rate_limits`), not in memory or a new service | On Vercel each request may run on a different machine, so memory forgets; Postgres is already there, one query per check, and the database does the counting, so two requests at once can't both slip through |
+| 2026-10-20 | Fixed windows (this minute, this hour) instead of a sliding window | Simple, one row per window, easy to test; someone could squeeze in twice the limit across a window's edge, which is fine for these limits |
+| 2026-10-20 | Only the expensive actions are rate limited: saving (fetches the title), "Check links" (fetches every link) and the imports | They make the server visit other websites or write many rows; cheap actions (edit, delete, mark read) only touch the user's own rows |
+| 2026-10-20 | Every call counts toward a rate limit, even ones that fail | Otherwise someone could send endless invalid requests for free |
+| 2026-10-20 | At most 10,000 links and 200 folders per account (`MAX_LINKS`, `MAX_FOLDERS`) | Far more than a person needs, small enough that one account can't fill the free database plan |
+| 2026-10-20 | Limit messages come back as text (`TOO_FAST`, `TOO_MANY_LINKS`, ...) instead of thrown errors | In production, Next.js hides a thrown error's message from the browser; a returned message can be shown as it is |
