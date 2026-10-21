@@ -228,7 +228,8 @@ Signed-out visitors see only a small sign-in card today. Give them a real welcom
 - [x] "Save from anywhere" for newcomers: any browser (bookmarklet), your phone, copy and paste, importing old bookmarks. The extension is left out until it's published
 - [x] No other companies' or products' names in what users see: neutral words like "your browser", "your phone" and "other bookmark apps"
 - [x] A short FAQ: Is it free? Who can see my links? Can I take them with me? How is it different from other bookmark apps? Is it safe? (`<details>`, no JavaScript)
-- [ ] Privacy policy and terms pages (Google needs a privacy policy before sign-in can leave "testing" mode for everyone)
+- [x] Privacy policy and terms pages (`/privacy`, `/terms`) in plain language, linked from the landing page, the account page and next to the sign-in button. Google needs them before sign-in can leave "testing" mode for everyone
+- [ ] A contact email for privacy questions (`SITE.contactEmail` in `lib/site.ts`)
 - [ ] Sharing previews: page titles and descriptions, and an Open Graph image for when someone shares the link in a chat
 - [x] A new drawing for "Keep them alive": the character as a doctor, listening to Linkwell's chain link with a stethoscope (`LinkDoctor`)
 

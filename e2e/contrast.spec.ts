@@ -53,6 +53,14 @@ for (const colorScheme of ["light", "dark"] as const) {
       expect(results.filter((result) => result.ratio < result.needed)).toEqual([]);
     });
 
+    test("every text on the privacy and terms pages is readable", async ({ page }) => {
+      for (const path of ["/privacy", "/terms"]) {
+        await page.goto(path);
+        const results = await measureContrast(page);
+        expect(results.filter((result) => result.ratio < result.needed), path).toEqual([]);
+      }
+    });
+
     test("every text on the account page is readable", async ({
       page,
       signIn,

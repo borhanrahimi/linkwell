@@ -161,3 +161,16 @@
 @utility btn-danger {
   @apply shrink-0 rounded-full border border-danger/40 bg-surface px-4 py-2 text-sm font-medium text-danger hover:bg-danger/10 focus:outline-none focus:ring-2 focus:ring-danger/40 disabled:opacity-50;
 }
+
+/* Long reading text (the privacy and terms pages): Tailwind removes the
+   browser's heading sizes and list bullets, so they're put back here. */
+.legal h2 {
+  @apply pt-4 text-xl font-semibold text-ink;
+}
+.legal ul {
+  @apply list-disc space-y-2 pl-5;
+}
+.legal p,
+.legal li {
+  @apply leading-relaxed;
+}

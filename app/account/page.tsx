@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import Bookmarklet from "@/components/Bookmarklet";
 import DeleteAccount from "@/components/DeleteAccount";
+import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import ImportBookmarks from "@/components/ImportBookmarks";
 import UsernameForm from "@/components/UsernameForm";
@@ -78,6 +79,7 @@ export default async function AccountPage() {
               <DeleteAccount />
             </div>
           </section>
+          <Footer />
         </div>
       </div>
     </main>

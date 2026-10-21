@@ -120,6 +120,8 @@ Anything a client component imports becomes client code as well, so you don't ne
 | File | Type | Why |
 |---|---|---|
 | `app/page.tsx` | Server | `async`; reads the session with `auth.api.getSession`. Signed out: shows `Landing` (with `deleted` after an account was deleted). Signed in: reads links and folders, and shows the `Header` and `LinkManager`. Sends no JavaScript of its own to the browser |
+| `app/privacy/page.tsx`, `app/terms/page.tsx` | Server | The privacy policy and terms, in plain language, inside `LegalPage` (title, date from `SITE.legalUpdated`, readable `.legal` text styles). They call `connection()` so they render per request: a page built ahead of time would have no nonce, and the Content-Security-Policy would block its scripts. Keep them true whenever a feature changes what's stored |
+| `components/Footer.tsx` | Server | Links to Privacy and Terms, under the landing, account and legal pages |
 | `components/Landing.tsx` | Server | The landing page for visitors: a bar with Sign in, the promise and **Sign in with Google**, three promise cards with drawings (`EmptyBox`, `LinkDoctor`, `Stargazer`), "Save from anywhere", a FAQ in `<details>` (opens without JavaScript) and a last call to sign in. Only the `SignInButton`s are client components |
 | `app/api/auth/[...all]/route.ts` | Route Handler | Hands every `/api/auth/*` request (sign in, Google callback, sign out) to Better Auth |
 | `app/api/export/route.ts` | Route Handler | `GET /api/export`: checks the session (401 without one), then sends `toBookmarksHtml(links, folders)` as a download (`Content-Disposition: attachment`, `Cache-Control: no-store`). The account page links to it with a plain `<a download>` |
@@ -441,6 +443,10 @@ Go through this list for every new feature, before committing. Each line is some
 **The browser**
 - [ ] Anything loaded from another site (images, scripts, fonts) is added to `lib/csp.ts` on purpose; the security-header browser test fails until it is
 - [ ] No inline `<script>`; inline `<style>` tags need the nonce
+- [ ] New pages render per request (they read the session, or call `connection()`), so their scripts get the nonce
+
+**Privacy**
+- [ ] If a feature stores something new about people, or sends data somewhere new, update `/privacy` (and `SITE.legalUpdated`)
 
 **Data and secrets**
 - [ ] New tables get a `user_id` with `ON DELETE CASCADE`, so deleting an account deletes everything
@@ -647,3 +653,6 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | The landing page's three sign-in buttons have different labels ("Sign in", "Sign in with Google", "Start saving links") | Buttons with the same name are confusing in a screen reader's list of buttons, and tests can find each one by name |
 | 2026-10-20 | The FAQ uses `<details>` and `<summary>` | Opens and closes with no JavaScript, works with the keyboard and screen readers out of the box |
 | 2026-10-20 | No other companies' or products' names in what users see ("your browser", "your phone", "other bookmark apps") | Linkwell stands on its own instead of advertising or comparing itself to other brands. Internal docs may still name the tools Linkwell is built on |
+| 2026-10-20 | The privacy page says "a hosting provider" and "a database provider" instead of their names; only the Google account is named | Keeps the no-brand-names rule while staying honest about who is involved; where account details come from has to be named, and the sign-in provider requires it |
+| 2026-10-20 | The contact address lives in `SITE.contactEmail` and only shows once filled in | A privacy policy needs a way to reach someone, but publishing an email address is the owner's choice; until then, the pages point to the account page, where everything can be exported or deleted |
+| 2026-10-20 | Static pages call `connection()` | With a nonce-based Content-Security-Policy, a page rendered at build time has no nonce, so its scripts would be blocked |

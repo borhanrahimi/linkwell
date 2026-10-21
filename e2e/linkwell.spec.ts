@@ -290,6 +290,12 @@ test("every page sends security headers, and nothing on it is blocked by them", 
   });
   const violations = () => page.evaluate(() => (window as unknown as { cspViolations: string[] }).cspViolations);
 
+  for (const path of ["/privacy", "/terms"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    expect(await violations(), path).toEqual([]);
+  }
+
   const response = await page.goto("/");
   const headers = response!.headers();
   expect(headers["content-security-policy"]).toMatch(/script-src 'self' 'nonce-/);
@@ -308,4 +314,15 @@ test("every page sends security headers, and nothing on it is blocked by them", 
   await saveLink(page, "https://example.com/csp", "Scripts still run");
   await expect(page.getByRole("link", { name: "Scripts still run" })).toBeVisible();
   expect(await violations()).toEqual([]);
+});
+
+test("the privacy and terms pages are linked from the landing page", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("link", { name: "Privacy", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Privacy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What Linkwell stores" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Terms", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Terms of use" })).toBeVisible();
 });

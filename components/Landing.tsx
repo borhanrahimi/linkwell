@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import NextLink from "next/link";
+import Footer from "@/components/Footer";
 import SignInButton from "@/components/SignInButton";
 import EmptyBox from "@/components/illustrations/EmptyBox";
 import LinkDoctor from "@/components/illustrations/LinkDoctor";
@@ -86,7 +88,17 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
               Your account and all your links were deleted. Goodbye
             </p>
           ) : (
-            <p className="mt-3 text-sm text-muted">Free to use.</p>
+            <p className="mt-3 text-sm text-muted">
+              Free to use. By signing in, you agree to the{" "}
+              <NextLink href="/terms" className="underline hover:text-ink">
+                terms
+              </NextLink>{" "}
+              and the{" "}
+              <NextLink href="/privacy" className="underline hover:text-ink">
+                privacy policy
+              </NextLink>
+              .
+            </p>
           )}
         </section>
 
@@ -144,6 +156,8 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
           <h2 className="text-2xl font-semibold text-ink">Give your links a home</h2>
           <SignInButton label="Start saving links" />
         </section>
+
+        <Footer />
       </div>
     </main>
   );
