@@ -765,24 +765,43 @@ describe("rediscover", () => {
   test("brings back an old unread link", () => {
     render(<LinkManager initialLinks={[old, recent]} now={now} />);
 
-    const section = screen.getByRole("region", { name: "Rediscover" });
+    const section = screen.getByRole("region", { name: /^Rediscover/ });
     expect(within(section).getByRole("link", { name: "Old article" })).toBeDefined();
-    expect(within(section).getByText("saved 3 weeks ago")).toBeDefined();
+    expect(within(section).getByText("old.com · saved 3 weeks ago")).toBeDefined();
     expect(within(section).queryByRole("link", { name: "recent.com" })).toBeNull();
   });
 
-  test("asks \"Remember these?\" next to a drawing that screen readers skip", () => {
+  test("asks \"Remember this one?\" next to a drawing that screen readers skip", () => {
     render(<LinkManager initialLinks={[old]} now={now} />);
 
-    const section = screen.getByRole("region", { name: "Rediscover" });
-    expect(within(section).getByText(/^Remember these\?/)).toBeDefined();
+    const section = screen.getByRole("region", { name: /^Rediscover/ });
+    expect(within(section).getByText(/Remember this one\?/)).toBeDefined();
     expect(section.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    // With only one link, there's no other to show.
+    expect(within(section).queryByRole("button", { name: "Show another" })).toBeNull();
+  });
+
+  test("shows one link at a time, and \"Show another\" flips through them", () => {
+    const older = { id: "3", url: "https://older.com", title: "Older article", createdAt: "2026-09-01T12:00:00.000Z" };
+    render(<LinkManager initialLinks={[old, older]} now={now} />);
+
+    const section = screen.getByRole("region", { name: /^Rediscover/ });
+    // The oldest comes first.
+    expect(within(section).getByRole("link", { name: "Older article" })).toBeDefined();
+    expect(within(section).queryByRole("link", { name: "Old article" })).toBeNull();
+
+    fireEvent.click(within(section).getByRole("button", { name: "Show another" }));
+    expect(within(section).getByRole("link", { name: "Old article" })).toBeDefined();
+
+    // And back round to the first.
+    fireEvent.click(within(section).getByRole("button", { name: "Show another" }));
+    expect(within(section).getByRole("link", { name: "Older article" })).toBeDefined();
   });
 
   test("is hidden when there is nothing to rediscover", () => {
     render(<LinkManager initialLinks={[recent]} now={now} />);
 
-    expect(screen.queryByRole("region", { name: "Rediscover" })).toBeNull();
+    expect(screen.queryByRole("region", { name: /^Rediscover/ })).toBeNull();
   });
 
   test("lets go of a link once it is marked as read", async () => {
@@ -792,7 +811,7 @@ describe("rediscover", () => {
       fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
     });
 
-    expect(screen.queryByRole("region", { name: "Rediscover" })).toBeNull();
+    expect(screen.queryByRole("region", { name: /^Rediscover/ })).toBeNull();
   });
 });
 

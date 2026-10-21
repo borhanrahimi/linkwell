@@ -106,7 +106,8 @@ export default function LinkManager({
     ),
     sortOrder,
   );
-  const rediscover = now ? pickRediscover(links, now) : [];
+  // Up to ten old links; the banner shows one at a time.
+  const rediscover = now ? pickRediscover(links, now, 10) : [];
   const showRediscover = now !== undefined && rediscover.length > 0;
   const selectedFolder = folders.find((folder) => folder.id === activeFolder);
 

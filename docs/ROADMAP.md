@@ -279,11 +279,11 @@ Drawings first:
 - [x] A shared `ChainLink` part in `Character.tsx` (the app icon's loops), used by the doctor, the thumbs-up scene and the logo
 - [x] **Every drawing redrawn as loose pen doodles** (after a page of notebook sketches): full-body, stick arms and legs, grey marker shading, a shadow under the feet, speech bubbles. Waving with "Hi!" / "Bye!", holding an empty box, a magnifying glass and "?", a telescope on a tripod for Rediscover, a doctor's coat, sitting at a café table with tea, a thumbs-up, an empty folder
 - [x] The logo mark on the landing page's top bar too
-- [ ] The sharing preview picture (`app/opengraph-image.png`) still shows the old character: redraw it in the new style
-- [ ] A Rediscover drawing that fits the slim banner below
+- [x] The sharing preview picture (`app/opengraph-image.png`, `twitter-image.png`) redrawn: the doodle character waving "Hi!" next to the promise
+- [x] A Rediscover drawing that fits a slim banner: the character from the shoulders up with a spyglass (`Spyglass`)
 
 Then the layout:
-- [ ] Rediscover as a slim banner above the list: still front and centre, but lighter. One forgotten link at a time, with "Show another"
+- [x] Rediscover as a slim banner above the list: still front and centre, but lighter. One forgotten link at a time (from up to ten), with "Show another" (a round arrow button on phones)
 - [ ] Phones: the sidebar becomes a menu button, the details panel a full-screen sheet
 - [ ] Calmer cards: title, site name (not the full address), date and tags; Mark read and Details up front, the folder menu, Edit and Delete in the details panel
 - [ ] Read links fade a little; one button style instead of pills next to plain text buttons

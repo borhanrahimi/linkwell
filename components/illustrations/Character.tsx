@@ -15,11 +15,20 @@ type At = { x: number; y: number };
 // Every illustration shares the same <svg>: the size, the pen and its wobble.
 // The wobble is an SVG filter that nudges each line by a pixel or two, so
 // straight lines look drawn by hand. Each drawing gets its own filter id.
-export function Drawing({ className = "", children }: { className?: string; children: ReactNode }) {
+export function Drawing({
+  className = "",
+  viewBox = "0 0 160 120",
+  children,
+}: {
+  className?: string;
+  // Most scenes are 160×120; a banner's drawing can be wider and shorter.
+  viewBox?: string;
+  children: ReactNode;
+}) {
   const pen = `pen-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <svg
-      viewBox="0 0 160 120"
+      viewBox={viewBox}
       fill="none"
       stroke="currentColor"
       strokeWidth={1.7}
