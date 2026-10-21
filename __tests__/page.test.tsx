@@ -1137,3 +1137,81 @@ describe("views", () => {
     expect(views().getByRole("button", { name: "List", pressed: true })).toBeDefined();
   });
 });
+
+
+describe("details panel", () => {
+  const link = {
+    id: "1",
+    url: "https://react.dev/learn",
+    title: "React",
+    tags: ["react", "docs"],
+    note: "For the interview",
+    createdAt: "2020-01-01T00:00:00.000Z",
+    checkedAt: "2020-02-01T12:00:00.000Z",
+    status: "ok" as const,
+    folderId: "f1",
+  };
+  const folders = [{ id: "f1", name: "Work" }, { id: "f2", name: "Reading" }];
+  const panel = () => within(screen.getByRole("complementary", { name: "React" }));
+
+  function open() {
+    render(<LinkManager initialLinks={[link]} initialFolders={folders} />);
+    fireEvent.click(cards().getByRole("button", { name: "Details" }));
+  }
+
+  test("shows everything about the link, and moves focus into it", () => {
+    open();
+
+    expect(panel().getByRole("link", { name: "https://react.dev/learn" })).toBeDefined();
+    expect(panel().getByText("For the interview")).toBeDefined();
+    expect(panel().getByText("Not yet")).toBeDefined();
+    expect(panel().getByText(/February 1, 2020: working/)).toBeDefined();
+    expect(panel().getByRole("combobox", { name: "Folder" })).toHaveProperty("value", "f1");
+    expect(panel().getByRole("button", { name: "#docs" })).toBeDefined();
+    expect(document.activeElement?.textContent).toBe("React");
+  });
+
+  test("changes the folder, the read status and the details from the panel", async () => {
+    open();
+
+    await act(async () => {
+      fireEvent.change(panel().getByRole("combobox", { name: "Folder" }), { target: { value: "f2" } });
+    });
+    expect(moveToFolder).toHaveBeenCalledWith("1", "f2");
+
+    await act(async () => {
+      fireEvent.click(panel().getByRole("button", { name: "Mark read" }));
+    });
+    expect(panel().getByRole("button", { name: "Mark unread" })).toBeDefined();
+
+    fireEvent.click(panel().getByRole("button", { name: "Edit" }));
+    fireEvent.change(panel().getByRole("textbox", { name: "Note" }), { target: { value: "Read before Friday" } });
+    await act(async () => {
+      fireEvent.click(panel().getByRole("button", { name: "Save" }));
+    });
+    expect(saveLinkDetails).toHaveBeenCalledWith("1", { title: "React", tags: "react, docs", note: "Read before Friday" });
+    expect(panel().getByText("Read before Friday")).toBeDefined();
+  });
+
+  test("closes with the Close button or Esc", () => {
+    open();
+    fireEvent.click(panel().getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("complementary", { name: "React" })).toBeNull();
+
+    fireEvent.click(cards().getByRole("button", { name: "Details" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("complementary", { name: "React" })).toBeNull();
+  });
+
+  test("deleting from the panel removes the link and closes the panel", async () => {
+    open();
+
+    await act(async () => {
+      fireEvent.click(panel().getByRole("button", { name: "Delete" }));
+    });
+
+    expect(removeLink).toHaveBeenCalledWith("1");
+    expect(screen.queryByRole("complementary", { name: "React" })).toBeNull();
+    expect(cardCount()).toBe(0);
+  });
+});

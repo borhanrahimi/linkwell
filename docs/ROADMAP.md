@@ -269,7 +269,7 @@ As the list of links grows, the dashboard tiles get in the way: you scroll past 
 - [x] Search, sort and the view switch together in one toolbar above the list (search gets its own row on phones)
 
 **Step 4: the details panel**
-- [ ] Click a link to see everything about it beside the list (note, tags, folder, dates, check status) and edit it there
+- [x] **Details** on any card or row opens everything about the link beside the list (full address, note, saved, read and last-checked dates, folder, tags, archive link) with Mark read, Edit and Delete. A third column on wide screens, a full-screen sheet on smaller ones; Close or Esc closes it, and focus moves into it when it opens
 
 **Step 5: Rediscover, phones and polish**
 - [ ] Rediscover as a slim banner above the list: still front and centre, but lighter

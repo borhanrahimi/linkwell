@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Header from "@/components/Header";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
+import LinkDetails from "@/components/LinkDetails";
 import ImportBanner from "@/components/ImportBanner";
 import Rediscover from "@/components/Rediscover";
 import EmptyBox from "@/components/illustrations/EmptyBox";
@@ -87,6 +88,11 @@ export default function LinkManager({
   const [query, setQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [view, setView] = useLinkView();
+  // The link shown in the details panel, if any.
+  const [detailsId, setDetailsId] = useState<string | null>(null);
+  const detailsLink = links.find((link) => link.id === detailsId);
+  // Stable, so the panel's Esc listener isn't re-added on every render.
+  const closeDetails = useCallback(() => setDetailsId(null), []);
   const visibleLinks = sortLinks(
     searchLinks(
       filterByTag(
@@ -232,7 +238,12 @@ export default function LinkManager({
       />
 
       {/* The sidebar on the left (on top, on phones), the list on the right. */}
-      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-[14rem_minmax(0,1fr)]">
+      {/* With the details panel open, wide screens get a third column for it. */}
+      <div
+        className={`mt-6 grid grid-cols-1 gap-6 md:grid-cols-[14rem_minmax(0,1fr)] ${
+          detailsLink ? "lg:grid-cols-[14rem_minmax(0,1fr)_20rem]" : ""
+        }`}
+      >
         <Sidebar
           links={links}
           folders={folders}
@@ -347,7 +358,7 @@ export default function LinkManager({
               className={
                 view === "list"
                   ? "glass mt-4 divide-y divide-line rounded-2xl"
-                  : "mt-4 grid grid-flow-dense grid-cols-1 gap-4 lg:grid-cols-2"
+                  : `mt-4 grid grid-flow-dense grid-cols-1 gap-4 ${detailsLink ? "" : "lg:grid-cols-2"}`
               }
             >
               {visibleLinks.map((link) => (
@@ -363,11 +374,30 @@ export default function LinkManager({
                   onMove={moveLink}
                   onTagClick={toggleTag}
                   compact={view === "list"}
+                  onShowDetails={setDetailsId}
                 />
               ))}
             </ul>
           )}
         </div>
+
+        {detailsLink && (
+          <LinkDetails
+            key={detailsLink.id}
+            link={detailsLink}
+            folders={folders}
+            now={now}
+            onClose={closeDetails}
+            onEditDetails={editDetails}
+            onToggleRead={toggleRead}
+            onMove={moveLink}
+            onDelete={(id) => {
+              closeDetails();
+              deleteLink(id);
+            }}
+            onTagClick={toggleTag}
+          />
+        )}
       </div>
     </>
   );

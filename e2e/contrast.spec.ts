@@ -40,6 +40,10 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "All links", exact: true }).click();
       await page.getByRole("button", { name: "List", exact: true }).click();
       results.push(...(await measureContrast(page)));
+      // And the details panel of a link with a note.
+      await page.getByRole("button", { name: "Details" }).last().click();
+      await page.getByRole("button", { name: "Close", exact: true }).waitFor();
+      results.push(...(await measureContrast(page)));
       const tooLow = results.filter((result) => result.ratio < result.needed);
 
       expect(results.length).toBeGreaterThan(10);
