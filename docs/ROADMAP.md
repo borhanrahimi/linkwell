@@ -235,7 +235,7 @@ Signed-out visitors see only a small sign-in card today. Give them a real welcom
 
 **You'll learn:** marketing pages vs. app pages, metadata and Open Graph images, and writing for people who don't know Linkwell yet.
 
-## 🔜 v1.9: A better layout 🗂️ (in progress)
+## ✅ v1.9: A better layout 🗂️ (done)
 
 As the list of links grows, the dashboard tiles get in the way: you scroll past them every time, and folders, tags and counts live in different places. Give Linkwell the layout of a real app, while keeping what's Linkwell's own (Rediscover, coming back to links) front and centre.
 
@@ -285,11 +285,11 @@ Drawings first:
 Then the layout:
 - [x] Rediscover as a slim banner above the list: still front and centre, but lighter. One forgotten link at a time (from up to ten), with "Show another" (a round arrow button on phones)
 - [x] Phones: the sidebar becomes a drawer behind a **Lists** button next to the list's heading (it slides over a dimmed page; Close, Esc, a tap outside or picking something closes it), and the details panel a full-screen sheet
-- [ ] Calmer cards: title, site name (not the full address), date and tags; Mark read and Details up front, the folder menu, Edit and Delete in the details panel
-- [ ] Read links fade a little; one button style instead of pills next to plain text buttons
-- [ ] The sidebar shows the 5 most used tags, with "Show all"; the list's heading says how many links it has ("6 links")
-- [ ] The selected list, folder, tag and view live in the address (`/?folder=…&view=list`), so the back button works and lists can be bookmarked
-- [ ] The contrast and browser tests cover the new layout in light and dark mode
+- [x] Calmer cards: title, then one quiet line with the site name (not the full address), when it was saved and its folder (a dot and the name); the note and tags under it. Mark read and Details up front; Edit and Delete appear while a mouse is over the card (on touch screens they're in the details panel), and the folder menu moved to the details panel
+- [x] Read links fade a little (their icon goes grey); the card's actions are one quiet button style
+- [x] The sidebar shows the 5 most used tags (plus the chosen one), with "Show all 10 tags" / "Show fewer"; the list's heading says how many links it's showing ("6 links")
+- [x] The selected list, folder, tag and view live in the address (`/?list=unread`, `/?folder=…&tag=react&view=list`), so Back, a refresh and bookmarks keep them. Search stays out of it. An address with a folder that's gone falls back to all links
+- [x] The contrast and browser tests cover the new layout in light and dark mode: the details panel, List view, and the phone drawer; browser tests for the drawer and for Back and refresh
 
 **You'll learn:** layouts with CSS Grid, responsive navigation, keeping state in the URL (`useSearchParams`), and keyboard-friendly focus handling.
 

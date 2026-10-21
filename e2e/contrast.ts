@@ -25,6 +25,10 @@ export async function measureContrast(page: Page): Promise<ContrastResult[]> {
       // A faded parent (like opacity-75 on read cards) fades the text too.
       let opacity = 1;
       for (let e: Element | null = el; e; e = e.parentElement) opacity *= Number(getComputedStyle(e).opacity);
+      // Fully see-through text (like Edit and Delete on a card until it's
+      // hovered) isn't showing yet: there's nothing to read. When it shows,
+      // it has the same style as the buttons next to it, which are measured.
+      if (opacity === 0) return [];
       const size = parseFloat(style.fontSize);
       const large = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66);
 

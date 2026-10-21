@@ -4,13 +4,14 @@ import { useState } from "react";
 import type { Folder, Link, LinkDetailsInput } from "@/types/link";
 import { Badges, EditForm, Favicon, StickyNote } from "@/components/LinkParts";
 import { getArchiveUrl, getDomain, timeAgo } from "@/lib/links";
+import { FOLDER_DOT_CLASS } from "@/lib/folders";
 
 type LinkCardProps = {
   link: Link;
   onDelete: (id: string) => void;
   onEditDetails: (id: string, input: LinkDetailsInput) => void;
   onToggleRead: (id: string) => void;
-  onMove: (id: string, folderId: string | undefined) => void;
+  // To show the link's folder; moving it happens in the details panel.
   folders: Folder[];
   onTagClick: (tag: string) => void;
   activeTag: string | null;
@@ -21,7 +22,7 @@ type LinkCardProps = {
   onShowDetails: (id: string) => void;
 };
 
-export default function LinkCard({ link, activeTag, now, folders, compact = false, onDelete, onEditDetails, onMove, onTagClick, onToggleRead, onShowDetails }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, now, folders, compact = false, onDelete, onEditDetails, onTagClick, onToggleRead, onShowDetails }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   // Broken links get a red outline, so they stand out in the grid.
   const tileSize = link.status === "broken" ? "ring-1 ring-danger/50" : "";
@@ -59,20 +60,38 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
     </ul>
   );
 
+  // Mark read and Details are always there. Edit and Delete only show while a
+  // mouse is over the card (or the keyboard is in it); on touch screens, where
+  // nothing hovers, they're in the details panel instead.
+  const action = "btn-quiet px-2.5 py-1 font-normal text-muted";
+  const onHover =
+    "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:none)]:hidden";
   const actions = (
     <>
-      <button onClick={() => onShowDetails(link.id)} className="text-sm text-muted hover:text-ink">
-        Details
-      </button>
-      <button onClick={() => onToggleRead(link.id)} className="text-sm text-muted hover:text-success">
+      <button onClick={() => onToggleRead(link.id)} className={`${action} hover:text-success`}>
         {link.readAt ? "Mark unread" : "Mark read"}
       </button>
-      <button onClick={() => setIsEditing(true)} className="text-sm text-muted hover:text-accent">
+      <button onClick={() => onShowDetails(link.id)} className={`${action} hover:text-ink`}>
+        Details
+      </button>
+      <button onClick={() => setIsEditing(true)} className={`${action} hover:text-accent ${onHover}`}>
         Edit
       </button>
-      <button onClick={() => onDelete(link.id)} className="text-sm text-muted hover:text-danger">
+      <button onClick={() => onDelete(link.id)} className={`${action} hover:text-danger ${onHover}`}>
         Delete
       </button>
+    </>
+  );
+
+  // The folder the link is in, as a coloured dot and its name.
+  const folder = folders.find((f) => f.id === link.folderId);
+  const folderName = folder && (
+    <>
+      <span aria-hidden="true">·</span>
+      <span className="flex min-w-0 items-center gap-1">
+        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`} />
+        <span className="truncate">{folder.name}</span>
+      </span>
     </>
   );
 
@@ -98,8 +117,10 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
   if (compact) {
     return (
       // On phones the actions wrap onto their own line under the title.
-      <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
-        <Favicon url={link.url} size="small" />
+      <li className="group flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+        <div className={link.readAt ? "opacity-50 grayscale" : ""}>
+          <Favicon url={link.url} size="small" />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             {titleLink}
@@ -109,26 +130,36 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
             <span className="truncate">{getDomain(link.url)}</span>
             <span aria-hidden="true">·</span>
             {savedAgo}
+            {folderName}
             {tagButtons}
           </div>
         </div>
-        <div className="flex w-full shrink-0 gap-3 pl-10 sm:w-auto sm:pl-0">{actions}</div>
+        <div className="-ml-2.5 flex w-full shrink-0 pl-10 sm:ml-0 sm:w-auto sm:pl-0">{actions}</div>
       </li>
     );
   }
 
   return (
     <li
-      className={`glass flex flex-col justify-between gap-3 rounded-2xl p-4 ${tileSize}`}
+      className={`group glass flex flex-col justify-between gap-3 rounded-2xl p-4 ${tileSize}`}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <Favicon url={link.url} />
-        <div className="min-w-0">
+        {/* Read links fade a little: their icon goes grey. */}
+        <div className={`shrink-0 ${link.readAt ? "opacity-50 grayscale" : ""}`}>
+          <Favicon url={link.url} />
+        </div>
+        <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             {titleLink}
             <Badges link={link} now={now} />
           </div>
-          <p className="truncate text-sm text-muted">{link.url}</p>
+          {/* The site, when it was saved and its folder: the full address is in Details. */}
+          <p className="flex min-w-0 items-center gap-x-1.5 text-sm text-muted">
+            <span className="truncate">{getDomain(link.url)}</span>
+            <span aria-hidden="true">·</span>
+            <span className="shrink-0">{savedAgo}</span>
+            {folderName}
+          </p>
           {link.note && <StickyNote note={link.note} />}
           {link.status === "broken" && (
             <a
@@ -140,26 +171,10 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
               View archived copy
             </a>
           )}
-          <p className="text-sm text-muted">Saved {savedAgo}</p>
           {tagButtons}
-          {folders.length > 0 && (
-            <select
-              value={link.folderId ?? ""}
-              onChange={(e) => onMove(link.id, e.target.value || undefined)}
-              aria-label="Folder"
-              className="mt-2 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="">No folder</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
-      <div className="flex gap-3 border-t border-line pt-3">{actions}</div>
+      <div className="-mx-2.5 -mb-1 flex border-t border-line pt-2">{actions}</div>
     </li>
   )
 }

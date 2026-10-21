@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import FolderBar from "@/components/FolderBar";
 import { countLinks, countTags, type SmartList } from "@/lib/links";
@@ -56,6 +56,12 @@ export default function Sidebar(props: SidebarProps) {
       folderCounts[link.folderId] = (folderCounts[link.folderId] ?? 0) + 1;
   }
   const tags = countTags(links);
+  // The 5 most used tags, plus the chosen one; "Show all" lists the rest.
+  const [allTags, setAllTags] = useState(false);
+  const TOP_TAGS = 5;
+  const shownTags = allTags
+    ? tags
+    : tags.filter(({ tag }, index) => index < TOP_TAGS || tag === activeTag);
 
   const lists: {
     id: SmartList;
@@ -150,7 +156,7 @@ export default function Sidebar(props: SidebarProps) {
             {/* The buttons are named by the tag alone ("react"), so they don't
               clash with the #react buttons on the cards. */}
             <ul aria-label="All tags" className="space-y-0.5">
-              {tags.map(({ tag, count }) => (
+              {shownTags.map(({ tag, count }) => (
                 <li key={tag}>
                   <button
                     onClick={() => props.onSelectTag(tag)}
@@ -171,6 +177,11 @@ export default function Sidebar(props: SidebarProps) {
                 </li>
               ))}
             </ul>
+            {tags.length > TOP_TAGS && (
+              <button onClick={() => setAllTags(!allTags)} className="sidebar-item text-muted">
+                {allTags ? "Show fewer" : `Show all ${tags.length} tags`}
+              </button>
+            )}
           </section>
         )}
       </nav>

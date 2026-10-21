@@ -374,3 +374,30 @@ test("on a phone, the lists open in a drawer and close once one is picked", asyn
   await page.keyboard.press("Escape");
   await expect(lists).toBeHidden();
 });
+
+test("the chosen list lives in the address: back, refresh and bookmarks keep it", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/");
+  await saveLink(page, "https://example.com/address-one", "Address one");
+  await expect(page.getByRole("link", { name: "Address one" })).toBeVisible();
+  await saveLink(page, "https://example.com/address-two", "Address two");
+  await expect(page.getByRole("link", { name: "Address two" })).toBeVisible();
+  // "Address two" is newest, so it's first: mark it as read.
+  await page.getByRole("button", { name: "Mark read" }).first().click();
+  await expect(page.getByRole("button", { name: "Mark unread" })).toBeVisible();
+
+  const lists = page.getByRole("navigation", { name: "Your lists" });
+  await lists.getByRole("button", { name: "Unread" }).click();
+  await expect(page).toHaveURL(/\?list=unread$/);
+  await expect(page.getByRole("link", { name: "Address two" })).toHaveCount(0);
+
+  // A refresh (or a bookmark) opens the same list.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Address two" })).toHaveCount(0);
+
+  // Back goes to all links again.
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "All links" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Address two" })).toBeVisible();
+});

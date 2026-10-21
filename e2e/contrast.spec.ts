@@ -44,6 +44,12 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "Details" }).last().click();
       await page.getByRole("button", { name: "Close", exact: true }).waitFor();
       results.push(...(await measureContrast(page)));
+      // And on a phone, the Lists drawer over the dimmed page.
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByRole("button", { name: "Lists", exact: true }).click();
+      await page.getByRole("navigation", { name: "Your lists" }).waitFor();
+      results.push(...(await measureContrast(page)));
       const tooLow = results.filter((result) => result.ratio < result.needed);
 
       expect(results.length).toBeGreaterThan(10);

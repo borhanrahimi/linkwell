@@ -14,6 +14,7 @@ import EmptyFolder from "@/components/illustrations/EmptyFolder";
 import Magnifier from "@/components/illustrations/Magnifier";
 import Sidebar from "@/components/Sidebar";
 import { useLinkView, type LinkView } from "@/components/useLinkView";
+import { useAddressState } from "@/components/useAddressState";
 import FolderIconDrawing from "@/components/FolderIcon";
 import { FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
@@ -73,6 +74,8 @@ type LinkManagerProps = {
   // The signed-in user, for the top bar. Tests may leave it out: then the
   // save box is shown on its own.
   user?: { name: string; image?: string | null; username?: string | null };
+  // The address's query (like "list=unread") the server rendered with.
+  initialSearch?: string;
 };
 
 export default function LinkManager({
@@ -80,17 +83,27 @@ export default function LinkManager({
   initialFolders = [],
   now,
   user,
+  initialSearch,
 }: LinkManagerProps) {
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
   // What the list shows: a smart list (all, unread, broken) or one folder,
   // optionally narrowed to one tag and a search.
-  const [activeList, setActiveList] = useState<SmartList>("all");
-  const [activeFolder, setActiveFolder] = useState<string | null>(null);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  // The chosen list, folder, tag and view live in the address (see useAddressState).
+  const [address, updateAddress] = useAddressState(initialSearch);
+  const activeList = address.list;
+  // A folder that no longer exists (deleted, or an old bookmark) means no folder.
+  const activeFolder = folders.some((folder) => folder.id === address.folder) ? address.folder : null;
+  const activeTag = address.tag;
   const [query, setQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
-  const [view, setView] = useLinkView();
+  // The address can choose the view; otherwise the device remembers its own.
+  const [storedView, storeView] = useLinkView();
+  const view = address.view ?? storedView;
+  function setView(next: LinkView) {
+    storeView(next);
+    updateAddress({ view: next });
+  }
   // The link shown in the details panel, if any.
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const detailsLink = links.find((link) => link.id === detailsId);
@@ -137,14 +150,12 @@ export default function LinkManager({
   // A smart list and a folder are one choice: picking one leaves the other.
   // Picking something in the phone drawer also closes it, to show the list.
   function selectList(list: SmartList) {
-    setActiveList(list);
-    setActiveFolder(null);
+    updateAddress({ list, folder: null });
     if (menuOpen) closeMenu();
   }
 
   function selectFolder(folderId: string | null) {
-    setActiveFolder(folderId);
-    setActiveList("all");
+    updateAddress({ folder: folderId, list: "all" });
     if (menuOpen) closeMenu();
   }
 
@@ -178,7 +189,7 @@ export default function LinkManager({
   }
 
   function toggleTag(tag: string) {
-    setActiveTag((current) => (current === tag ? null : tag));
+    updateAddress({ tag: activeTag === tag ? null : tag });
     if (menuOpen) closeMenu();
   }
 
@@ -251,7 +262,8 @@ export default function LinkManager({
   async function removeFolder(id: string) {
     setFolders((current) => current.filter((folder) => folder.id !== id));
     setLinks((current) => clearFolder(current, id));
-    setActiveFolder(null);
+    // The folder is gone, so the address shouldn't point at it (nor offer it on Back).
+    updateAddress({ folder: null }, { replace: true });
     await deleteFolder(id);
   }
   return (
@@ -320,6 +332,10 @@ export default function LinkManager({
                 {selectedFolder ? selectedFolder.name : LIST_TITLES[activeList]}
               </span>
             </h2>
+            {/* How many links the list is showing, with search and tag applied. */}
+            <span className="shrink-0 text-sm text-muted">
+              {visibleLinks.length === 1 ? "1 link" : `${visibleLinks.length} links`}
+            </span>
             <button
               ref={menuButton}
               onClick={() => setMenuOpen(true)}
@@ -398,7 +414,7 @@ export default function LinkManager({
             <div className="glass mt-4 flex items-center justify-between gap-4 rounded-full py-1.5 pl-5 pr-1.5 text-sm text-muted">
               <span>Showing links tagged #{activeTag}</span>
               <button
-                onClick={() => setActiveTag(null)}
+                onClick={() => updateAddress({ tag: null })}
                 className="btn-secondary"
               >
                 Show all
@@ -440,7 +456,6 @@ export default function LinkManager({
                   onEditDetails={editDetails}
                   onToggleRead={toggleRead}
                   folders={folders}
-                  onMove={moveLink}
                   onTagClick={toggleTag}
                   compact={view === "list"}
                   onShowDetails={setDetailsId}

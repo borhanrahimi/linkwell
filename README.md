@@ -32,9 +32,11 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Archived copies of broken links (Wayback Machine)
 - [x] Page titles filled in automatically
 - [x] Read / unread status for each link
-- [x] Rediscover old unread links ("actually come back to them")
+- [x] Rediscover old unread links ("actually come back to them"), one at a time in a slim banner
 - [x] Folders (each link in one folder), each with a colour and an optional hand-drawn icon
-- [x] A sidebar with All links, Unread and Broken (with counts), your folders and your tags; the save box in the top bar
+- [x] A sidebar with All links, Unread and Broken (with counts), your folders and your top tags; the save box in the top bar. On phones, the sidebar is a drawer behind a Lists button
+- [x] Cards or List view, calm cards (site name, date and folder on one line), and a details panel with everything about one link
+- [x] The chosen list, folder, tag and view live in the address: Back, refresh and bookmarks keep your place
 - [x] Minimal Apple-style look: glass cards and a liquid glass header, with every text checked for readable contrast
 - [x] Dark mode (follows the system setting)
 - [x] Account page with your profile picture and a username
@@ -46,7 +48,7 @@ Linkwell is a bookmark manager built with Next.js, React and Tailwind CSS. Most 
 - [x] Save from anywhere: browser extension, bookmarklet, Android Share menu, iPhone Shortcut
 - [x] Installable app (Add to Home screen / Install app)
 - [x] Paste button: fills in a copied link with one tap
-- [x] Hand-drawn touches: folder icons, and an illustration in Rediscover
+- [x] Hand-drawn touches: folder icons, and pen-doodle drawings of the Linkwell character for empty lists, Rediscover and the landing page
 - [x] Import bookmarks from Chrome, Safari, Firefox or Raindrop, with their folders
 
 ## Tech stack

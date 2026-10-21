@@ -33,6 +33,8 @@ vi.mock("@/app/actions", () => ({
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  // The chosen list, folder and tag live in the address: start each test at "/".
+  window.history.replaceState(null, "", "/");
   vi.clearAllMocks();
 });
 
@@ -644,6 +646,75 @@ describe("sidebar", () => {
     expect(menu.getAttribute("aria-expanded")).toBe("false");
   });
 
+  test("puts the chosen list, folder, tag and view in the address", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Unread" }));
+    expect(window.location.search).toBe("?list=unread");
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    fireEvent.click(sidebar().getByRole("button", { name: "react" }));
+    expect(window.location.search).toBe("?folder=f1&tag=react");
+
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(window.location.search).toBe("?folder=f1&tag=react&view=list");
+
+    fireEvent.click(sidebar().getByRole("button", { name: "All links" }));
+    expect(window.location.search).toBe("?tag=react&view=list");
+  });
+
+  test("opens on what the address chooses, and follows the back button", () => {
+    window.history.replaceState(null, "", "/?list=broken");
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+    expect(screen.getByRole("heading", { name: "Broken" })).toBeDefined();
+    expect(shownTitles()).toEqual(["C"]);
+
+    // Going back to a page without a choice: all links again.
+    act(() => {
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(screen.getByRole("heading", { name: "All links" })).toBeDefined();
+    expect(shownTitles()).toEqual(["A", "B", "C"]);
+  });
+
+  test("ignores an address with a folder that doesn't exist (anymore)", () => {
+    window.history.replaceState(null, "", "/?folder=gone&list=nonsense");
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+
+    expect(screen.getByRole("heading", { name: "All links" })).toBeDefined();
+    expect(shownTitles()).toEqual(["A", "B", "C"]);
+  });
+
+  test("the heading says how many links the list is showing", () => {
+    render(<LinkManager initialLinks={links} initialFolders={folders} />);
+    expect(screen.getByText("3 links")).toBeDefined();
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Broken" }));
+    expect(screen.getByText("1 link")).toBeDefined();
+  });
+
+  test("shows the 5 most used tags, and the rest after \"Show all\"", () => {
+    const tagged = ["a", "b", "c", "d", "e", "f", "g"].map((tag, i) => ({
+      id: String(i),
+      url: `https://${tag}.com`,
+      createdAt: "2020-01-01T00:00:00.000Z",
+      // "a" is used most, "g" least.
+      tags: ["a", "b", "c", "d", "e", "f", "g"].slice(0, 7 - i),
+    }));
+    render(<LinkManager initialLinks={tagged} />);
+    const tagNames = () => within(sidebar().getByRole("list", { name: "All tags" })).getAllByRole("button").map((b) => b.textContent?.replace(/[#\d]/g, ""));
+    expect(tagNames()).toEqual(["a", "b", "c", "d", "e"]);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Show all 7 tags" }));
+    expect(tagNames()).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
+
+    fireEvent.click(sidebar().getByRole("button", { name: "g" }));
+    fireEvent.click(sidebar().getByRole("button", { name: "Show fewer" }));
+    // The chosen tag stays in sight, even when it's not in the top 5.
+    expect(tagNames()).toEqual(["a", "b", "c", "d", "e", "g"]);
+  });
+
   test("says so when there's nothing unread", () => {
     render(<LinkManager initialLinks={[links[1]]} />);
 
@@ -895,35 +966,65 @@ describe("folders", () => {
 });
 
 describe("moving links into folders", () => {
-  const link = { id: "1", url: "https://example.com", createdAt: "2026-10-01T12:00:00.000Z" };
-  const work = { id: "f1", name: "Work" };
+  const link = { id: "1", url: "https://example.com/page", createdAt: "2026-10-01T12:00:00.000Z" };
+  const work = { id: "f1", name: "Work", color: "green" as const };
+  const openDetails = () => fireEvent.click(cards().getByRole("button", { name: "Details" }));
 
-  test("has no folder picker when there are no folders", () => {
-    render(<LinkManager initialLinks={[link]} />);
-
-    expect(screen.queryByRole("combobox", { name: "Folder" })).toBeNull();
-  });
-
-  test("moves a link into a folder", async () => {
+  test("cards have no folder menu: moving happens in the details panel", () => {
     render(<LinkManager initialLinks={[link]} initialFolders={[work]} />);
 
+    expect(cards().queryByRole("combobox", { name: "Folder" })).toBeNull();
+  });
+
+  test("moves a link into a folder, and the card then names it", async () => {
+    render(<LinkManager initialLinks={[link]} initialFolders={[work]} />);
+    expect(cards().queryByText("Work")).toBeNull();
+
+    openDetails();
     await act(async () => {
       fireEvent.change(screen.getByRole("combobox", { name: "Folder" }), { target: { value: "f1" } });
     });
 
-    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveProperty("value", "f1");
     expect(moveToFolder).toHaveBeenCalledWith("1", "f1");
+    expect(cards().getByText("Work")).toBeDefined();
   });
 
   test("takes a link out of its folder", async () => {
     render(<LinkManager initialLinks={[{ ...link, folderId: "f1" }]} initialFolders={[work]} />);
 
+    openDetails();
     await act(async () => {
       fireEvent.change(screen.getByRole("combobox", { name: "Folder" }), { target: { value: "" } });
     });
 
-    expect(screen.getByRole("combobox", { name: "Folder" })).toHaveProperty("value", "");
     expect(moveToFolder).toHaveBeenCalledWith("1", null);
+    expect(cards().queryByText("Work")).toBeNull();
+  });
+});
+
+describe("calmer cards", () => {
+  const link = {
+    id: "1",
+    url: "https://www.example.com/a/long/path?with=query",
+    title: "A page",
+    createdAt: "2026-10-01T12:00:00.000Z",
+    folderId: "f1",
+  };
+  const folders = [{ id: "f1", name: "Reading" }];
+
+  test("show the site's name, not the full address, and the link's folder", () => {
+    render(<LinkManager initialLinks={[link]} initialFolders={folders} />);
+
+    expect(cards().getByText("example.com")).toBeDefined();
+    expect(cards().queryByText(link.url)).toBeNull();
+    expect(cards().getByText("Reading")).toBeDefined();
+  });
+
+  test("put Mark read and Details first, then Edit and Delete", () => {
+    render(<LinkManager initialLinks={[link]} initialFolders={folders} />);
+
+    const names = cards().getAllByRole("button").map((button) => button.textContent);
+    expect(names).toEqual(["Mark read", "Details", "Edit", "Delete"]);
   });
 });
 

@@ -17,11 +17,16 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     getLinks(session.user.id),
     getFolders(session.user.id),
   ]);
+  // The list, folder, tag and view chosen in the address, for the first render.
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === "string") params.set(key, value);
+  }
   return (
     <main className="min-h-screen p-4 sm:p-8">
       <div className="mx-auto max-w-6xl">
         {/* LinkManager draws the top bar itself, because the save box in it is part of its state. */}
-        <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} user={session.user} />
+        <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} user={session.user} initialSearch={params.toString()} />
       </div>
     </main>
   );
