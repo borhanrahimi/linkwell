@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import LegalPage, { Contact } from "@/components/LegalPage";
 
-export const metadata = { title: "Privacy · Linkwell" };
+export const metadata = { title: "Privacy" };
 
 // Plain language, and only what Linkwell really does: keep it true whenever a
 // feature changes what's stored or who sees it (and update SITE.legalUpdated).

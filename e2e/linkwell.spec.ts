@@ -326,3 +326,22 @@ test("the privacy and terms pages are linked from the landing page", async ({ pa
   await page.getByRole("link", { name: "Terms", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Terms of use" })).toBeVisible();
 });
+
+test("pages carry a title, a description and a sharing preview picture", async ({ page, request }) => {
+  await page.goto("/");
+  await expect(page).toHaveTitle("Linkwell");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /Save links/);
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Linkwell");
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+
+  // The picture is announced with its size and description, and it loads.
+  const image = await page.locator('meta[property="og:image"]').getAttribute("content");
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute("content", /Linkwell/);
+  const response = await request.get(new URL(image!).pathname);
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["content-type"]).toBe("image/png");
+
+  await page.goto("/privacy");
+  await expect(page).toHaveTitle("Privacy · Linkwell");
+});

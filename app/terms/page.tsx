@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import NextLink from "next/link";
 import LegalPage, { Contact } from "@/components/LegalPage";
 
-export const metadata = { title: "Terms · Linkwell" };
+export const metadata = { title: "Terms" };
 
 export default async function TermsPage() {
   // Rendered per request, so the page's scripts get the Content-Security-Policy nonce.

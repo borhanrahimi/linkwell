@@ -10,7 +10,7 @@ import ImportBookmarks from "@/components/ImportBookmarks";
 import UsernameForm from "@/components/UsernameForm";
 import { auth } from "@/lib/auth";
 
-export const metadata = { title: "Your account · Linkwell" };
+export const metadata = { title: "Your account" };
 
 export default async function AccountPage() {
   const session = await auth.api.getSession({ headers: await headers() });
