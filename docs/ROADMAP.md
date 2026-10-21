@@ -197,7 +197,7 @@ Give Linkwell a personality of its own, while the app itself stays calm and mini
 **You'll learn:** working with SVG, a small illustration style guide (line weight, palette), adding columns for folder colour and icon, and keeping drawings readable in light and dark mode.
 
 
-## 🔜 v1.7: Safety before strangers 🔒
+## ✅ v1.7: Safety before strangers 🔒 (done)
 
 Before the landing page invites strangers in, lock the doors. Already done: every Server Action checks who is asking, the link checker refuses private addresses (SSRF), the daily check needs a secret, and deleting an account needs a recent sign-in.
 
@@ -214,8 +214,8 @@ Before the landing page invites strangers in, lock the doors. Already done: ever
 - [x] Security headers: a Content-Security-Policy with a fresh nonce for every page (`proxy.ts`, `lib/csp.ts`), so only Linkwell's own scripts run; plus, on every response (`next.config.ts`): no showing Linkwell inside other sites, no guessing file types, a strict referrer policy, HTTPS only, and no camera, microphone or location
 
 **Housekeeping**
-- [ ] Fix what `npm audit` reports (5 known issues in development tools: vite, esbuild)
-- [ ] A `SECURITY.md` (how to report a problem), and a security checklist in ARCHITECTURE.md to go through for every new feature
+- [x] Fix what `npm audit` reports: `vite` updated, `drizzle-kit`'s old `esbuild` replaced with an `overrides` entry. Left: `braces` (through ESLint), which has no fix yet and only reads our own lint patterns
+- [x] A `SECURITY.md` (report problems privately through GitHub), and a security checklist in ARCHITECTURE.md to go through for every new feature
 
 **You'll learn:** validating input on the server, rate limiting, security headers and CSP, and keeping dependencies safe.
 

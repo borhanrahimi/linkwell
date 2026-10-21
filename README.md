@@ -191,3 +191,4 @@ For how these pieces fit together and the rules for where new code goes, see [do
 
 - [Architecture](docs/ARCHITECTURE.md): how the code is organized and why
 - [Roadmap](docs/ROADMAP.md): what's planned next
+- [Security](SECURITY.md): how Linkwell protects its users, and how to report a problem privately

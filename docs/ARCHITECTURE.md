@@ -417,7 +417,39 @@ Tests use **Vitest** with **React Testing Library**, running in `jsdom` (a fake 
 - **Security headers:** one test collects every `securitypolicyviolation` event while it visits each page signed out and signed in, and fails on any blocked script, style or image. If a new feature loads something from another site, that test says so, and `lib/csp.ts` needs the new address.
 - Vitest skips `e2e/` (`exclude` in `vitest.config.mts`), so `npm run check` stays fast and doesn't need the test database.
 
-## 8. Decision log
+## 8. Security checklist
+
+Go through this list for every new feature, before committing. Each line is something Linkwell got wrong once, or protects on purpose.
+
+**Server Actions and routes** (they're public: anyone can call them with anything)
+- [ ] Starts with `await getUserId()` (or a session check in a Route Handler), and passes that id to every `lib/data.ts` call
+- [ ] Every `lib/data.ts` function filters by `user_id` (`ownLink`, `ownFolder`), for reads, updates and deletes
+- [ ] Checks its input again on the server, whatever the browser checked: use the helpers in `lib/links.ts` (`cleanNewLink`, `cleanText`, `cleanTags`, `cleanFolderName`, `isWebAddress`). Text that isn't text becomes `""`, lists get a maximum size
+- [ ] New limits go next to the others in `lib/links.ts` (lengths) or `lib/limits.ts` (counts), and the form uses the same number as `maxLength`
+- [ ] Ids from the browser are never trusted to belong to the caller: `ownLink`/`ownFolder` decide
+- [ ] Expensive work (fetching other websites, many rows) gets a rate limit in `RATE_LIMITS`, counted before the work starts
+- [ ] Errors the user should see are **returned** as text; thrown errors are hidden in production
+
+**Fetching other websites**
+- [ ] Always through `safeFetch` (`lib/safeUrl.ts`), never plain `fetch`, so private addresses stay unreachable
+
+**Showing data**
+- [ ] Text from users or other websites is shown with React (`{text}`), never `dangerouslySetInnerHTML`; anything written into HTML by hand (like the bookmarks export) goes through `escapeHtml`
+- [ ] Links in `href` come from saved, `http(s)`-only URLs
+
+**The browser**
+- [ ] Anything loaded from another site (images, scripts, fonts) is added to `lib/csp.ts` on purpose; the security-header browser test fails until it is
+- [ ] No inline `<script>`; inline `<style>` tags need the nonce
+
+**Data and secrets**
+- [ ] New tables get a `user_id` with `ON DELETE CASCADE`, so deleting an account deletes everything
+- [ ] Migrations are applied to production **before** pushing the code that needs them
+- [ ] Secrets go in `.env.local` and Vercel only; never in code, commits or logs
+
+**Dependencies**
+- [ ] `npm audit` before adding a package, and after updating. Known and accepted: `braces` (through `eslint-config-next`), a denial-of-service bug with no fixed version yet that only reads our own lint patterns. `overrides` in `package.json` gives `drizzle-kit`'s old `@esbuild-kit` helper a safe `esbuild`
+
+## 9. Decision log
 
 Record important decisions here so the reasons aren't forgotten.
 
@@ -607,3 +639,6 @@ Record important decisions here so the reasons aren't forgotten.
 | 2026-10-20 | `img-src` allows Google's favicon service (`www.google.com`, `*.gstatic.com`) and profile pictures (`*.googleusercontent.com`) | Those are the only outside images; everything else must come from Linkwell itself |
 | 2026-10-20 | No `upgrade-insecure-requests` | The browser tests run on `http://localhost`, where it would break every request; on the live site, HTTPS is already enforced by `Strict-Transport-Security` and Vercel |
 | 2026-10-20 | The contrast test uses Playwright's `bypassCSP` | It injects a `<style>` tag to hide text while measuring, which the policy (rightly) blocks; a separate test checks that real pages cause no violations |
+| 2026-10-20 | `npm audit fix` for `vite`; an `overrides` entry for `@esbuild-kit/core-utils`' `esbuild` instead of `npm audit fix --force` | `--force` would have downgraded `drizzle-kit` by a year. The override only replaces one old copy of esbuild inside a deprecated helper; `drizzle-kit generate` and `check` still work |
+| 2026-10-20 | The `braces` advisory (through `eslint-config-next`) is accepted for now | No fixed version exists; it's a denial-of-service through crafted glob patterns, and it only reads our own lint config. `npm audit` will show the fix when it's released |
+| 2026-10-20 | Security problems are reported through GitHub's private vulnerability reporting (`SECURITY.md`) | Reports stay private until fixed, and no email address has to be public |
