@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { fetchTitle, readTitle } from "@/lib/fetchTitle";
+import { fetchTitle, readOembedUrl, readTitle } from "@/lib/fetchTitle";
 import { BlockedUrlError } from "@/lib/safeUrl";
 
 function respondWith(
@@ -35,6 +35,32 @@ describe("readTitle", () => {
 
   test("cuts very long titles to 200 characters", () => {
     expect(readTitle(`<title>${"a".repeat(500)}</title>`)).toHaveLength(200);
+  });
+
+  test("prefers the sharing title, which has no site name on the end", () => {
+    expect(
+      readTitle(
+        '<title>Black &amp; Blue - Videos</title><meta content="Black &amp; Blue" property="og:title">'
+      )
+    ).toBe("Black & Blue");
+    expect(readTitle("<meta name='twitter:title' content='Hi'><title>Hi - Site</title>")).toBe("Hi");
+  });
+
+  test("skips titles that are only the site's name, like ' - Videos'", () => {
+    expect(readTitle("<title> - Videos</title>")).toBeUndefined();
+    expect(readTitle('<meta property="og:title" content="| News"><title>Real one</title>')).toBe("Real one");
+  });
+});
+
+describe("readOembedUrl", () => {
+  test("finds the page's title service, resolving relative addresses", () => {
+    expect(
+      readOembedUrl(
+        '<link rel="alternate" type="application/json+oembed" href="/oembed?a=1&amp;b=2">',
+        "https://example.com/watch"
+      )
+    ).toBe("https://example.com/oembed?a=1&b=2");
+    expect(readOembedUrl("<link rel='icon' href='/x.png'>", "https://example.com")).toBeUndefined();
   });
 });
 
@@ -88,5 +114,41 @@ describe("fetchTitle", () => {
     };
 
     expect(await fetchTitle("http://localhost", blocked)).toBeUndefined();
+  });
+
+  test("asks a video site's title service first, and returns its title", async () => {
+    const asked: string[] = [];
+    const fetchFn: typeof fetch = async (input) => {
+      asked.push(String(input));
+      return new Response(JSON.stringify({ title: "Black & Blue" }), {
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    expect(await fetchTitle("https://www.youtube.com/watch?v=abc", fetchFn)).toBe("Black & Blue");
+    expect(asked).toEqual([
+      "https://www.youtube.com/oembed?format=json&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Dabc",
+    ]);
+  });
+
+  test("reads the page when the title service doesn't answer", async () => {
+    const fetchFn: typeof fetch = async (input) =>
+      String(input).includes("oembed")
+        ? new Response("busy", { status: 503 })
+        : new Response("<title>From the page - Videos</title>", { headers: { "content-type": "text/html" } });
+
+    expect(await fetchTitle("https://youtu.be/abc", fetchFn)).toBe("From the page - Videos");
+  });
+
+  test("asks the title service a page names when the page's own title is useless", async () => {
+    const fetchFn: typeof fetch = async (input) =>
+      String(input) === "https://example.com/oembed"
+        ? new Response('{"title":"The real title"}', { headers: { "content-type": "application/json" } })
+        : new Response(
+            '<title> - Example</title><link rel="alternate" type="application/json+oembed" href="/oembed">',
+            { headers: { "content-type": "text/html" } }
+          );
+
+    expect(await fetchTitle("https://example.com/page", fetchFn)).toBe("The real title");
   });
 });
