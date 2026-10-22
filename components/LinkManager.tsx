@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import Header from "@/components/Header";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
@@ -18,18 +18,7 @@ import { useAddressState } from "@/components/useAddressState";
 import FolderIconDrawing from "@/components/FolderIcon";
 import { FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
-import {
-  createFolder,
-  moveToFolder,
-  removeLink,
-  saveLink,
-  saveReadStatus,
-  saveLinkDetails,
-  deleteFolder,
-  renameFolder,
-  setFolderColor,
-  setFolderIcon,
-} from "@/app/actions";
+import { useLinkActions } from "@/components/LinkActions";
 import {
   createLink,
   filterByFolder,
@@ -74,6 +63,8 @@ type LinkManagerProps = {
   // The signed-in user, for the top bar. Tests may leave it out: then the
   // save box is shown on its own.
   user?: { name: string; image?: string | null; username?: string | null };
+  // The demo's right side of the top bar, instead of an account.
+  topBarEnd?: ReactNode;
   // The address's query (like "list=unread") the server rendered with.
   initialSearch?: string;
 };
@@ -83,8 +74,22 @@ export default function LinkManager({
   initialFolders = [],
   now,
   user,
+  topBarEnd,
   initialSearch,
 }: LinkManagerProps) {
+  // The server's actions, or the demo's stand-ins (see LinkActions).
+  const {
+    createFolder,
+    moveToFolder,
+    removeLink,
+    saveLink,
+    saveReadStatus,
+    saveLinkDetails,
+    deleteFolder,
+    renameFolder,
+    setFolderColor,
+    setFolderIcon,
+  } = useLinkActions();
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
   // What the list shows: a smart list (all, unread, broken) or one folder,
@@ -274,8 +279,8 @@ export default function LinkManager({
   return (
     <>
       {/* The save box lives in the top bar, so it's always at hand. */}
-      {user ? (
-        <Header user={user}>
+      {user || topBarEnd ? (
+        <Header user={user} end={topBarEnd}>
           <LinkForm onAdd={addLink} folders={folders} currentFolder={activeFolder} onCreateFolder={makeFolder} />
         </Header>
       ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { importLinks } from "@/app/actions";
+import { useLinkActions } from "@/components/LinkActions";
 import { clearSavedLinks, loadLinks } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -10,6 +10,7 @@ type ImportBannerProps = {
 };
 
 export default function ImportBanner({ onImported }: ImportBannerProps) {
+  const { importLinks } = useLinkActions();
   const [oldLinks, setOldLinks] = useState<Link[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 

@@ -290,7 +290,7 @@ test("every page sends security headers, and nothing on it is blocked by them", 
   });
   const violations = () => page.evaluate(() => (window as unknown as { cspViolations: string[] }).cspViolations);
 
-  for (const path of ["/privacy", "/terms"]) {
+  for (const path of ["/privacy", "/terms", "/demo"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     expect(await violations(), path).toEqual([]);
@@ -430,4 +430,29 @@ test("the health check answers ok, for the uptime monitor", async ({ request }) 
 
   expect(response.status()).toBe(200);
   expect(await response.json()).toEqual({ status: "ok" });
+});
+
+test("anyone can try the demo without an account, and nothing is saved", async ({ page }) => {
+  // No server actions may run in the demo: record every POST the page makes.
+  const posts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") posts.push(request.url());
+  });
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Try the demo" }).click();
+  await expect(page).toHaveURL(/\/demo$/);
+  await expect(page.getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
+  await expect(page.getByRole("region", { name: /^Rediscover/ })).toBeVisible();
+
+  await saveLink(page, "https://example.com/tried-the-demo", "Tried the demo");
+  await expect(page.getByRole("link", { name: "Tried the demo" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Your lists" }).getByRole("button", { name: "Recipes" }).click();
+  await expect(page).toHaveURL(/\/demo\?folder=demo-recipes$/);
+  expect(posts).toEqual([]);
+
+  // A refresh starts over.
+  await page.goto("/demo");
+  await expect(page.getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Tried the demo" })).toHaveCount(0);
 });

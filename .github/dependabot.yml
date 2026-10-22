@@ -19,6 +19,15 @@ updates:
     ignore:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # Waiting on Next.js's lint setup (eslint-config-next), checked 2026-10-21:
+      # typescript-eslint refuses TypeScript 7 ("does not support TS 7.0"), and
+      # its import, jsx-a11y and react plugins don't support ESLint 10 yet. Our
+      # own code passes both. Remove these two when eslint-config-next supports
+      # them (see MAINTENANCE.md, "Big upgrades").
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
 
   # The workflow's own building blocks (actions/checkout and friends).
   - package-ecosystem: github-actions

@@ -87,7 +87,13 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
             Linkwell is a calm place for the links you want to keep. It checks they still work, and brings old ones back
             when you&apos;ve forgotten them.
           </p>
-          <SignInButton />
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <SignInButton className="btn-primary" />
+            {/* For anyone who wants to look around first: no account needed. */}
+            <NextLink href="/demo" className="btn-secondary">
+              Try the demo
+            </NextLink>
+          </div>
           {deleted ? (
             <p role="status" className="mt-4 text-sm text-muted">
               Your account and all your links were deleted. Goodbye
