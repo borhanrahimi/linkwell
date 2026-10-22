@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { checkAllLinks } from "@/app/actions";
+import { useLinkActions } from "@/components/LinkActions";
 import type { Link } from "@/types/link";
 
 type CheckLinksButtonProps = {
@@ -9,6 +9,7 @@ type CheckLinksButtonProps = {
 };
 
 export default function CheckLinksButton({ onChecked }: CheckLinksButtonProps) {
+  const { checkAllLinks } = useLinkActions();
   const [isChecking, setIsChecking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 

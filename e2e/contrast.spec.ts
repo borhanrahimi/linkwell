@@ -75,6 +75,17 @@ for (const colorScheme of ["light", "dark"] as const) {
       }
     });
 
+    test("every text on the demo is readable, details panel too", async ({ page }) => {
+      await page.goto("/demo");
+      await page.getByRole("link", { name: "Notes on CSS grid layouts" }).waitFor();
+      const results = await measureContrast(page);
+      await page.getByRole("button", { name: "Details" }).first().click();
+      await page.getByRole("button", { name: "Close", exact: true }).waitFor();
+      results.push(...(await measureContrast(page)));
+
+      expect(results.filter((result) => result.ratio < result.needed)).toEqual([]);
+    });
+
     test("every text on the save page is readable, folder menu and new folder box too", async ({ page, signIn }) => {
       await signIn();
       await page.goto("/share?url=" + encodeURIComponent("https://example.com/x"));

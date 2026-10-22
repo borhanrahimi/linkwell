@@ -31,4 +31,4 @@ Especially welcome: seeing or changing another person's links, folders or accoun
 - A Content-Security-Policy with a fresh nonce for every page, and security headers on every response.
 - Secrets live only in Vercel and in a local `.env.local` that's never committed.
 
-The details, and the checklist every new feature goes through, are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#8-security-checklist).
+The details, and the checklist every new feature goes through, are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#7-security).

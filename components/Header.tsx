@@ -5,22 +5,27 @@ import SignOutButton from "@/components/SignOutButton";
 import LogoMark from "@/components/LogoMark";
 
 type HeaderProps = {
-  user: { name: string; image?: string | null; username?: string | null };
+  user?: { name: string; image?: string | null; username?: string | null };
   // Something to put in the middle of the bar: the save box, on the links page.
   children?: ReactNode;
+  // Replaces the account part on the right (the demo puts its sign-in there).
+  end?: ReactNode;
 };
 
 // The floating glass bar at the top of every signed-in page. The links scroll
 // underneath it. Your picture and name lead to your account page.
 // On phones, the middle part (the save box) gets a row of its own.
-export default function Header({ user, children }: HeaderProps) {
+export default function Header({ user, children, end }: HeaderProps) {
   return (
     <header
       className={`glass-bar sticky top-3 z-10 flex flex-wrap items-center gap-x-4 gap-y-1 py-1.5 pl-5 pr-1.5 ${
         children ? "rounded-[1.75rem]" : "rounded-full"
       }`}
     >
-      <Link href="/" className="flex shrink-0 items-center gap-1.5 text-lg font-semibold tracking-tight text-ink">
+      <Link
+        href="/"
+        className="flex shrink-0 items-center gap-1.5 text-lg font-semibold tracking-tight text-ink"
+      >
         <LogoMark className="size-5" />
         Linkwell
       </Link>
@@ -29,16 +34,24 @@ export default function Header({ user, children }: HeaderProps) {
           {children}
         </div>
       )}
-      <div className="ml-auto flex min-w-0 items-center gap-1">
-        <Link
-          href="/account"
-          className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-medium text-ink hover:bg-hover focus:outline-none focus:ring-2 focus:ring-blue-400"
-        >
-          <Avatar name={user.name} image={user.image} />
-          <span className="truncate">{user.username ? `@${user.username}` : user.name}</span>
-        </Link>
-        <SignOutButton />
-      </div>
+      {end ? (
+        <div className="ml-auto flex min-w-0 items-center gap-2">{end}</div>
+      ) : (
+        user && (
+          <div className="ml-auto flex min-w-0 items-center gap-1">
+            <Link
+              href="/account"
+              className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-medium text-ink hover:bg-hover focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <Avatar name={user.name} image={user.image} />
+              <span className="truncate">
+                {user.username ? `@${user.username}` : user.name}
+              </span>
+            </Link>
+            <SignOutButton />
+          </div>
+        )
+      )}
     </header>
   );
 }

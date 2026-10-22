@@ -22,14 +22,15 @@ Where we stopped: v2.0 "Runs on its own" is mostly done (checks, Dependabot, `ma
 - [ ] Optional: the restore fire drill (restore the backup into an empty Neon branch, check the numbers, delete the branch)
 
 **Claude:**
-- [ ] Finish `MAINTENANCE.md`: updating Next.js and packages safely, running migrations, what to do when the uptime monitor emails you, restarting `npm run dev` after `npm install`
-- [ ] Error tracking: decide together (suggestion: mark it "later": it sends data to an outside service and needs privacy-page changes)
-- [ ] The two big upgrades Dependabot found and the checks stopped: ESLint 10 and TypeScript 7 (pull requests #7 and #8 were closed; they need code changes)
+- [x] Finish `MAINTENANCE.md`: updating Next.js and packages safely, running migrations, what to do when the uptime monitor emails you, restarting `npm run dev` after `npm install`
+- [x] Error tracking: not now (see v2.0)
+- [x] The two big upgrades: tried both. Our code passes them, but Next.js's lint setup doesn't support them yet (typescript-eslint refuses TypeScript 7; its import, jsx-a11y and react plugins don't list ESLint 10). Dependabot now skips both majors until it does; how to retry is in `MAINTENANCE.md`
 
 **For the portfolio** (so a reviewer can actually see what Linkwell is):
-- [ ] Let anyone try it. Google sign-in in "testing" mode only lets in accounts you added, so a recruiter hits a wall. Either publish the OAuth consent screen (needs the `/privacy` and `/terms` addresses, below), or add a **demo mode** with sample links that needs no account (or both)
-- [ ] A portfolio-first README: one line on what Linkwell is, the live link, a screenshot, 4–5 highlights (tested accessibility, security, CI and monitoring, its own illustrations), the tech stack, then the details. The long version-by-version paragraph moves down or into the roadmap
-- [ ] A one-page case study (`docs/CASE_STUDY.md`): the problem, the key decisions (from the decision log), what was hard, what was learned, and how AI help was used. Also your study guide for interviews: be able to explain the private-address protection, the Content-Security-Policy, rate limits, address-based filters and the CI setup
+- [x] A **demo** at `/demo` ("Try the demo" on the landing page): the real app with sample links, no account; every change stays in the browser. Publishing Google sign-in is still worth doing (below), so reviewers can also sign in
+- [x] Docs tidied: a short README (56 lines), `ARCHITECTURE.md` rewritten to match the code today (system diagram, layers, request flows, data, security, testing, conventions), the decision log in `docs/DECISIONS.md`, setup in `MAINTENANCE.md` and `docs/SAVE_FROM_ANYWHERE.md`
+- [x] A portfolio-first README: the promise, live site, demo and case study links, a light/dark screenshot, the three promises and six highlights first; the long version-by-version paragraph is gone (the roadmap tells that story)
+- [x] A one-page case study (`docs/CASE_STUDY.md`): the problem, what was built, key decisions, what was hard, how AI help was used, what was learned, and an interview study guide (questions, and the file that answers each). Read it, and make it sound like you
 - [ ] Optional: a 30–60 second screen recording (save a link, Rediscover, a broken link with its archived copy)
 
 **Smaller open questions:**
@@ -342,14 +343,14 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 - [x] Dependabot (`.github/dependabot.yml`): weekly pull requests for package updates (small ones grouped into one), monthly for the workflow's actions; the checks test each one before you merge. Security alerts and fixes are switched on in GitHub's settings
 - [x] A health check (`/api/health`): 200 `{"status":"ok"}` when the app reaches the database, 503 `{"status":"down"}` when it can't, never cached
 - [x] A free uptime monitor (UptimeRobot, "Linkwell") that opens `/api/health` every 5 minutes and emails you when the site is down
-- [ ] Error tracking (for example Sentry's free plan), so errors on the live site are reported instead of lost
+- [x] Error tracking: decided **not now** (2026-10-21). A service like Sentry would send error details, which can include visitors' data, to another company, and the privacy page would have to say so. Vercel's Logs plus the uptime monitor cover it; `MAINTENANCE.md` says where to look
 
 **Data that survives**
 - [x] Backups: `npm run backup` saves users, accounts (no tokens), folders and links to a private file in `backups/` (ignored by Git); `npm run restore` puts one back, only into an empty database, all or nothing. How to use Neon's restore window is in `MAINTENANCE.md`
 - [x] Keep secrets only in Vercel and `.env.local`, and write down which ones exist (never their values): the table in `MAINTENANCE.md`, with where each comes from and how to renew it
 
 **Coming back later**
-- [ ] A `MAINTENANCE.md`: where everything lives (GitHub, Vercel, Neon, Google Cloud), every secret's name and where to renew it, how to update Next.js and other packages safely, and how to run migrations
+- [x] A `MAINTENANCE.md`: where everything lives, every secret's name and how to renew it, backups and restoring, shipping a change through a pull request, running it locally, updating packages and big upgrades, migrations, what to do when the monitor emails you, and the regular jobs
 
 **You'll learn:** CI/CD, dependency management, monitoring, backups, and writing for your future self.
 
