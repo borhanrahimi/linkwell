@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Folder, Link, LinkDetailsInput } from "@/types/link";
-import { Badges, EditForm, Favicon, StickyNote } from "@/components/LinkParts";
+import { Badges, EditForm, Favicon, PreviewImage, StickyNote } from "@/components/LinkParts";
 import { getArchiveUrl, getDomain, timeAgo } from "@/lib/links";
 import { FOLDER_DOT_CLASS } from "@/lib/folders";
 
@@ -20,9 +20,19 @@ type LinkCardProps = {
   compact?: boolean;
   // Opens the details panel for this link.
   onShowDetails: (id: string) => void;
+  // Select mode: a tick box on each link, and tapping the card ticks it.
+  selecting?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 };
 
-export default function LinkCard({ link, activeTag, now, folders, compact = false, onDelete, onEditDetails, onTagClick, onToggleRead, onShowDetails }: LinkCardProps) {
+// Clicks on the card's own controls (title, buttons, tags) do their own thing;
+// a click anywhere else on the card opens its details, or ticks it in Select mode.
+function onCardBackground(event: React.MouseEvent) {
+  return !(event.target as Element).closest("a, button, input, select, textarea, label");
+}
+
+export default function LinkCard({ link, activeTag, now, folders, compact = false, onDelete, onEditDetails, onTagClick, onToggleRead, onShowDetails, selecting = false, selected = false, onToggleSelect }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   // Broken links get a red outline, so they stand out in the grid.
   const tileSize = link.status === "broken" ? "ring-1 ring-danger/50" : "";
@@ -112,12 +122,33 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
     </time>
   );
 
+  const name = link.title || getDomain(link.url);
+  const checkbox = selecting && (
+    <input
+      type="checkbox"
+      checked={selected}
+      onChange={() => onToggleSelect?.(link.id)}
+      aria-label={`Select ${name}`}
+      className="size-5 shrink-0 accent-[#0071e3]"
+    />
+  );
+  function handleCardClick(event: React.MouseEvent) {
+    if (!onCardBackground(event)) return;
+    if (selecting) onToggleSelect?.(link.id);
+    else onShowDetails(link.id);
+  }
+  const selectedRing = selected ? "ring-2 ring-[#0071e3]" : "";
+
   // List view: one row. The note, the folder menu and the archive link stay
   // in Cards view (and the details panel).
   if (compact) {
     return (
       // On phones the actions wrap onto their own line under the title.
-      <li className="group flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+      <li
+        onClick={handleCardClick}
+        className={`group flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-hover/50 ${selected ? "bg-hover" : ""}`}
+      >
+        {checkbox}
         <div className={link.readAt ? "opacity-50 grayscale" : ""}>
           <Favicon url={link.url} size="small" />
         </div>
@@ -134,16 +165,20 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
             {tagButtons}
           </div>
         </div>
-        <div className="-ml-2.5 flex w-full shrink-0 pl-10 sm:ml-0 sm:w-auto sm:pl-0">{actions}</div>
+        {!selecting && <div className="-ml-2.5 flex w-full shrink-0 pl-10 sm:ml-0 sm:w-auto sm:pl-0">{actions}</div>}
       </li>
     );
   }
 
   return (
     <li
-      className={`group glass flex flex-col justify-between gap-3 rounded-2xl p-4 ${tileSize}`}
+      onClick={handleCardClick}
+      className={`group glass flex cursor-pointer flex-col justify-between gap-3 overflow-hidden rounded-2xl p-4 transition-[transform,box-shadow] duration-200 motion-safe:animate-rise-in motion-safe:hover:-translate-y-0.5 hover:shadow-lg ${tileSize} ${selectedRing}`}
     >
+      {/* The page's picture across the top of the card, edge to edge. */}
+      {link.image && <PreviewImage src={link.image} className="-mx-4 -mt-4 mb-1 w-[calc(100%+2rem)] max-w-none self-start" />}
       <div className="flex min-w-0 items-start gap-3">
+        {checkbox}
         {/* Read links fade a little: their icon goes grey. */}
         <div className={`shrink-0 ${link.readAt ? "opacity-50 grayscale" : ""}`}>
           <Favicon url={link.url} />
@@ -174,7 +209,7 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
           {tagButtons}
         </div>
       </div>
-      <div className="-mx-2.5 -mb-1 flex border-t border-line pt-2">{actions}</div>
+      {!selecting && <div className="-mx-2.5 -mb-1 flex border-t border-line pt-2">{actions}</div>}
     </li>
   )
 }

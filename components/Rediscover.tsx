@@ -37,7 +37,7 @@ export default function Rediscover({ links, now, className = "" }: RediscoverPro
           href={link.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="block truncate font-medium text-highlight hover:underline"
+          className="line-clamp-2 font-medium text-highlight hover:underline sm:block sm:truncate"
         >
           {link.title || getDomain(link.url)}
         </a>

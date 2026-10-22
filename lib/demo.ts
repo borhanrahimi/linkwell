@@ -5,7 +5,9 @@ import { MAX_FOLDERS, TOO_MANY_FOLDERS } from "@/lib/limits";
 import type { Folder, Link } from "@/types/link";
 
 // The demo (/demo): Linkwell with sample links, for visitors who want to try
-// it before signing in. Made-up titles on example addresses, no real brands.
+// it before signing in. Made-up titles on example addresses, no real brands;
+// some have simple cover pictures of our own (public/demo/), so the demo shows
+// preview pictures too.
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -24,14 +26,15 @@ export function demoLinks(now: Date): Link[] {
     ...rest,
   });
   return [
-    link("1", 1, { url: "https://example.org/css-grid", title: "Notes on CSS grid layouts", tags: ["css", "web", "design"] }),
-    link("2", 2, { url: "https://example.com/sourdough", title: "Sourdough starter, step by step", tags: ["food"], folderId: "demo-recipes" }),
+    link("1", 1, { url: "https://example.org/css-grid", title: "Notes on CSS grid layouts", tags: ["css", "web", "design"], image: "/demo/css-grid.svg" }),
+    link("2", 2, { url: "https://example.com/sourdough", title: "Sourdough starter, step by step", tags: ["food"], folderId: "demo-recipes", image: "/demo/sourdough.svg" }),
     link("3", 3, {
       url: "https://example.com/calm-interfaces",
       title: "How to write calm interfaces",
       tags: ["design", "ux"],
       folderId: "demo-reading",
       readAt: ago(1),
+      image: "/demo/calm-interfaces.svg",
     }),
     link("4", 5, { url: "https://example.net/database-indexes", title: "A gentle guide to database indexes", tags: ["db"], folderId: "demo-work" }),
     link("5", 12, {
@@ -39,6 +42,7 @@ export function demoLinks(now: Date): Link[] {
       title: "Weekend hikes near the coast",
       tags: ["travel"],
       note: "For the long weekend in spring",
+      image: "/demo/coast-hikes.svg",
     }),
     link("6", 20, {
       url: "https://example.net/old-conference-talk",
@@ -55,7 +59,7 @@ export function demoLinks(now: Date): Link[] {
       folderId: "demo-recipes",
       note: "For Friday dinner with friends",
     }),
-    link("8", 70, { url: "https://example.org/hyperlink-history", title: "The long history of the hyperlink", tags: ["web", "history"], folderId: "demo-reading" }),
+    link("8", 70, { url: "https://example.org/hyperlink-history", title: "The long history of the hyperlink", tags: ["web", "history"], folderId: "demo-reading", image: "/demo/hyperlink.svg" }),
   ];
 }
 
@@ -80,6 +84,8 @@ export function makeDemoActions(folders: Folder[] = DEMO_FOLDERS): LinkActions {
     },
     async saveReadStatus() {},
     async moveToFolder() {},
+    async moveLinksToFolder() {},
+    async markLinksRead() {},
     async importLinks() {
       return [];
     },

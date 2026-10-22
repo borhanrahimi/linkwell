@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { fetchTitle, readOembedUrl, readTitle } from "@/lib/fetchTitle";
+import { fetchPageInfo, fetchTitle, readImage, readOembedUrl, readTitle } from "@/lib/fetchTitle";
 import { BlockedUrlError } from "@/lib/safeUrl";
 
 function respondWith(
@@ -150,5 +150,47 @@ describe("fetchTitle", () => {
           );
 
     expect(await fetchTitle("https://example.com/page", fetchFn)).toBe("The real title");
+  });
+});
+
+describe("readImage", () => {
+  test("finds the sharing picture, resolving relative addresses", () => {
+    expect(readImage('<meta property="og:image" content="/cards/a.png">', "https://example.com/post")).toBe(
+      "https://example.com/cards/a.png"
+    );
+    expect(readImage("<meta name='twitter:image' content='https://cdn.example/b.jpg'>", "https://example.com")).toBe(
+      "https://cdn.example/b.jpg"
+    );
+  });
+
+  test("only takes https pictures, and nothing odd", () => {
+    expect(readImage('<meta property="og:image" content="http://example.com/a.png">', "https://example.com")).toBeUndefined();
+    expect(readImage('<meta property="og:image" content="javascript:alert(1)">', "https://example.com")).toBeUndefined();
+    expect(readImage("<title>No picture</title>", "https://example.com")).toBeUndefined();
+  });
+});
+
+describe("fetchPageInfo", () => {
+  test("reads the title and the picture from one visit", async () => {
+    const page = new Response('<title>Soup</title><meta property="og:image" content="https://example.com/soup.jpg">', {
+      headers: { "content-type": "text/html" },
+    });
+
+    expect(await fetchPageInfo("https://example.com/soup", async () => page)).toEqual({
+      title: "Soup",
+      image: "https://example.com/soup.jpg",
+    });
+  });
+
+  test("takes a video's thumbnail from its title service", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({ title: "A video", thumbnail_url: "https://img.example/thumb.jpg" }), {
+        headers: { "content-type": "application/json" },
+      });
+
+    expect(await fetchPageInfo("https://www.youtube.com/watch?v=abc", fetchFn)).toEqual({
+      title: "A video",
+      image: "https://img.example/thumb.jpg",
+    });
   });
 });

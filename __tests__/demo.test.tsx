@@ -11,6 +11,8 @@ vi.mock("@/app/actions", () => ({
   createFolder: vi.fn(),
   deleteFolder: vi.fn(),
   importLinks: vi.fn(),
+  markLinksRead: vi.fn(),
+  moveLinksToFolder: vi.fn(),
   moveToFolder: vi.fn(),
   removeLink: vi.fn(),
   renameFolder: vi.fn(),

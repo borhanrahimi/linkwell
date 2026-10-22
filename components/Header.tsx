@@ -10,16 +10,18 @@ type HeaderProps = {
   children?: ReactNode;
   // Replaces the account part on the right (the demo puts its sign-in there).
   end?: ReactNode;
+  // Phones save through the bottom bar's + instead, so the bar stays slim.
+  hideMiddleOnPhones?: boolean;
 };
 
 // The floating glass bar at the top of every signed-in page. The links scroll
 // underneath it. Your picture and name lead to your account page.
 // On phones, the middle part (the save box) gets a row of its own.
-export default function Header({ user, children, end }: HeaderProps) {
+export default function Header({ user, children, end, hideMiddleOnPhones = false }: HeaderProps) {
   return (
     <header
       className={`glass-bar sticky top-3 z-10 flex flex-wrap items-center gap-x-4 gap-y-1 py-1.5 pl-5 pr-1.5 ${
-        children ? "rounded-[1.75rem]" : "rounded-full"
+        !children ? "rounded-full" : hideMiddleOnPhones ? "rounded-full md:rounded-[1.75rem]" : "rounded-[1.75rem]"
       }`}
     >
       <Link
@@ -30,7 +32,11 @@ export default function Header({ user, children, end }: HeaderProps) {
         Linkwell
       </Link>
       {children && (
-        <div className="order-last w-full pr-3.5 pb-1.5 md:order-none md:w-auto md:flex-1 md:pr-0 md:pb-0">
+        <div
+          className={`order-last w-full pr-3.5 pb-1.5 md:order-none md:w-auto md:flex-1 md:pr-0 md:pb-0 ${
+            hideMiddleOnPhones ? "max-md:hidden" : ""
+          }`}
+        >
           {children}
         </div>
       )}

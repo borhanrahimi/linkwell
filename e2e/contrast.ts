@@ -29,6 +29,10 @@ export async function measureContrast(page: Page): Promise<ContrastResult[]> {
       // hovered) isn't showing yet: there's nothing to read. When it shows,
       // it has the same style as the buttons next to it, which are measured.
       if (opacity === 0) return [];
+      // Text covered by something else (behind a dimmed backdrop while a
+      // drawer or sheet is open) isn't being read; what's on top is measured.
+      const covering = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      if (covering && covering !== el && !el.contains(covering) && !covering.contains(el)) return [];
       const size = parseFloat(style.fontSize);
       const large = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66);
 

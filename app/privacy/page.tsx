@@ -42,8 +42,8 @@ export default async function PrivacyPage() {
       <ul>
         <li>Shows your links to you, and only to you.</li>
         <li>
-          Visits the pages you save from its own server: once to read a page&apos;s title, and once a day to check that
-          your links still work.
+          Visits the pages you save from its own server: once to read a page&apos;s title and preview picture, and once
+          a day to check that your links still work.
         </li>
         <li>Nothing else. There&apos;s no advertising, no selling of data, and no tracking or analytics.</li>
       </ul>
@@ -56,7 +56,9 @@ export default async function PrivacyPage() {
       </p>
       <p>
         When you look at your links, your browser loads each site&apos;s small icon from a public icon service, which
-        then learns the website&apos;s name (not the full address, and not who you are). A broken link&apos;s
+        then learns the website&apos;s name (not the full address, and not who you are). A link&apos;s preview
+        picture loads straight from the website it belongs to, like when you visit it, without telling it which page
+        asked. A broken link&apos;s
         &ldquo;View archived copy&rdquo; opens a public web archive.
       </p>
 

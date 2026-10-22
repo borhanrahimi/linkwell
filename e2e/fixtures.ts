@@ -47,10 +47,15 @@ export const test = base.extend<Fixtures>({
 });
 
 export async function saveLink(page: Page, url: string, title: string) {
-  await page.getByPlaceholder("Paste a link...").fill(url);
+  // On phones the save box is in a sheet behind the bottom bar's +.
+  const linkField = page.getByPlaceholder("Paste a link...").filter({ visible: true });
+  if ((await linkField.count()) === 0) {
+    await page.getByRole("button", { name: "Save a link" }).click();
+  }
+  await linkField.fill(url);
   // A typed title means the server doesn't fetch the page, so tests stay fast.
-  await page.getByPlaceholder("Title (optional)").fill(title);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByPlaceholder("Title (optional)").filter({ visible: true }).fill(title);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
 }
 
 export { expect } from "@playwright/test";

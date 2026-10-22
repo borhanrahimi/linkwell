@@ -81,46 +81,81 @@ function knownOembedUrl(url: string): string | undefined {
   return provider && provider.endpoint + encodeURIComponent(url);
 }
 
-async function fetchOembedTitle(oembedUrl: string, fetchFn: FetchFn): Promise<string | undefined> {
+// The page's sharing picture (og:image and friends), for its card. Only
+// https pictures (the app is served over https, and http ones would be
+// blocked), resolved against the page's address, and of a sane length.
+export function readImage(html: string, pageUrl: string): string | undefined {
+  const metas = tags(html, "meta");
+  for (const key of ["og:image:secure_url", "og:image", "og:image:url", "twitter:image", "twitter:image:src"]) {
+    const meta = metas.find((m) => (m.property ?? m.name)?.toLowerCase() === key);
+    const image = meta?.content && httpsAddress(decode(meta.content).trim(), pageUrl);
+    if (image) return image;
+  }
+  return undefined;
+}
+
+function httpsAddress(value: string, base: string): string | undefined {
   try {
-    const response = await fetchFn(oembedUrl, { signal: AbortSignal.timeout(5_000) });
-    if (!response.ok || !response.headers.get("content-type")?.includes("json")) {
-      await response.body?.cancel();
-      return undefined;
-    }
-    const data: unknown = await response.json();
-    const title = (data as { title?: unknown } | null)?.title;
-    return typeof title === "string" ? clean(title) : undefined;
+    const url = new URL(value, base);
+    return url.protocol === "https:" && url.href.length <= 2048 ? url.href : undefined;
   } catch {
     return undefined;
   }
 }
 
-export async function fetchTitle(url: string, fetchFn: FetchFn = safeFetch): Promise<string | undefined> {
+export type PageInfo = { title?: string; image?: string };
+
+async function fetchOembed(oembedUrl: string, fetchFn: FetchFn): Promise<PageInfo> {
+  try {
+    const response = await fetchFn(oembedUrl, { signal: AbortSignal.timeout(5_000) });
+    if (!response.ok || !response.headers.get("content-type")?.includes("json")) {
+      await response.body?.cancel();
+      return {};
+    }
+    const data = (await response.json()) as { title?: unknown; thumbnail_url?: unknown } | null;
+    return {
+      title: typeof data?.title === "string" ? clean(data.title) : undefined,
+      image: typeof data?.thumbnail_url === "string" ? httpsAddress(data.thumbnail_url, oembedUrl) : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+// A page's title and sharing picture, from one visit. Video sites answer
+// through their title service (oEmbed) first; otherwise the page itself, and
+// its own title service if the page's title is useless. Never throws.
+export async function fetchPageInfo(url: string, fetchFn: FetchFn = safeFetch): Promise<PageInfo> {
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    return undefined;
+    return {};
   }
 
   try {
     const known = knownOembedUrl(url);
-    if (known) {
-      const title = await fetchOembedTitle(known, fetchFn);
-      if (title) return title;
-    }
+    const fromService = known ? await fetchOembed(known, fetchFn) : {};
+    if (fromService.title) return fromService;
 
     const response = await fetchFn(url, { signal: AbortSignal.timeout(5_000) });
     if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) {
       await response.body?.cancel();
-      return undefined;
+      return fromService;
     }
     const html = await response.text();
-    const title = readTitle(html);
-    if (title) return title;
+    const info: PageInfo = { title: readTitle(html), image: fromService.image ?? readImage(html, url) };
+    if (info.title) return info;
 
     // No useful title on the page: ask its oEmbed service, if it names one.
     const oembed = readOembedUrl(html, url);
-    return oembed && oembed !== known ? await fetchOembedTitle(oembed, fetchFn) : undefined;
+    if (oembed && oembed !== known) {
+      const named = await fetchOembed(oembed, fetchFn);
+      return { title: named.title, image: info.image ?? named.image };
+    }
+    return info;
   } catch {
-    return undefined;
+    return {};
   }
+}
+
+export async function fetchTitle(url: string, fetchFn: FetchFn = safeFetch): Promise<string | undefined> {
+  return (await fetchPageInfo(url, fetchFn)).title;
 }

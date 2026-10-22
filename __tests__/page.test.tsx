@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, deleteFolder, moveToFolder, renameFolder, setFolderColor, setFolderIcon, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
+import { checkAllLinks, createFolder, deleteFolder, markLinksRead, moveLinksToFolder, moveToFolder, renameFolder, setFolderColor, setFolderIcon, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -20,6 +20,8 @@ vi.mock("@/app/actions", () => ({
   deleteFolder: vi.fn(async () => {}),
   importLinks: vi.fn(async (links) => links),
   saveLink: vi.fn(async (link) => link),
+  moveLinksToFolder: vi.fn(async () => {}),
+  markLinksRead: vi.fn(async () => {}),
   removeLink: vi.fn(async () => { }),
   // Like the real action: returns the cleaned details.
   saveLinkDetails: vi.fn(async (_id: string, input: { title: string; tags: string; note: string }) => ({
@@ -1137,7 +1139,7 @@ describe("showing one folder", () => {
   });
 });
 
-describe("renaming and deleting folders", () => {
+describe("editing folders", () => {
   const work = { id: "f1", name: "Work" };
   const github = { id: "1", url: "https://github.com", createdAt: "2026-10-01T12:00:00.000Z", folderId: "f1" };
 
@@ -1145,20 +1147,53 @@ describe("renaming and deleting folders", () => {
     render(<LinkManager initialLinks={[github]} initialFolders={[work]} />);
     fireEvent.click(screen.getByRole("button", { name: "Work" }));
   }
+  const edit = () => fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
 
-  test("only offers rename and delete when a folder is selected", () => {
+  test("only offers editing when a folder is selected", () => {
     render(<LinkManager initialLinks={[github]} initialFolders={[work]} />);
 
-    expect(screen.queryByRole("button", { name: "Rename folder" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit folder" })).toBeNull();
+  });
+
+  test("keeps the folder's settings out of sight until Edit folder is clicked", () => {
+    openWork();
+    const pencil = screen.getByRole("button", { name: "Edit folder" });
+
+    expect(pencil.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("group", { name: "Folder icon" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete folder" })).toBeNull();
+
+    edit();
+    expect(pencil.getAttribute("aria-expanded")).toBe("true");
+    const panel = screen.getByRole("region", { name: "Edit folder" });
+    expect(within(panel).getByRole("group", { name: "Folder icon" })).toBeDefined();
+    expect(within(panel).getByRole("group", { name: "Folder colour" })).toBeDefined();
+    // Focus moves into the panel.
+    expect(document.activeElement).toBe(within(panel).getByRole("heading", { name: "Edit folder" }));
+  });
+
+  test("Done and Esc close the panel, and focus goes back to the pencil", () => {
+    openWork();
+    const pencil = screen.getByRole("button", { name: "Edit folder" });
+
+    edit();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("region", { name: "Edit folder" })).toBeNull();
+    expect(document.activeElement).toBe(pencil);
+
+    edit();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Edit folder" })).toBeNull();
+    expect(document.activeElement).toBe(pencil);
   });
 
   test("renames the selected folder", async () => {
     openWork();
+    edit();
 
-    fireEvent.click(screen.getByRole("button", { name: "Rename folder" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "New folder name" }), { target: { value: "Job" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Job" } });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save name" }));
     });
 
     expect(renameFolder).toHaveBeenCalledWith("f1", "Job");
@@ -1168,10 +1203,11 @@ describe("renaming and deleting folders", () => {
   test("shows the server's error when renaming fails", async () => {
     vi.mocked(renameFolder).mockResolvedValueOnce('You already have a folder called "Recipes".');
     openWork();
+    edit();
 
-    fireEvent.click(screen.getByRole("button", { name: "Rename folder" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "recipes" } });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save name" }));
     });
 
     expect(screen.getByRole("alert").textContent).toBe('You already have a folder called "Recipes".');
@@ -1180,6 +1216,7 @@ describe("renaming and deleting folders", () => {
   test("deletes the folder after asking, and keeps its links", async () => {
     vi.spyOn(window, "confirm").mockReturnValueOnce(true);
     openWork();
+    edit();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
@@ -1193,6 +1230,7 @@ describe("renaming and deleting folders", () => {
   test("does nothing when you cancel the delete", () => {
     vi.spyOn(window, "confirm").mockReturnValueOnce(false);
     openWork();
+    edit();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
 
@@ -1273,6 +1311,7 @@ describe("folder colours", () => {
   test("picking a colour changes the pill at once and saves it", async () => {
     render(<LinkManager initialLinks={[]} initialFolders={[work]} />);
     fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
     const colours = screen.getByRole("group", { name: "Folder colour" });
 
     expect(within(colours).getByRole("button", { name: "Green", pressed: true })).toBeDefined();
@@ -1292,6 +1331,7 @@ describe("folder icons", () => {
   test("picking an icon draws it on the pill in the folder's colour, and Dot takes it away", async () => {
     render(<LinkManager initialLinks={[]} initialFolders={[work]} />);
     fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
     const icons = screen.getByRole("group", { name: "Folder icon" });
 
     expect(within(icons).getByRole("button", { name: "Dot", pressed: true })).toBeDefined();
@@ -1436,5 +1476,148 @@ describe("details panel", () => {
     expect(removeLink).toHaveBeenCalledWith("1");
     expect(screen.queryByRole("complementary", { name: "React" })).toBeNull();
     expect(cardCount()).toBe(0);
+  });
+});
+
+describe("filling a folder like a playlist", () => {
+  const recipes = { id: "f1", name: "Recipes" };
+  const soup = { id: "5f0c6c1e-1b1a-4c3e-9a7e-000000000001", url: "https://soup.com", title: "Soup", createdAt: "2026-10-01T12:00:00.000Z" };
+  const bread = { id: "5f0c6c1e-1b1a-4c3e-9a7e-000000000002", url: "https://bread.com", title: "Bread", createdAt: "2026-10-02T12:00:00.000Z" };
+  const news = { id: "5f0c6c1e-1b1a-4c3e-9a7e-000000000003", url: "https://news.com", title: "News", createdAt: "2026-10-03T12:00:00.000Z" };
+
+  function openRecipes() {
+    render(<LinkManager initialLinks={[soup, bread, news]} initialFolders={[recipes]} />);
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Recipes" }));
+  }
+
+  test("an empty folder offers to add links; ticked links move in, all at once", async () => {
+    openRecipes();
+    expect(screen.getByText("No links in this folder yet.")).toBeDefined();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Add links/ })[1]);
+    const sheet = screen.getByRole("dialog", { name: "Add links to Recipes" });
+    expect(within(sheet).getByRole("button", { name: "Add links" }).hasAttribute("disabled")).toBe(true);
+
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: /Soup/ }));
+    fireEvent.click(within(sheet).getByRole("checkbox", { name: /Bread/ }));
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole("button", { name: "Add 2 links" }));
+    });
+
+    expect(moveLinksToFolder).toHaveBeenCalledWith([soup.id, bread.id], "f1");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(cards().getByRole("link", { name: "Soup" })).toBeDefined();
+    expect(cards().getByRole("link", { name: "Bread" })).toBeDefined();
+    expect(cards().queryByRole("link", { name: "News" })).toBeNull();
+  });
+
+  test("the picker's search narrows the list, and links already in the folder aren't offered", () => {
+    render(<LinkManager initialLinks={[{ ...soup, folderId: "f1" }, bread, news]} initialFolders={[recipes]} />);
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Recipes" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /Add links/ }));
+    const sheet = screen.getByRole("dialog", { name: "Add links to Recipes" });
+    expect(within(sheet).queryByRole("checkbox", { name: /Soup/ })).toBeNull();
+
+    fireEvent.change(within(sheet).getByRole("searchbox", { name: "Search your links" }), { target: { value: "bre" } });
+    expect(within(sheet).getAllByRole("checkbox")).toHaveLength(1);
+    expect(within(sheet).getByRole("checkbox", { name: /Bread/ })).toBeDefined();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("select mode", () => {
+  const work = { id: "f1", name: "Work" };
+  const a = { id: "5f0c6c1e-1b1a-4c3e-9a7e-00000000000a", url: "https://a.com", title: "A", createdAt: "2026-10-01T12:00:00.000Z" };
+  const b = { id: "5f0c6c1e-1b1a-4c3e-9a7e-00000000000b", url: "https://b.com", title: "B", createdAt: "2026-10-02T12:00:00.000Z" };
+
+  test("ticks links, moves them to a folder together, and leaves select mode", async () => {
+    render(<LinkManager initialLinks={[a, b]} initialFolders={[work]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    const bar = screen.getByRole("toolbar", { name: "Selected links" });
+    expect(within(bar).getByText("Tick links to select them")).toBeDefined();
+
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select A" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select B" }));
+    expect(within(bar).getByText("2 selected")).toBeDefined();
+    await act(async () => {
+      fireEvent.change(within(bar).getByRole("combobox", { name: "Move selected links to folder" }), { target: { value: "f1" } });
+    });
+
+    expect(moveLinksToFolder).toHaveBeenCalledWith([a.id, b.id], "f1");
+    expect(screen.queryByRole("toolbar", { name: "Selected links" })).toBeNull();
+    expect(cards().getAllByText("Work")).toHaveLength(2);
+  });
+
+  test("marks the selected links read at once; tapping a card ticks it", async () => {
+    render(<LinkManager initialLinks={[a, b]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    // A tap on the card itself, not its title, ticks it.
+    fireEvent.click(cards().getAllByRole("listitem")[0]);
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("toolbar", { name: "Selected links" })).getByRole("button", { name: "Mark read" }));
+    });
+
+    expect(markLinksRead).toHaveBeenCalledWith([b.id], true);
+    expect(cards().getAllByText("Read")).toHaveLength(1);
+  });
+
+  test("outside select mode, tapping a card's empty space opens its details", () => {
+    render(<LinkManager initialLinks={[a]} />);
+
+    fireEvent.click(cards().getAllByRole("listitem")[0]);
+
+    expect(screen.getByRole("complementary", { name: "A" })).toBeDefined();
+  });
+});
+
+describe("the phone's bottom bar", () => {
+  const a = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000a1", url: "https://a.com", title: "A", createdAt: "2026-10-01T12:00:00.000Z", readAt: "2026-10-02T12:00:00.000Z" };
+  const b = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000b2", url: "https://b.com", title: "B", createdAt: "2026-10-02T12:00:00.000Z" };
+  const bar = () => within(screen.getByRole("navigation", { name: "Phone menu" }));
+
+  test("switches between all links and unread, within thumb's reach", () => {
+    render(<LinkManager initialLinks={[a, b]} />);
+
+    fireEvent.click(bar().getByRole("button", { name: "Show unread links" }));
+    expect(screen.getByRole("heading", { name: "Unread" })).toBeDefined();
+    expect(bar().getByRole("button", { name: "Show unread links" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(bar().getByRole("button", { name: "Show all links" }));
+    expect(screen.getByRole("heading", { name: "All links" })).toBeDefined();
+  });
+
+  test("+ opens the save box in a sheet, ready to type, and saving closes it", async () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    fireEvent.click(bar().getByRole("button", { name: "Save a link" }));
+    const sheet = within(screen.getByRole("dialog", { name: "Save a link" }));
+    const field = sheet.getByPlaceholderText("Paste a link...");
+    expect(document.activeElement).toBe(field);
+
+    fireEvent.change(field, { target: { value: "https://example.com/from-phone" } });
+    await act(async () => {
+      fireEvent.click(sheet.getByRole("button", { name: "Save" }));
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(cards().getByRole("link", { name: "example.com" })).toBeDefined();
+  });
+
+  test("a failed save keeps the sheet open, with the reason", async () => {
+    render(<LinkManager initialLinks={[b]} />);
+
+    fireEvent.click(bar().getByRole("button", { name: "Save a link" }));
+    const sheet = within(screen.getByRole("dialog", { name: "Save a link" }));
+    fireEvent.change(sheet.getByPlaceholderText("Paste a link..."), { target: { value: "https://b.com" } });
+    await act(async () => {
+      fireEvent.click(sheet.getByRole("button", { name: "Save" }));
+    });
+
+    expect(sheet.getByRole("alert").textContent).toBe("You already saved this link!");
   });
 });

@@ -1,6 +1,6 @@
 import "server-only";
 import { connection } from "next/server";
-import { and, asc, desc, eq, lt, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { folders, links, rateLimits, user } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
@@ -36,6 +36,8 @@ export async function insertLink(userId: string, link: Link) {
     title: link.title ?? null,
     tags: link.tags ?? [],
     folderId: link.folderId ?? null,
+    // null: not looked for yet (a picture may follow, see updateLinkImage).
+    image: link.image ?? null,
     createdAt: new Date(link.createdAt),
   });
 }
@@ -100,6 +102,18 @@ export async function updateLinkFolder(
   await db.update(links).set({ folderId }).where(ownLink(userId, id));
 }
 
+// Bulk versions, for Select mode and "Add links" in a folder. They still only
+// touch the user's own links: ids from someone else's account match nothing.
+export async function updateLinksFolder(userId: string, ids: string[], folderId: string | null) {
+  if (ids.length === 0) return;
+  await db.update(links).set({ folderId }).where(and(eq(links.userId, userId), inArray(links.id, ids)));
+}
+
+export async function updateLinksReadAt(userId: string, ids: string[], readAt: Date | null) {
+  if (ids.length === 0) return;
+  await db.update(links).set({ readAt }).where(and(eq(links.userId, userId), inArray(links.id, ids)));
+}
+
 export async function getFolders(userId: string): Promise<Folder[]> {
   const rows = await db
     .select()
@@ -147,6 +161,22 @@ export async function deleteFolderById(userId: string, id: string) {
 }
 // Every user's links, for the daily check that Vercel Cron runs.
 // The only function here without a userId: never call it from a Server Action.
+// The page's sharing picture once it's been looked for: its address, or ""
+// when the page has none (so it isn't looked for again).
+export async function updateLinkImage(userId: string, id: string, image: string) {
+  await db.update(links).set({ image }).where(ownLink(userId, id));
+}
+
+// For the daily job: links, of every user, whose picture hasn't been looked
+// for yet (saved before pictures existed), a batch at a time.
+export async function getLinksWithoutImage(limit: number): Promise<{ id: string; userId: string; url: string }[]> {
+  return db
+    .select({ id: links.id, userId: links.userId, url: links.url })
+    .from(links)
+    .where(and(sql`${links.image} is null`, sql`${links.status} is distinct from 'broken'`))
+    .limit(limit);
+}
+
 export async function getLinksToCheck(): Promise<
   { id: string; userId: string; url: string }[]
 > {

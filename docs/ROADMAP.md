@@ -323,6 +323,18 @@ Then the layout:
 - [x] The selected list, folder, tag and view live in the address (`/?list=unread`, `/?folder=…&tag=react&view=list`), so Back, a refresh and bookmarks keep them. Search stays out of it. An address with a folder that's gone falls back to all links
 - [x] The contrast and browser tests cover the new layout in light and dark mode: the details panel, List view, and the phone drawer; browser tests for the drawer and for Back and refresh
 
+**Extra: folders like playlists, a phone-first layout, and a richer look** (2026-10-22)
+- [x] **Add links** to a folder like a playlist: a button in the folder's heading and in an empty folder opens a picker (search, tick boxes, "Add 3 links"); everything moves in one database update (`moveLinksToFolder`)
+- [x] **Select mode**: tick links anywhere, then **Move to…** a folder or **Mark read** them all at once (`markLinksRead`)
+- [x] Tapping a card's empty space opens its details; the title still opens the website
+- [x] Phones: a **bottom bar** (All, Unread, a big **+**, Lists); **+** opens the save box in a sheet; the top bar keeps only the logo and account
+- [x] Sheets that slide up from the bottom with a handle to swipe them down (`Sheet`, `useSwipeToClose`); the details panel is one on phones and tablets
+- [x] **Preview pictures**: a page's sharing picture (og:image, or a video's thumbnail) across the top of its card and in its details. Read while saving (after the answer when a title was typed), and filled in for older links by the daily job, 50 a day. New column `links.image` (migration `0013`)
+- [x] Gentle motion (cards rise in and lift on hover, sheets slide), off for people who turn animations off; a letter tile when a site's icon can't load; Rediscover titles wrap onto two lines on phones; the demo got cover pictures of its own
+
+**Extra: editing a folder only when you want to**
+- [x] Opening a folder shows just a pencil next to its name; it opens one **Edit folder** panel (name, colour, icon, Delete), closed with Done or Esc. Focus moves into the panel and back to the pencil
+
 **Extra: save straight into a folder, like a browser bookmark**
 - [x] The save page (where the bookmarklet, the extension and phone sharing land) has a **Folder** menu: No folder, your folders, and **New folder…**, which opens a name box right there, creates the folder and picks it. It remembers the last folder on this device, like a browser's bookmark dialog
 - [x] The top bar's save box has the same menu next to Title and Tags; it starts on the folder you're looking at

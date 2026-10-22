@@ -126,6 +126,17 @@ export function cleanDate(value: unknown, now = new Date()): string | undefined 
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// The most links one bulk action (Select → Move, Add links to a folder) takes.
+export const BULK_MAX = 500;
+
+// Link ids sent from the browser for a bulk action: only real ids (UUIDs),
+// each once, at most BULK_MAX. Anything else is dropped, never trusted.
+export function cleanIds(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const ids = input.filter((id): id is string => typeof id === "string" && UUID.test(id));
+  return [...new Set(ids)].slice(0, BULK_MAX);
+}
+
 // Checks a new link the browser sends (saveLink, importLinks). Returns the
 // cleaned link, or a message saying what's wrong. Only the fields a new link
 // may have are kept: the browser can't set a status, a read date or a folder.
@@ -283,6 +294,8 @@ export function toLink(row: LinkRow): Link {
     checkedAt: row.checkedAt?.toISOString(),
     readAt: row.readAt?.toISOString(),
     folderId: row.folderId ?? undefined,
+    // "" means the page had none: the same as no picture, for the app.
+    image: row.image || undefined,
   };
 }
 
