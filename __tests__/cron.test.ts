@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { GET } from "@/app/api/cron/check-links/route";
-import { getLinksToCheck, updateLinkStatus } from "@/lib/data";
+import { getLinksToCheck, getLinksWithoutImage, updateLinkImage, updateLinkStatus } from "@/lib/data";
+import { fetchPageInfo } from "@/lib/fetchTitle";
 import { checkLink } from "@/lib/checkLink";
 
 vi.mock("@/lib/data", () => ({
   getLinksToCheck: vi.fn(async () => []),
   updateLinkStatus: vi.fn(async () => {}),
   deleteOldRateLimits: vi.fn(async () => {}),
+  getLinksWithoutImage: vi.fn(async () => []),
+  updateLinkImage: vi.fn(async () => {}),
+}));
+
+vi.mock("@/lib/fetchTitle", () => ({
+  fetchPageInfo: vi.fn(async () => ({})),
 }));
 
 vi.mock("@/lib/checkLink", () => ({
@@ -55,8 +62,25 @@ describe("GET /api/cron/check-links", () => {
     const response = await callWith("Bearer s3cret");
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ checked: 2, broken: 1 });
+    expect(await response.json()).toEqual({ checked: 2, broken: 1, imagesLookedFor: 0 });
     expect(updateLinkStatus).toHaveBeenCalledWith("u1", "1", "ok");
     expect(updateLinkStatus).toHaveBeenCalledWith("u2", "2", "broken");
+  });
+
+  test("looks for preview pictures of older links, a batch a day, and remembers when there's none", async () => {
+    vi.mocked(getLinksWithoutImage).mockResolvedValueOnce([
+      { id: "1", userId: "u1", url: "https://pictured.example" },
+      { id: "2", userId: "u2", url: "https://plain.example" },
+    ]);
+    vi.mocked(fetchPageInfo).mockImplementation(async (url) =>
+      url === "https://pictured.example" ? { image: "https://pictured.example/card.png" } : {}
+    );
+
+    const response = await callWith("Bearer s3cret");
+
+    expect(getLinksWithoutImage).toHaveBeenCalledWith(50);
+    expect(updateLinkImage).toHaveBeenCalledWith("u1", "1", "https://pictured.example/card.png");
+    expect(updateLinkImage).toHaveBeenCalledWith("u2", "2", "");
+    expect(await response.json()).toMatchObject({ imagesLookedFor: 2 });
   });
 });

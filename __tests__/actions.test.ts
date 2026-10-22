@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { countAction, deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, markLinksRead, moveLinksToFolder, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
+import { countAction, deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
-import { fetchTitle } from "@/lib/fetchTitle";
+import { fetchPageInfo } from "@/lib/fetchTitle";
+import { after } from "next/server";
 import { getUserId } from "@/lib/session";
 import { MAX_FOLDERS, MAX_LINKS, TOO_FAST, TOO_MANY_FOLDERS, TOO_MANY_LINKS } from "@/lib/limits";
 
@@ -17,6 +18,9 @@ vi.mock("@/lib/data", () => ({
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
   updateLinkFolder: vi.fn(async () => {}),
+  updateLinksFolder: vi.fn(async () => {}),
+  updateLinksReadAt: vi.fn(async () => {}),
+  updateLinkImage: vi.fn(async () => {}),
   updateFolderName: vi.fn(async () => {}),
   updateFolderColor: vi.fn(async () => {}),
   updateFolderIcon: vi.fn(async () => {}),
@@ -35,8 +39,11 @@ vi.mock("@/lib/checkLink", () => ({
   checkLink: vi.fn(async () => "ok"),
 }));
 
+// after() runs work once the answer is sent; here it just records the work.
+vi.mock("next/server", () => ({ after: vi.fn() }));
+
 vi.mock("@/lib/fetchTitle", () => ({
-  fetchTitle: vi.fn(async () => undefined),
+  fetchPageInfo: vi.fn(async () => ({})),
 }));
 
 afterEach(() => {
@@ -55,6 +62,8 @@ describe("signed out", () => {
     await expect(saveLinkDetails("1", { title: "", tags: "", note: "" })).rejects.toThrow("Not signed in");
     await expect(saveReadStatus("1", true)).rejects.toThrow("Not signed in");
     await expect(moveToFolder("1", null)).rejects.toThrow("Not signed in");
+    await expect(moveLinksToFolder([link.id], null)).rejects.toThrow("Not signed in");
+    await expect(markLinksRead([link.id], true)).rejects.toThrow("Not signed in");
     await expect(importLinks([link])).rejects.toThrow("Not signed in");
     await expect(importBookmarks([])).rejects.toThrow("Not signed in");
     await expect(checkAllLinks()).rejects.toThrow("Not signed in");
@@ -74,13 +83,53 @@ describe("signed out", () => {
     expect(deleteFolderById).not.toHaveBeenCalled();
     expect(updateUsername).not.toHaveBeenCalled();
     expect(updateLinkDetails).not.toHaveBeenCalled();
+    expect(updateLinksFolder).not.toHaveBeenCalled();
+    expect(updateLinksReadAt).not.toHaveBeenCalled();
+  });
+});
+
+describe("bulk actions (Select mode, Add links)", () => {
+  const a = "5f0c6c1e-1b1a-4c3e-9a7e-2d3b4c5d6e7a";
+  const b = "5f0c6c1e-1b1a-4c3e-9a7e-2d3b4c5d6e7b";
+
+  test("moves many of the user's links into one of their folders, in one update", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Recipes" }]);
+
+    await moveLinksToFolder([a, b], "f1");
+
+    expect(updateLinksFolder).toHaveBeenCalledWith("u1", [a, b], "f1");
+  });
+
+  test("never moves into someone else's folder", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f1", name: "Recipes" }]);
+
+    await moveLinksToFolder([a], "someone-elses");
+
+    expect(updateLinksFolder).not.toHaveBeenCalled();
+  });
+
+  test("only passes real link ids on, each once, and at most 500", async () => {
+    await moveLinksToFolder([a, a, "1; drop table links", 42, b] as unknown as string[], null);
+    expect(updateLinksFolder).toHaveBeenCalledWith("u1", [a, b], null);
+
+    const many = Array.from({ length: 600 }, (_, i) => `5f0c6c1e-1b1a-4c3e-9a7e-${String(i).padStart(12, "0")}`);
+    await moveLinksToFolder(many, null);
+    expect(vi.mocked(updateLinksFolder).mock.calls[1][1]).toHaveLength(500);
+  });
+
+  test("marks many links read with the server's time, or unread", async () => {
+    await markLinksRead([a, b], true);
+    expect(updateLinksReadAt).toHaveBeenCalledWith("u1", [a, b], expect.any(Date));
+
+    await markLinksRead([a], false);
+    expect(updateLinksReadAt).toHaveBeenLastCalledWith("u1", [a], null);
   });
 });
 
 describe("saveLink", () => {
-  test("saves a new link", async () => {
+  test("saves a new link (looked for a picture, found none)", async () => {
     expect(await saveLink(link)).toEqual(link);
-    expect(insertLink).toHaveBeenCalledWith("u1", link);
+    expect(insertLink).toHaveBeenCalledWith("u1", { ...link, image: "" });
   });
 
   test("only looks for duplicates among the user's own links", async () => {
@@ -89,11 +138,30 @@ describe("saveLink", () => {
     expect(getLinks).toHaveBeenCalledWith("u1");
   });
 
-  test("fills in the page's title when none was given", async () => {
-    vi.mocked(fetchTitle).mockResolvedValueOnce("Example Domain");
+  test("fills in the page's title and preview picture when no title was given", async () => {
+    vi.mocked(fetchPageInfo).mockResolvedValueOnce({ title: "Example Domain", image: "https://example.com/card.png" });
 
-    expect(await saveLink(link)).toEqual({ ...link, title: "Example Domain" });
-    expect(insertLink).toHaveBeenCalledWith("u1", { ...link, title: "Example Domain" });
+    const expected = { ...link, title: "Example Domain", image: "https://example.com/card.png" };
+    expect(await saveLink(link)).toEqual(expected);
+    expect(insertLink).toHaveBeenCalledWith("u1", expected);
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  test("with a typed title, saves at once and looks for the picture after answering", async () => {
+    vi.mocked(fetchPageInfo).mockResolvedValueOnce({ title: "Page", image: "https://example.com/card.png" });
+
+    expect(await saveLink({ ...link, title: "Mine" })).toMatchObject({ title: "Mine" });
+    expect(fetchPageInfo).not.toHaveBeenCalled();
+    // The picture is looked for later, and stored for this user's link only.
+    await (vi.mocked(after).mock.calls[0][0] as () => Promise<void>)();
+    expect(updateLinkImage).toHaveBeenCalledWith("u1", link.id, "https://example.com/card.png");
+  });
+
+  test("never takes a picture address from the browser", async () => {
+    const sneaky = { ...link, title: "Mine", image: "https://tracker.example/pixel.gif" } as typeof link;
+
+    expect(await saveLink(sneaky)).not.toHaveProperty("image");
+    expect(insertLink).toHaveBeenCalledWith("u1", expect.not.objectContaining({ image: "https://tracker.example/pixel.gif" }));
   });
 
   test("saves straight into one of the user's own folders", async () => {
@@ -115,7 +183,7 @@ describe("saveLink", () => {
 
   test("keeps the title the user typed", async () => {
     expect(await saveLink({ ...link, title: "My title" })).toMatchObject({ title: "My title" });
-    expect(fetchTitle).not.toHaveBeenCalled();
+    expect(fetchPageInfo).not.toHaveBeenCalled();
   });
 
   test("refuses a link that is already saved", async () => {
@@ -467,7 +535,7 @@ describe("rate limits", () => {
 
     vi.mocked(countAction).mockResolvedValueOnce(31);
     expect(await saveLink({ ...link, url: "https://example.com/new" })).toBe(TOO_FAST);
-    expect(fetchTitle).not.toHaveBeenCalledWith("https://example.com/new");
+    expect(fetchPageInfo).not.toHaveBeenCalledWith("https://example.com/new");
   });
 
   test("checkAllLinks refuses a sixth check in the same hour, without visiting any link", async () => {

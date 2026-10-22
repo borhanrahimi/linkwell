@@ -18,6 +18,9 @@ import { useAddressState } from "@/components/useAddressState";
 import FolderIconDrawing from "@/components/FolderIcon";
 import { FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
+import AddLinksSheet from "@/components/AddLinksSheet";
+import BottomBar from "@/components/BottomBar";
+import Sheet from "@/components/Sheet";
 import { useLinkActions } from "@/components/LinkActions";
 import {
   createLink,
@@ -89,6 +92,8 @@ export default function LinkManager({
     renameFolder,
     setFolderColor,
     setFolderIcon,
+    moveLinksToFolder,
+    markLinksRead,
   } = useLinkActions();
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
@@ -114,6 +119,15 @@ export default function LinkManager({
   const detailsLink = links.find((link) => link.id === detailsId);
   // Stable, so the panel's Esc listener isn't re-added on every render.
   const closeDetails = useCallback(() => setDetailsId(null), []);
+  // "Add links" to the open folder, like filling a playlist.
+  const [addingLinks, setAddingLinks] = useState(false);
+  const closeAddLinks = useCallback(() => setAddingLinks(false), []);
+  // Phones: the save box opens in a sheet from the bottom bar's +.
+  const [savingOnPhone, setSavingOnPhone] = useState(false);
+  const closeSaveSheet = useCallback(() => setSavingOnPhone(false), []);
+  // Select mode: tick several links, then move them or mark them read.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   // Phones: whether the sidebar is open as a drawer. Closing it puts focus
   // back on the Lists button that opened it.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -219,6 +233,38 @@ export default function LinkManager({
     await saveReadStatus(id, !link.readAt);
   }
 
+  // Several links into one folder (or out of folders, with null), at once.
+  async function moveMany(ids: string[], folderId: string | null) {
+    if (ids.length === 0) return;
+    const chosen = new Set(ids);
+    setLinks((current) =>
+      current.map((link) => (chosen.has(link.id) ? { ...link, folderId: folderId ?? undefined } : link))
+    );
+    await moveLinksToFolder(ids, folderId);
+  }
+
+  async function markManyRead(ids: string[], read: boolean) {
+    if (ids.length === 0) return;
+    const chosen = new Set(ids);
+    const readAt = read ? new Date().toISOString() : undefined;
+    setLinks((current) => current.map((link) => (chosen.has(link.id) ? { ...link, readAt } : link)));
+    await markLinksRead(ids, read);
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+  }
+
   async function moveLink(id: string, folderId: string | undefined) {
     setLinks((current) => setFolder(current, id, folderId));
     await moveToFolder(id, folderId ?? null);
@@ -280,7 +326,7 @@ export default function LinkManager({
     <>
       {/* The save box lives in the top bar, so it's always at hand. */}
       {user || topBarEnd ? (
-        <Header user={user} end={topBarEnd}>
+        <Header user={user} end={topBarEnd} hideMiddleOnPhones>
           <LinkForm onAdd={addLink} folders={folders} currentFolder={activeFolder} onCreateFolder={makeFolder} />
         </Header>
       ) : (
@@ -324,8 +370,9 @@ export default function LinkManager({
 
           {/* What the list is showing: a smart list, or a folder with its own controls. */}
           {/* On phones, the Lists button next to it opens the sidebar as a drawer. */}
-          <div className="flex items-center gap-2">
-            <h2 className="flex min-w-0 flex-1 items-center gap-2 text-xl font-semibold text-ink">
+          {/* A folder's pencil sits right after its name; its edit panel wraps below. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-ink">
               {selectedFolder &&
                 (selectedFolder.icon ? (
                   <FolderIconDrawing
@@ -342,42 +389,27 @@ export default function LinkManager({
                 {selectedFolder ? selectedFolder.name : LIST_TITLES[activeList]}
               </span>
             </h2>
+            {selectedFolder && (
+              <FolderActions
+                key={selectedFolder.id}
+                folder={selectedFolder}
+                onRename={changeFolderName}
+                onRecolor={changeFolderColor}
+                onChangeIcon={changeFolderIcon}
+                onDelete={removeFolder}
+              />
+            )}
             {/* How many links the list is showing, with search and tag applied. */}
-            <span className="shrink-0 text-sm text-muted">
+            <span className="ml-auto shrink-0 text-sm text-muted">
               {visibleLinks.length === 1 ? "1 link" : `${visibleLinks.length} links`}
             </span>
-            <button
-              ref={menuButton}
-              onClick={() => setMenuOpen(true)}
-              aria-expanded={menuOpen}
-              aria-controls="sidebar"
-              className="btn-secondary flex items-center gap-1.5 md:hidden"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                aria-hidden="true"
-                className="size-4"
-              >
-                <path d="M4 7h16M4 12h16M4 17h10" />
-              </svg>
-              Lists
-            </button>
+            {selectedFolder && (
+              <button onClick={() => setAddingLinks(true)} className="btn-secondary flex items-center gap-1.5">
+                <span aria-hidden="true" className="text-base leading-none">+</span>
+                Add links
+              </button>
+            )}
           </div>
-          {selectedFolder && (
-            <FolderActions
-              key={selectedFolder.id}
-              folder={selectedFolder}
-              onRename={changeFolderName}
-              onRecolor={changeFolderColor}
-              onChangeIcon={changeFolderIcon}
-              onDelete={removeFolder}
-            />
-          )}
-
           {/* The toolbar: search, sort and the view. */}
           <div className="mt-4 flex flex-wrap gap-2">
             <input
@@ -418,6 +450,15 @@ export default function LinkManager({
                 </button>
               ))}
             </div>
+            {links.length > 0 && (
+              <button
+                onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+                aria-pressed={selecting}
+                className="btn-secondary"
+              >
+                Select
+              </button>
+            )}
           </div>
 
           {activeTag && (
@@ -443,6 +484,12 @@ export default function LinkManager({
             <div className="mt-6 text-center">
               {emptyState().drawing}
               <p className="mt-2 text-muted">{emptyState().text}</p>
+              {/* An empty folder is a playlist waiting to be filled. */}
+              {selectedFolder && !query && !activeTag && (
+                <button onClick={() => setAddingLinks(true)} className="btn-primary mt-4">
+                  Add links
+                </button>
+              )}
             </div>
           )}
 
@@ -469,11 +516,91 @@ export default function LinkManager({
                   onTagClick={toggleTag}
                   compact={view === "list"}
                   onShowDetails={setDetailsId}
+                  selecting={selecting}
+                  selected={selected.has(link.id)}
+                  onToggleSelect={toggleSelected}
                 />
               ))}
             </ul>
           )}
         </div>
+
+        {addingLinks && selectedFolder && (
+          <AddLinksSheet
+            folderName={selectedFolder.name}
+            links={links.filter((link) => link.folderId !== selectedFolder.id)}
+            onAdd={(ids) => {
+              closeAddLinks();
+              moveMany(ids, selectedFolder.id);
+            }}
+            onClose={closeAddLinks}
+          />
+        )}
+
+        {/* Select mode's actions, floating at the bottom while links are ticked. */}
+        {selecting && (
+          <div
+            role="toolbar"
+            aria-label="Selected links"
+            className="glass-bar fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto grid max-w-xl grid-cols-[1fr_auto] items-center gap-2 rounded-3xl px-4 py-3 motion-safe:animate-rise-in md:bottom-6 md:flex"
+          >
+            <span className="text-sm font-medium text-ink md:mr-auto" aria-live="polite">
+              {selected.size === 0 ? "Tick links to select them" : `${selected.size} selected`}
+            </span>
+            <button onClick={stopSelecting} className="btn-primary md:order-last">
+              Done
+            </button>
+            {/* On phones the actions get a row of their own, under the count. */}
+            <div className="col-span-2 flex gap-2">
+              <select
+                value=""
+                onChange={(e) => {
+                  const target = e.target.value;
+                  if (!target) return;
+                  moveMany([...selected], target === "none" ? null : target);
+                  stopSelecting();
+                }}
+                disabled={selected.size === 0}
+                aria-label="Move selected links to folder"
+                className="field min-w-0 flex-1 py-1.5 disabled:opacity-50 md:flex-none"
+              >
+                <option value="">Move to…</option>
+                <option value="none">No folder</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  markManyRead([...selected], true);
+                  stopSelecting();
+                }}
+                disabled={selected.size === 0}
+                className="btn-secondary"
+              >
+                Mark read
+              </button>
+            </div>
+          </div>
+        )}
+
+        {savingOnPhone && (
+          <Sheet title="Save a link" onClose={closeSaveSheet} focusTitle={false}>
+            <LinkForm
+              autoFocus
+              onAdd={async (...args) => {
+                const message = await addLink(...args);
+                if (!message) closeSaveSheet();
+                return message;
+              }}
+              folders={folders}
+              currentFolder={activeFolder}
+              onCreateFolder={makeFolder}
+            />
+          </Sheet>
+        )}
 
         {detailsLink && (
           <LinkDetails
@@ -493,6 +620,18 @@ export default function LinkManager({
           />
         )}
       </div>
+
+      <BottomBar
+        activeList={activeList}
+        inFolder={Boolean(activeFolder)}
+        onSelectList={selectList}
+        onSave={() => setSavingOnPhone(true)}
+        onOpenLists={() => setMenuOpen(true)}
+        listsOpen={menuOpen}
+        listsButton={menuButton}
+      />
+      {/* Room under the last link, so the bottom bar never covers it. */}
+      <div aria-hidden="true" className="h-24 md:hidden" />
     </>
   );
 }

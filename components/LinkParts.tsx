@@ -20,17 +20,47 @@ const FAVICON_SIZES = {
 // all line up. The 64px image shown smaller stays sharp on retina screens.
 export function Favicon({ url, size = "medium" }: { url: string; size?: keyof typeof FAVICON_SIZES }) {
   const faviconUrl = getFaviconUrl(url);
+  const [failed, setFailed] = useState(false);
   const { tile, image } = FAVICON_SIZES[size];
   return (
-    <div className={`flex shrink-0 items-center justify-center bg-white ring-1 ring-line ${tile}`}>
-      {faviconUrl ? (
-        <Image src={faviconUrl} alt="" width={32} height={32} unoptimized className={`${image} rounded`} />
+    <div className={`flex shrink-0 items-center justify-center overflow-hidden bg-white ring-1 ring-line ${tile}`}>
+      {faviconUrl && !failed ? (
+        <Image
+          src={faviconUrl}
+          alt=""
+          width={32}
+          height={32}
+          unoptimized
+          onError={() => setFailed(true)}
+          className={`${image} rounded`}
+        />
       ) : (
+        // No icon, or it can't load (offline, blocked, gone): the site's first letter.
         <span aria-hidden="true" className="text-sm font-semibold text-slate-600">
           {getDomain(url).charAt(0).toUpperCase()}
         </span>
       )}
     </div>
+  );
+}
+
+// The page's sharing picture, for the card and the details panel. Loaded
+// straight from the site (no-referrer: it isn't told which page asked), only
+// when it scrolls into view, and simply left out if it can't load.
+export function PreviewImage({ src, className = "" }: { src: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- pictures from any site, not ours to optimise
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+      className={`aspect-[1.91/1] bg-hover object-cover ${className}`}
+    />
   );
 }
 

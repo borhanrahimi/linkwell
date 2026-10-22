@@ -27,6 +27,9 @@ export const links = pgTable("links", {
   status: text("status", { enum: ["ok", "broken"] }),
   checkedAt: timestamp("checked_at", { withTimezone: true }),
   readAt: timestamp("read_at", { withTimezone: true }),
+  // The page's sharing picture (og:image), shown on its card: an https
+  // address, "" when the page has none, null when not looked for yet.
+  image: text("image"),
   folderId: uuid("folder_id").references(() => folders.id, {
     onDelete: "set null",
   }),

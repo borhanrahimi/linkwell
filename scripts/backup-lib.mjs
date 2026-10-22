@@ -15,7 +15,7 @@ export const TABLES = {
   user: ["id", "name", "email", "email_verified", "image", "username", "created_at", "updated_at"],
   account: ["id", "account_id", "provider_id", "user_id", "scope", "created_at", "updated_at"],
   folders: ["id", "name", "color", "icon", "user_id", "created_at"],
-  links: ["id", "url", "title", "tags", "note", "created_at", "status", "checked_at", "read_at", "folder_id", "user_id"],
+  links: ["id", "url", "title", "tags", "note", "created_at", "status", "checked_at", "read_at", "folder_id", "image", "user_id"],
 };
 
 const quoted = (name) => `"${name}"`;

@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import {
   deleteFolderById,
   deleteLinkById,
@@ -12,6 +13,9 @@ import {
   updateFolderColor,
   updateFolderIcon,
   updateLinkFolder,
+  updateLinksFolder,
+  updateLinksReadAt,
+  updateLinkImage,
   updateLinkStatus,
   updateLinkDetails,
   updateLinkReadAt,
@@ -20,9 +24,9 @@ import {
   countAction,
 } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
-import { fetchTitle } from "@/lib/fetchTitle";
+import { fetchPageInfo } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
-import { cleanDetails, cleanFolderName, cleanNewLink, isDuplicate, normalizeUrl } from "@/lib/links";
+import { cleanDetails, cleanFolderName, cleanIds, cleanNewLink, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
 import { isFolderColor, isFolderIcon, nextFolderColor } from "@/lib/folders";
 import {
@@ -78,13 +82,24 @@ export async function saveLink(input: Link): Promise<Link | string> {
   // Anything else (someone else's folder, a made-up id) saves with no folder.
   const folderId = typeof input?.folderId === "string" ? input.folderId : null;
   const inOwnFolder = folderId !== null && (await getFolders(userId)).some((folder) => folder.id === folderId);
-  const withTitle = {
+  // No title typed: read the page now, for its title and picture. With a
+  // title typed, saving doesn't wait: the picture is looked for just after
+  // the answer is sent (after()), and shows from the next visit.
+  const page = link.title ? {} : await fetchPageInfo(link.url);
+  const stored = {
     ...link,
     ...(inOwnFolder && { folderId }),
-    title: link.title ?? (await fetchTitle(link.url)),
+    title: link.title ?? page.title,
+    ...(page.image && { image: page.image }),
   };
-  await insertLink(userId, withTitle);
-  return withTitle;
+  await insertLink(userId, link.title ? stored : { ...stored, image: page.image ?? "" });
+  if (link.title) {
+    after(async () => {
+      const { image } = await fetchPageInfo(link.url);
+      await updateLinkImage(userId, link.id, image ?? "");
+    });
+  }
+  return stored;
 }
 
 export async function removeLink(id: string) {
@@ -116,6 +131,21 @@ export async function moveToFolder(id: string, folderId: string | null) {
     return;
   }
   await updateLinkFolder(userId, id, folderId);
+}
+
+// Moves many links at once (Select mode, "Add links" in a folder). Only real
+// ids of the user's own links, and only into one of the user's own folders.
+export async function moveLinksToFolder(ids: string[], folderId: string | null) {
+  const userId = await getUserId();
+  if (folderId !== null && !(await getFolders(userId)).some((folder) => folder.id === folderId)) {
+    return;
+  }
+  await updateLinksFolder(userId, cleanIds(ids), folderId);
+}
+
+// Marks many links read or unread at once. The server picks the time.
+export async function markLinksRead(ids: string[], read: boolean) {
+  await updateLinksReadAt(await getUserId(), cleanIds(ids), read === true ? new Date() : null);
 }
 
 // Links from this browser's localStorage, from before v0.5.

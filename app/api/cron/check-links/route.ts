@@ -1,5 +1,10 @@
-import { deleteOldRateLimits, getLinksToCheck, updateLinkStatus } from "@/lib/data";
+import { deleteOldRateLimits, getLinksToCheck, getLinksWithoutImage, updateLinkImage, updateLinkStatus } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
+import { fetchPageInfo } from "@/lib/fetchTitle";
+
+// Preview pictures for links saved before Linkwell looked for them: a batch
+// a day, so the job stays short.
+const IMAGES_PER_RUN = 50;
 
 // Vercel Cron calls this address once a day (see vercel.json) and sends
 // "Authorization: Bearer <CRON_SECRET>". Anyone else gets 401, so strangers
@@ -19,11 +24,20 @@ export async function GET(request: Request) {
     })
   );
 
+  const withoutImage = await getLinksWithoutImage(IMAGES_PER_RUN);
+  await Promise.all(
+    withoutImage.map(async (link) => {
+      const { image } = await fetchPageInfo(link.url);
+      await updateLinkImage(link.userId, link.id, image ?? "");
+    })
+  );
+
   // Rate limit counts older than a day are never needed again.
   await deleteOldRateLimits(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
   return Response.json({
     checked: results.length,
     broken: results.filter((status) => status === "broken").length,
+    imagesLookedFor: withoutImage.length,
   });
 }

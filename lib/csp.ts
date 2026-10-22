@@ -15,9 +15,11 @@ export function buildCsp(nonce: string, isDev = false): string {
     // allows inline styles instead (a nonce would switch 'unsafe-inline' off).
     `style-src 'self' ${isDev ? "'unsafe-inline'" : `'nonce-${nonce}'`}`,
     "style-src-attr 'unsafe-inline'",
-    // Site icons come from Google's favicon service (which redirects to
-    // gstatic.com), profile pictures from googleusercontent.com.
-    "img-src 'self' data: blob: https://www.google.com https://*.gstatic.com https://*.googleusercontent.com",
+    // Pictures may come from any https site: links' preview pictures are
+    // hosted by the sites themselves (and site icons by Google's favicon
+    // service, profile pictures by googleusercontent.com). Pictures can't run
+    // code, so this only allows images; scripts stay locked to the nonce.
+    "img-src 'self' data: blob: https:",
     "font-src 'self'",
     "connect-src 'self'",
     "object-src 'none'",

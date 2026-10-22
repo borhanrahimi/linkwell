@@ -15,6 +15,15 @@ describe("buildCsp", () => {
     expect(csp).toContain("object-src 'none'");
   });
 
+  test("pictures may come from https sites (preview pictures), but never over plain http", () => {
+    const images = csp.split("; ").find((rule) => rule.startsWith("img-src"));
+    expect(images).toBe("img-src 'self' data: blob: https:");
+    expect(images).not.toContain("http:");
+    // Allowing pictures allows nothing else: everything else stays on 'self'.
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("connect-src 'self'");
+  });
+
   test("development adds what React needs for its error messages", () => {
     expect(buildCsp("abc123", true)).toContain("'unsafe-eval'");
     expect(buildCsp("abc123", true)).toContain("style-src 'self' 'unsafe-inline'");

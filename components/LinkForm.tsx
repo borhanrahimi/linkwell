@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { TITLE_MAX_LENGTH, URL_MAX_LENGTH } from "@/lib/links";
 import { findSharedUrl } from "@/lib/share";
 import FolderPicker from "@/components/FolderPicker";
@@ -19,9 +19,15 @@ type LinkFormProps = {
   // The folder being looked at: new links go there unless you pick another.
   currentFolder?: string | null;
   onCreateFolder?: (name: string) => Promise<Folder | string>;
+  // In the phone's save sheet: the link field is ready to type into.
+  autoFocus?: boolean;
 };
 
-export default function LinkForm({ onAdd, folders = [], currentFolder = null, onCreateFolder }: LinkFormProps) {
+export default function LinkForm({ onAdd, folders = [], currentFolder = null, onCreateFolder, autoFocus = false }: LinkFormProps) {
+  const linkField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (autoFocus) linkField.current?.focus();
+  }, [autoFocus]);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
@@ -79,6 +85,7 @@ export default function LinkForm({ onAdd, folders = [], currentFolder = null, on
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <div className="flex min-w-0 gap-2">
           <input
+            ref={linkField}
             type="url"
             value={url}
             onChange={(e) => {

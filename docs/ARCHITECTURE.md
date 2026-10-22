@@ -100,7 +100,8 @@ Each layer only uses the layers **below** it:
                                       3. cleanNewLink()      never trust the browser
                                       4. duplicate? limit?   against the database
                                       5. own folder?         else saved with no folder
-                                      6. fetchTitle()        if none typed, via safeFetch
+                                      6. fetchPageInfo()     title + picture if none typed, via safeFetch
+                                         (typed title: picture looked for after answering)
                                       7. insertLink()        lib/data.ts
                                                     │
                      the saved Link (or an error message string) ◄──┘
@@ -136,7 +137,7 @@ snapshot matches what the server rendered.
 | Path | Flow |
 |---|---|
 | Save from anywhere | Bookmarklet, extension and phone share all open `/share?url=…`. Nothing is saved until the user clicks **Save link** (any site could open that address) |
-| Daily check | Vercel Cron → `/api/cron/check-links` (needs `CRON_SECRET`) → `checkLink` per link via `safeFetch` → `updateLinkStatus` |
+| Daily check | Vercel Cron → `/api/cron/check-links` (needs `CRON_SECRET`) → `checkLink` per link via `safeFetch` → `updateLinkStatus`; then preview pictures for up to 50 older links (`fetchPageInfo` → `updateLinkImage`) |
 | Export | `/api/export` → the user's links as a bookmarks file |
 | Health | `/api/health` → `select 1` → 200 `ok` or 503 `down`, never cached |
 
@@ -149,9 +150,9 @@ possible: pages load data on the server and hand it to one client component.
 | Area | Main files |
 |---|---|
 | Pages | `app/page.tsx` (landing or the app), `account/`, `share/`, `demo/`, `privacy/`, `terms/` |
-| The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, folders, tags; a drawer on phones), `Rediscover` (banner), `LinkCard` (card or list row), `LinkDetails` (panel), `FolderActions`, `FolderPicker` |
-| Shared pieces | `LinkParts` (`Favicon`, `Badges`, `StickyNote`, `EditForm`), `LogoMark`, `FolderIcon` |
-| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useLinkActions` (server or demo actions) |
+| The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, folders, tags; a drawer on phones), `BottomBar` (phones: All, Unread, +, Lists), `Rediscover` (banner), `LinkCard` (card or list row; Select mode ticks), `LinkDetails` (panel; a bottom sheet below `lg`), `FolderActions` (the pencil next to a folder's name and its Edit folder panel), `AddLinksSheet` (fill a folder like a playlist), `FolderPicker` |
+| Shared pieces | `LinkParts` (`Favicon`, `PreviewImage`, `Badges`, `StickyNote`, `EditForm`), `Sheet` (bottom sheet on phones, dialog on wider screens), `LogoMark`, `FolderIcon` |
+| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
 | Around it | `Landing`, `ShareForm`, `ImportBookmarks`, `Bookmarklet`, `UsernameForm`, `DeleteAccount`, `LegalPage`, `Footer` |
 
 Props from server to client must be serializable (plain data and `Date`s; no
@@ -167,7 +168,7 @@ signed-in user's id, and every read, update and delete matches it
 
 | Table | Holds | Notes |
 |---|---|---|
-| `links` | url, title, tags (`text[]`), note, `created_at`, `status` + `checked_at` (link check), `read_at`, `folder_id`, `user_id` | `folder_id` → `folders`, `ON DELETE SET NULL` |
+| `links` | url, title, tags (`text[]`), note, `created_at`, `status` + `checked_at` (link check), `read_at`, `folder_id`, `image`, `user_id` | `folder_id` → `folders`, `ON DELETE SET NULL`. `image`: the page's sharing picture (https), `""` when it has none, `null` when not looked for yet |
 | `folders` | name, colour, icon, `user_id` | Names unique per user, ignoring case (checked by the actions) |
 | `rate_limits` | `user_id`, action, window start, count | One row per window; `INSERT … ON CONFLICT DO UPDATE` counts atomically |
 | `user`, `session`, `account`, `verification` | Better Auth's tables (`db/auth-schema.ts`) | Deleting a user deletes everything of theirs (`ON DELETE CASCADE`) |
@@ -188,7 +189,7 @@ are in [MAINTENANCE.md](../MAINTENANCE.md).
 | Someone calls an action with made-up input | Every action checks the session and cleans its input again: lengths, `http(s)` only, tag rules, folder ownership | `app/actions.ts`, `cleanNewLink` and friends in `lib/links.ts` |
 | Changing another user's data | Every query matches the user's id | `lib/data.ts` |
 | SSRF: making the server fetch private addresses | `safeFetch` resolves the host and refuses private, loopback and cloud-metadata addresses, **again on every redirect** | `lib/safeUrl.ts` |
-| Injected scripts | Per-request nonce CSP with `strict-dynamic`; text is rendered by React, never as raw HTML | `proxy.ts`, `lib/csp.ts` |
+| Injected scripts | Per-request nonce CSP with `strict-dynamic`; text is rendered by React, never as raw HTML. Images may come from any https site (preview pictures), nothing else from outside | `proxy.ts`, `lib/csp.ts` |
 | Clickjacking, sniffing, downgrade | `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff`, HSTS | `next.config.ts` |
 | Abuse of expensive work | Rate limits in Postgres (works across many server instances) | `lib/limits.ts` |
 | Saving through someone else's browser | `/share` only saves after a click | `components/ShareForm.tsx` |

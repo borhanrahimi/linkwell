@@ -389,6 +389,7 @@ describe("toLink", () => {
     folderId: null,
     userId: "u1",
     note: null,
+    image: null,
   };
 
   test("turns the date into an ISO string", () => {
@@ -397,6 +398,11 @@ describe("toLink", () => {
 
   test("turns an empty title into undefined", () => {
     expect(toLink(row).title).toBeUndefined();
+  });
+
+  test("keeps a preview picture, and treats \"looked, found none\" as no picture", () => {
+    expect(toLink({ ...row, image: "https://example.com/a.png" }).image).toBe("https://example.com/a.png");
+    expect(toLink({ ...row, image: "" }).image).toBeUndefined();
   });
 
   test("keeps the note, and turns an empty one into undefined", () => {

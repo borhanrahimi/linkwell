@@ -20,7 +20,7 @@ Most bookmark tools are where links go to die. Linkwell keeps three promises:
 - **Tested**: ~400 unit tests and ~37 browser tests, including WCAG AA contrast checks on every page, in light and dark mode.
 - **Secure by default**: server-side validation on every action, SSRF protection on every fetch and redirect, a per-request nonce CSP, rate limits, and per-user data access.
 - **Runs on its own**: CI on every pull request, a protected `main`, weekly dependency updates, a health check with uptime monitoring, and tested backups.
-- **Its own look**: a calm glass design, Cards and List views, a phone drawer, and hand-drawn pen doodles of the Linkwell character.
+- **Its own look**: a calm glass design with preview pictures, Cards and List views, folders you fill like playlists, a phone layout with a bottom bar and sheets, and hand-drawn pen doodles of the Linkwell character.
 
 ## Built with
 

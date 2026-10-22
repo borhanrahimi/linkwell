@@ -11,6 +11,8 @@ export type Link = {
   checkedAt?: string;
   readAt?: string;
   folderId?: string;
+  // The page's sharing picture (https), shown on its card.
+  image?: string;
 };
 
 // The palette in lib/folders.ts (FOLDER_COLORS).

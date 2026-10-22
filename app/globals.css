@@ -3,6 +3,29 @@
 @theme {
   /* The system font: San Francisco on Apple devices, Segoe UI on Windows. */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Gentle motion. Used with motion-safe:, so people who turn animations
+     off in their system settings never see it. */
+  --animate-sheet-up: sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: fade-in 180ms ease-out;
+  --animate-rise-in: rise-in 260ms ease-out both;
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
 }
 
 /* Colours are named by their job, not their shade, so one class works in

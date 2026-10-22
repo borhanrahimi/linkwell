@@ -10,5 +10,5 @@ export const SITE = {
   // account page, where people can export or delete everything themselves.
   contactEmail: "",
   // When the privacy policy or terms last changed. Update it with every change.
-  legalUpdated: "October 20, 2026",
+  legalUpdated: "October 22, 2026",
 };

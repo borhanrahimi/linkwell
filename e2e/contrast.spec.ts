@@ -6,7 +6,8 @@ for (const colorScheme of ["light", "dark"] as const) {
   test.describe(`${colorScheme} mode`, () => {
     // measureContrast injects a <style> tag to hide text while measuring; the
     // Content-Security-Policy rightly blocks that, so this test bypasses it.
-    test.use({ colorScheme, bypassCSP: true });
+    // Reduced motion: measure the page as it ends up, not cards mid-fade-in.
+    test.use({ colorScheme, bypassCSP: true, reducedMotion: "reduce" });
 
     test("every text is readable (WCAG AA contrast)", async ({
       page,
@@ -34,7 +35,9 @@ for (const colorScheme of ["light", "dark"] as const) {
       const results = await measureContrast(page);
       // Then again with a folder's tab open (it shows only that folder's links).
       await page.getByRole("button", { name: "Work", exact: true }).click();
-      await page.getByRole("button", { name: "Rename folder" }).waitFor();
+      // With its edit panel open, so the name box, colours and icons are measured too.
+      await page.getByRole("button", { name: "Edit folder" }).click();
+      await page.getByRole("button", { name: "Done" }).waitFor();
       results.push(...(await measureContrast(page)));
       // And the List view, with its smaller rows.
       await page.getByRole("button", { name: "All links", exact: true }).click();
