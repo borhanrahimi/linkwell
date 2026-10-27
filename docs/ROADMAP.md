@@ -366,6 +366,190 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 
 **You'll learn:** CI/CD, dependency management, monitoring, backups, and writing for your future self.
 
+## 🗺️ What's next, in order (planned 2026-10-26)
+
+| Milestone | Why this order |
+| --- | --- |
+| v2.1 Trash and Undo 🗑️ | Small, and makes every later change safe to try: nothing is lost by one wrong tap |
+| v2.2 Folders inside folders 📁 | The big folder change, with Undo already there |
+| v2.3 A real Home screen 🏡 | Its folder tiles and tabs build on the folder tree |
+| v2.4 Drag and drop ✋ | Moving links and folders by hand, once there's a tree to drag into |
+| v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
+
+## 🔜 v2.1: Trash and Undo 🗑️ (planned)
+
+Today a deleted link or folder is gone for good, and a wrong tap in Select mode can move 50 links at once. Make every change easy to take back.
+
+```
+┌─────────────────────────────────────────────┐
+│ 3 links moved to Reading            [Undo] │  ← a small message for a few seconds
+└─────────────────────────────────────────────┘
+SIDEBAR: … Broken 2 · 🗑️ Trash 4
+TRASH:   "Deleted things stay here for 30 days"   [Empty trash]
+         ┌ link ┐ Deleted 3 days ago   [Restore] [Delete forever]
+```
+
+**Step 1: the database**
+- [ ] A `deleted_at` column on `links` and `folders` (`null` = not deleted). Migration `0014`
+- [ ] Every list, count, search, Rediscover and the daily link check skip deleted things; the 10,000-link and 200-folder limits don't count them
+- [ ] Deleting a folder remembers which links were in it, so Restore can put them back
+
+**Step 2: the Trash**
+- [ ] **Trash** in the sidebar (and under You on phones), with how many days each item has left
+- [ ] **Restore**, **Delete forever**, and **Empty trash** (asks first)
+- [ ] The daily job deletes anything that has been in the Trash for more than 30 days
+- [ ] Saving a link that's in the Trash offers to restore it instead of making a copy
+
+**Step 3: Undo**
+- [ ] A small message with **Undo** after deleting, moving, marking read or unread, and Select mode's actions on many links (gone after a few seconds, or when you do the next thing)
+- [ ] Screen readers hear the message (`role="status"`); it waits while a mouse is over it or it has focus
+
+**Step 4: the rest**
+- [ ] The export leaves the Trash out; backup and restore keep it
+- [ ] Deleting your account still deletes everything at once, Trash included
+- [ ] The demo (`lib/demo.ts`) gets the Trash and Undo too
+- [ ] Tests: deleted things are hidden everywhere, restore brings links back into their folder, the 30-day clean-up, Undo for each action
+
+**You'll learn:** soft deletes (`deleted_at` instead of `DELETE`), undo patterns, toast messages that work for everyone, and scheduled clean-up jobs.
+
+## 🔜 v2.2: Folders inside folders 📁 (planned)
+
+One level of folders isn't enough once you have many links: "Work" wants "Clients" and "Ideas" inside it. Folders can now hold other folders, as deep as you like.
+
+```
+SIDEBAR                      MAIN (opened "Work")
+FOLDERS                      Folders › Work                  ✏️  [+ Add links]
+▾ 💼 Work           23       ┌──────────┐ ┌──────────┐
+    ▸ 📖 Clients     8       │ 📖       │ │ ☕       │   ← its subfolders, as tiles
+    ▸ ☕ Ideas       4       │ Clients 8│ │ Ideas  4 │
+▸ 🏠 Home            9       └──────────┘ └──────────┘
++ New folder                 11 links in Work
+                             ┌──────┐ ┌──────┐ ┌──────┐   ← its own links
+```
+
+Decided (2026-10-26): **no depth limit**, and deleting a folder **moves its subfolders and links up one level**, so nothing is lost.
+
+**Step 1: the database**
+- [ ] A `parent_id` column on `folders` that points to another folder (a foreign key to its own table); `null` = a top-level folder. Migration `0015`
+- [ ] Folder names are unique (ignoring case) **within the same parent**, so "Ideas" can live under both Work and Home
+- [ ] The server checks that the parent is one of your own folders, and that a folder never goes inside itself or one of its own subfolders (a loop). The 200-folder limit still counts every folder
+
+**Step 2: seeing the tree**
+- [ ] The sidebar's folders become a tree with ▸/▾ arrows; which folders are open is remembered per device. Deep levels stop indenting after a few steps so the sidebar fits on phones
+- [ ] A breadcrumb trail in the heading (Folders › Work › Clients), each part clickable; on phones the middle collapses (Folders › … › Clients)
+- [ ] An open folder shows its subfolders as tiles first, then its own links
+- [ ] A folder's count includes the links in its subfolders
+
+**Step 3: making and moving**
+- [ ] **New folder inside** in the Edit folder panel and in the empty folder's drawing
+- [ ] **Move folder to…** (another folder, or Top level), with the same loop check
+- [ ] Deleting a folder with subfolders asks first ("Its 3 folders and 11 links move up into Work"), then moves everything up one level in one database update. The folder goes to the Trash, and Restore (or Undo) moves its subfolders and links back into it
+
+**Step 4: every folder menu shows the tree**
+- [ ] Indented folders in the save page's and top bar's Folder menu, Details, **Move to…** and the Add links picker; **New folder…** there can create inside the chosen folder
+
+**Step 5: import, export, backup and demo**
+- [ ] Importing bookmarks keeps the browser's nested folders (today `folderOf` in `lib/bookmarks.ts` only takes the nearest one, so they come in flat)
+- [ ] The export writes nested folders; backup and restore carry `parent_id` (parents restored before their children)
+- [ ] The demo (`lib/demo.ts`) does all of the above in memory
+- [ ] Tests: loops refused, delete moves things up and Restore moves them back, nested import and export round-trip, the tree in the browser tests
+
+**You'll learn:** a foreign key to its own table, trees and recursion (building the tree in the browser from the flat list we already load), preventing loops, and `WITH RECURSIVE` in SQL.
+
+## 🔜 v2.3: A real Home screen 🏡 (planned)
+
+The first screen is one long list today, so nothing feels organised. A **Home** view becomes the first screen, with short sections that each show a few things and a **See all**. On phones, a new floating tab bar to move around.
+
+**Step 1: Home**
+
+```
+Good evening
+🔭 Remember this? ……………………………………… [Show another]
+UNREAD (12)                                   See all →
+[card] [card] [card] [card]          ← sideways scroll on phones
+YOUR FOLDERS                                  See all →
+┌────────┐ ┌────────┐ ┌────────┐     ← like playlists: a collage of
+│▦▦ Work │ │▦▦ Home │ │▦▦ Reads│       4 preview pictures, colour, icon, count
+└────────┘ └────────┘ └────────┘
+RECENTLY SAVED                                See all →
+[row] [row] [row]
+⚠️ 2 broken links · 📥 9 links not in a folder → Sort them
+```
+
+- [ ] Home as the first screen (`/`), at the top of the sidebar; All links one click away (`/?list=all`)
+- [ ] Rediscover, Unread and Recently saved as short sections; empty ones hide themselves
+- [ ] **Your folders**: top-level folders as tiles with a collage of their links' preview pictures, colour, icon and count
+- [ ] **Pin** a folder to show it first on Home
+- [ ] **Not in a folder**: a gentle nudge that opens a "Sort them" flow (Select mode and Move to…)
+- [ ] A greeting by time of day, and a drawing when Home is completely empty
+
+**Step 2: the phone tab bar**
+
+```
+        ┌───────────────────────────────────────────┐
+        │  ( 🏠 )    📁      ⊕      📖      👤      │  ← frosted glass, floating
+        └───────────────────────────────────────────┘     above the page
+           ╰─ the pill glides to the tab you tap
+```
+
+- [ ] New tabs: **Home · Folders · + · Unread · You** (Folders opens the folder tree as a full screen; You opens the account page)
+- [ ] A **floating, frosted-glass bar**: rounded, lifted off the bottom edge with a soft shadow, the page blurred behind it (`backdrop-filter`), and a solid fallback where blur isn't supported. Readable in light and dark mode, and it keeps clear of the iPhone's home line (`env(safe-area-inset-bottom)`)
+- [ ] A **sliding highlight**: a soft pill behind the active tab glides to the next one when you tap it
+- [ ] Icons react: a small bounce on tap, and the outline drawing turns filled while the tab is active
+- [ ] The bar slides away while you scroll down to read and comes back when you scroll up a little
+- [ ] The screen slides sideways when you tap a tab (the View Transitions API). No swiping between tabs: it fights the iPhone's own swipe-back gesture and is easy to trigger while scrolling
+- [ ] All the motion is off for people who turn animations off (`prefers-reduced-motion`); the contrast and browser tests cover Home and the new bar
+
+**You'll learn:** designing from what the user needs first, sideways scrolling sections, combining several views of the same data on one screen, frosted glass with `backdrop-filter`, animating with CSS transforms, and page transitions.
+
+## 🔜 v2.4: Drag and drop ✋ (planned)
+
+With a folder tree, people want to pick things up and put them where they belong, and to choose the order of their folders instead of A to Z.
+
+**Step 1: dragging links**
+- [ ] Drag a card or row onto a folder in the sidebar or a folder tile; the folder lights up while you're over it
+- [ ] Links ticked in Select mode move together ("Moving 4 links")
+- [ ] Every drop shows the **Undo** message from v2.1
+
+**Step 2: dragging folders**
+- [ ] Drag a folder onto another folder to put it inside, or between folders to change the order; the loop check from v2.2 still applies
+- [ ] A `position` column on `folders` keeps your own order (migration `0016`), with "My order" or "A to Z" for the sidebar
+
+**Step 3: phones, keyboards and screen readers**
+- [ ] On phones: press and hold to pick something up, with a small buzz where phones support it (`navigator.vibrate`); the page scrolls when you drag near the edge
+- [ ] Nothing needs dragging: **Move to…** stays for links and folders, and the Edit folder panel gets **Move up** and **Move down**
+- [ ] Screen readers hear what's happening ("Picked up Reading. Over Work. Dropped into Work")
+- [ ] Browser tests for dragging with a mouse, a finger and the keyboard
+
+**You'll learn:** pointer events (one code path for mouse, finger and pen), drag and drop that works for everyone, and saving a hand-made order in the database.
+
+## 🔜 v2.5: Ready for 10,000 links ⚡ (planned)
+
+Today the page loads **every** link and folder into the browser and counts and searches them there. That's fast for 50 links and slow for 5,000, and accounts can hold 10,000.
+
+**Step 1: measure first**
+- [ ] A script that fills a test account with 10,000 made-up links in 200 folders
+- [ ] Write down how long the first screen, search and opening a folder take, on a computer and a phone, so we know the changes help
+
+**Step 2: the database does the heavy work**
+- [ ] Indexes for what we ask most (`links` by user and date, by user and folder)
+- [ ] Counts for the sidebar and Home (`COUNT … GROUP BY`) instead of counting in the browser
+- [ ] Rediscover picks its links on the server
+
+**Step 3: links a page at a time**
+- [ ] The list loads 50 links, and the next 50 as you scroll near the end (keyset pagination: "after this date and id", which stays fast deep into the list)
+- [ ] Select mode's **Select all** means all of the list (for example 2,340 links), not just the ones loaded so far
+
+**Step 4: search on the server**
+- [ ] Search runs in the database and also looks inside notes and tags (Postgres full-text search, or trigram matching for parts of words)
+- [ ] It waits until you stop typing for a moment, and shows the newest answer only
+
+**Step 5: check the numbers again**
+- [ ] The same measurements as Step 1, written down here next to the old ones
+- [ ] The demo keeps working in memory
+
+**You'll learn:** measuring before optimising, database indexes, `EXPLAIN` in SQL, pagination, infinite scrolling, and full-text search.
+
 ---
 
 ## 🔭 Long-term vision: Linkwell goes social
