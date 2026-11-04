@@ -347,33 +347,33 @@ test("pages carry a title, a description and a sharing preview picture", async (
   await expect(page).toHaveTitle("Privacy · Linkwell");
 });
 
-test("on a phone, the Folders tab opens the lists full screen, and they close once one is picked", async ({ page, signIn }) => {
+test("on a phone, the tab bar is always there: Folders shows only folders, and the account page has it too", async ({ page, signIn }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn();
   await page.goto("/?list=all");
   await saveLink(page, "https://example.com/phone-one", "Phone one");
-  await saveLink(page, "https://example.com/phone-two", "Phone two");
-  // The newest link comes first: "Phone two" is the one marked as read.
-  await expect(page.getByRole("link", { name: "Phone two" })).toBeVisible();
-  await page.getByRole("button", { name: "Mark read" }).first().click();
-  await expect(page.getByRole("button", { name: "Mark unread" })).toBeVisible();
-  const lists = page.getByRole("navigation", { name: "Your lists" });
+  const bar = page.getByRole("navigation", { name: "Phone menu" });
 
-  // The links come first; the sidebar waits behind the Folders tab.
-  await expect(lists).toBeHidden();
-  await page.getByRole("button", { name: "Folders", exact: true }).click();
-  await expect(lists).toBeVisible();
+  // No sidebar on a phone: Folders is a screen of its own, with only folders.
+  await expect(page.getByRole("navigation", { name: "Your lists" })).toBeHidden();
+  await bar.getByRole("button", { name: "Folders" }).click();
+  await expect(page).toHaveURL(/\?list=folders$/);
+  await expect(page.getByText("No folders yet.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "+ New folder" }).filter({ visible: true }).click();
+  await page.getByRole("textbox", { name: "Folder name" }).filter({ visible: true }).fill("Travel");
+  await page.getByRole("button", { name: "Create" }).filter({ visible: true }).click();
+  await page.getByRole("list", { name: "All folders" }).getByRole("button", { name: "Travel", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Travel" })).toBeVisible();
+  await expect(bar).toBeVisible();
 
-  await lists.getByRole("button", { name: "Unread" }).click();
-  await expect(lists).toBeHidden();
+  // The account page keeps the bar, and its tabs lead back.
+  await bar.getByRole("link", { name: "You" }).click();
+  await expect(page).toHaveURL(/\/account$/);
+  await bar.getByRole("link", { name: "Unread" }).click();
   await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Phone two" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Phone one" })).toBeVisible();
-
-  // Esc closes it too.
-  await page.getByRole("button", { name: "Folders", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(lists).toBeHidden();
+  await page.goto("/account");
+  await bar.getByRole("link", { name: "Save a link" }).click();
+  await expect(page.getByRole("dialog", { name: "Save a link" })).toBeVisible();
 });
 
 test("the chosen list lives in the address: back, refresh and bookmarks keep it", async ({ page, signIn }) => {
@@ -528,7 +528,7 @@ test("Home is the first screen: a few of everything, and the phone's tab bar get
   await expect(page).toHaveURL(/\?list=all$/);
   await expect(page.getByRole("heading", { name: "All links" })).toBeVisible();
 
-  // On a phone: Unread and Home in the bar, Folders full screen, You to the account.
+  // On a phone: Unread and Home in the bar, the Folders screen, You to the account.
   await page.setViewportSize({ width: 390, height: 844 });
   const bar = page.getByRole("navigation", { name: "Phone menu" });
   await bar.getByRole("button", { name: "Unread" }).click();
@@ -536,8 +536,7 @@ test("Home is the first screen: a few of everything, and the phone's tab bar get
   await bar.getByRole("button", { name: "Home" }).click();
   await expect(page.getByRole("list", { name: "Recently saved" })).toBeVisible();
   await bar.getByRole("button", { name: "Folders" }).click();
-  await expect(page.getByRole("navigation", { name: "Your lists" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(page.getByText("No folders yet.", { exact: false })).toBeVisible();
   await bar.getByRole("link", { name: "You" }).click();
   await expect(page).toHaveURL(/\/account$/);
 });

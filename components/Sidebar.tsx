@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import FolderBar from "@/components/FolderBar";
 import { countWithInside } from "@/lib/folders";
@@ -22,15 +22,12 @@ type SidebarProps = {
   onChecked: (links: Link[]) => void;
   // How many links and folders are in the Trash.
   trashCount?: number;
-  // Phones only: whether the sidebar is open as a drawer, and how to close it.
-  open?: boolean;
-  onClose?: () => void;
 };
 
 // The column on the left: smart lists (with the counts that used to be the
 // Overview tile), folders and tags. Each one is a filter for the list.
-// On phones it's a full screen instead, opened by the bottom bar's Folders
-// tab; Close or Esc closes it.
+// Wide screens only: phones get around with the bottom bar, the Folders
+// screen, and the More part of Home.
 export default function Sidebar(props: SidebarProps) {
   const {
     links,
@@ -39,21 +36,7 @@ export default function Sidebar(props: SidebarProps) {
     activeFolder,
     activeTag,
     trashCount = 0,
-    open = false,
-    onClose,
   } = props;
-  const closeButton = useRef<HTMLButtonElement>(null);
-
-  // When the drawer opens, focus moves into it, and Esc closes it.
-  useEffect(() => {
-    if (!open) return;
-    closeButton.current?.focus();
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose?.();
-    }
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [open, onClose]);
 
   const { total, unread, broken } = countLinks(links);
   // A folder's count includes the links in the folders inside it.
@@ -103,26 +86,11 @@ export default function Sidebar(props: SidebarProps) {
 
   return (
     <>
-      {open && (
-        <div
-          aria-hidden="true"
-          onClick={onClose}
-          className="fixed inset-0 z-30 bg-black/40 md:hidden"
-        />
-      )}
       <nav
         id="sidebar"
         aria-label="Your lists"
-        className={`glass space-y-5 p-3 max-md:fixed max-md:inset-0 max-md:z-40 max-md:overflow-y-auto max-md:rounded-none max-md:bg-surface max-md:motion-safe:animate-fade-in md:sticky md:top-24 md:self-start md:rounded-2xl ${
-          open ? "" : "max-md:hidden"
-        }`}
+        className="glass space-y-5 p-3 max-md:hidden md:sticky md:top-24 md:self-start md:rounded-2xl"
       >
-        <div className="flex items-center justify-between px-2 md:hidden">
-          <span className="text-sm font-semibold text-ink">Lists</span>
-          <button ref={closeButton} onClick={onClose} className="btn-quiet">
-            Close
-          </button>
-        </div>
         <div>
           <ul aria-label="Lists" className="space-y-0.5">
             {lists.map(listRow)}

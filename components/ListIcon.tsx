@@ -9,6 +9,7 @@ const LIST_ICONS: Record<SmartList, string> = {
   broken: "M12 4l9 16H3Z M12 10v4 M12 17h.01",
   unsorted: "M4 13l2-8h12l2 8v6H4Z M4 13h5l1 2h4l1-2h5",
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
+  folders: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z",
 };
 
 export default function ListIcon({ list, className = "size-4 text-muted" }: { list: SmartList; className?: string }) {

@@ -631,34 +631,42 @@ describe("sidebar", () => {
     expect(shownTitles()).toEqual(["A"]);
   });
 
-  test("on phones, the Folders tab opens it full screen, and picking a list closes it", () => {
+  test("on phones, the Folders tab shows only the folders, and the tab bar stays", () => {
     render(<LinkManager initialLinks={links} initialFolders={folders} />);
-    const menu = screen.getByRole("button", { name: "Folders" });
-    expect(menu.getAttribute("aria-expanded")).toBe("false");
+    const bar = within(screen.getByRole("navigation", { name: "Phone menu" }));
 
-    fireEvent.click(menu);
-    expect(menu.getAttribute("aria-expanded")).toBe("true");
-    // Focus moves into the drawer, onto its Close button.
-    expect(document.activeElement).toBe(sidebar().getByRole("button", { name: "Close" }));
+    fireEvent.click(bar.getByRole("button", { name: "Folders" }));
+    // (The sidebar's own "Folders" heading is there too, for wide screens.)
+    expect(screen.getAllByRole("heading", { name: "Folders" })).toHaveLength(2);
+    expect(window.location.search).toBe("?list=folders");
+    const all = within(screen.getByRole("list", { name: "All folders" }));
+    expect(all.getByRole("button", { name: "Work" })).toBeDefined();
+    // Only folders: no lists, no tags, no links.
+    expect(screen.queryByRole("list", { name: "Links" })).toBeNull();
 
-    fireEvent.click(sidebar().getByRole("button", { name: "Unread" }));
-    expect(menu.getAttribute("aria-expanded")).toBe("false");
-    expect(shownTitles()).toEqual(["A", "C"]);
-    // And back to the button that opened it.
-    expect(document.activeElement).toBe(menu);
+    fireEvent.click(all.getByRole("button", { name: "Work" }));
+    expect(screen.getByRole("heading", { name: "Work" })).toBeDefined();
+    // A folder counts as the Folders tab, and the bar is still there.
+    expect(bar.getByRole("button", { name: "Folders" }).getAttribute("aria-pressed")).toBe("true");
   });
 
-  test("the drawer closes with its Close button or Esc", () => {
+  test("on phones, Home's More part has the other lists, the Trash and the tags", () => {
+    window.history.replaceState(null, "", "/");
     render(<LinkManager initialLinks={links} initialFolders={folders} />);
-    const menu = screen.getByRole("button", { name: "Folders" });
+    const more = within(screen.getByRole("list", { name: "More lists" }));
 
-    fireEvent.click(menu);
-    fireEvent.click(sidebar().getByRole("button", { name: "Close" }));
-    expect(menu.getAttribute("aria-expanded")).toBe("false");
+    expect(more.getAllByRole("button").map((row) => row.textContent?.replace(/\d|›/g, ""))).toEqual(["All links", "Broken", "Not in a folder", "Trash"]);
+    fireEvent.click(more.getByRole("button", { name: /Trash/ }));
+    expect(screen.getByRole("heading", { name: "Trash" })).toBeDefined();
+  });
 
-    fireEvent.click(menu);
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(menu.getAttribute("aria-expanded")).toBe("false");
+  test("the account page's + comes back with the save box open", () => {
+    window.history.replaceState(null, "", "/?save=1");
+    render(<LinkManager initialLinks={links} initialFolders={folders} initialSearch="save=1" />);
+
+    expect(screen.getByRole("dialog", { name: "Save a link" })).toBeDefined();
+    // And the address forgets it, so a refresh doesn't open it again.
+    expect(window.location.search).toBe("");
   });
 
   test("puts the chosen list, folder, tag and view in the address", () => {
@@ -1979,7 +1987,9 @@ describe("folders inside folders", () => {
     });
 
     expect(screen.getByRole("alert").textContent).toBe('There\'s already a folder called "Work" in Home.');
-    expect(screen.queryByRole("navigation", { name: "Folder path" })).toBeNull();
+    // Still at the top level: the path only has the phone's way back to Folders.
+    const path = within(screen.getByRole("navigation", { name: "Folder path" }));
+    expect(path.getAllByRole("button").map((button) => button.textContent)).toEqual(["Folders"]);
   });
 
   test("deleting a folder with folders inside asks, moves everything up, and Undo moves it back", async () => {
@@ -2114,3 +2124,53 @@ describe("Home", () => {
 function shownTitlesOnCards() {
   return cards().getAllByRole("link").map((link) => link.textContent);
 }
+
+describe("sliding along the phone's tab bar, like Instagram", () => {
+  const a = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000e1", url: "https://a.com", title: "A", createdAt: "2026-10-01T12:00:00.000Z" };
+
+  // jsdom has no layout: give the bar a size, 500 pixels wide (100 per place).
+  function sizeBar(nav: HTMLElement) {
+    nav.getBoundingClientRect = () => ({ left: 0, top: 700, width: 516, height: 60, right: 516, bottom: 760, x: 0, y: 700, toJSON() {} });
+    nav.setPointerCapture = () => {};
+  }
+
+  test("press, slide and let go opens the tab under the finger; a short tap still works", () => {
+    render(<LinkManager initialLinks={[a]} />);
+    const nav = screen.getByRole("navigation", { name: "Phone menu" });
+    sizeBar(nav);
+    const home = within(nav).getByRole("button", { name: "Home" });
+
+    // From Home (place 0) across to Unread (place 3).
+    fireEvent.pointerDown(home, { pointerId: 1, clientX: 50, clientY: 730 });
+    fireEvent.pointerMove(nav, { pointerId: 1, clientX: 200, clientY: 730 });
+    fireEvent.pointerMove(nav, { pointerId: 1, clientX: 360, clientY: 730 });
+    // While sliding, the place under the finger lights up.
+    expect(within(nav).getByRole("button", { name: "Unread" }).className).toContain("text-ink");
+    fireEvent.pointerUp(nav, { pointerId: 1, clientX: 360, clientY: 730 });
+    // The click the drag ends with is ignored (it would open Home).
+    fireEvent.click(home);
+
+    expect(screen.getByRole("heading", { name: "Unread" })).toBeDefined();
+
+    // A plain tap.
+    fireEvent.click(within(nav).getByRole("button", { name: "Folders" }));
+    expect(window.location.search).toBe("?list=folders");
+  });
+
+  test("letting go on the + opens the save box; sliding off the bar cancels", () => {
+    render(<LinkManager initialLinks={[a]} />);
+    const nav = screen.getByRole("navigation", { name: "Phone menu" });
+    sizeBar(nav);
+    const home = within(nav).getByRole("button", { name: "Home" });
+
+    fireEvent.pointerDown(home, { pointerId: 2, clientX: 50, clientY: 730 });
+    fireEvent.pointerMove(nav, { pointerId: 2, clientX: 360, clientY: 730 });
+    fireEvent.pointerUp(nav, { pointerId: 2, clientX: 360, clientY: 500 });
+    expect(screen.queryByRole("heading", { name: "Unread" })).toBeNull();
+
+    fireEvent.pointerDown(home, { pointerId: 3, clientX: 50, clientY: 730 });
+    fireEvent.pointerMove(nav, { pointerId: 3, clientX: 260, clientY: 730 });
+    fireEvent.pointerUp(nav, { pointerId: 3, clientX: 260, clientY: 730 });
+    expect(screen.getByRole("dialog", { name: "Save a link" })).toBeDefined();
+  });
+});

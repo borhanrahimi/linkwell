@@ -31,6 +31,10 @@ vi.mock("@/app/actions", () => ({
   setReadDates: vi.fn(),
 }));
 vi.mock("@/lib/auth-client", () => ({ authClient: { signIn: { social: vi.fn() } } }));
+// The phone's tab bar opens pages with the router after a slide.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 afterEach(() => {
   cleanup();

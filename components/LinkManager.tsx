@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import Header from "@/components/Header";
 import LinkForm from "@/components/LinkForm";
@@ -30,7 +30,8 @@ import {
 } from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
 import AddLinksSheet from "@/components/AddLinksSheet";
-import BottomBar from "@/components/BottomBar";
+import BottomBar, { type Tab } from "@/components/BottomBar";
+import FolderBar from "@/components/FolderBar";
 import Sheet from "@/components/Sheet";
 import TrashView from "@/components/TrashView";
 import UndoToast, { type Toast } from "@/components/UndoToast";
@@ -71,6 +72,7 @@ const LIST_TITLES: Record<SmartList, string> = {
   home: "All links",
   all: "All links",
   unsorted: "Not in a folder",
+  folders: "Folders",
   unread: "Unread",
   broken: "Broken",
   trash: "Trash",
@@ -162,19 +164,19 @@ export default function LinkManager({
   const [addingLinks, setAddingLinks] = useState(false);
   const closeAddLinks = useCallback(() => setAddingLinks(false), []);
   // Phones: the save box opens in a sheet from the bottom bar's +.
-  const [savingOnPhone, setSavingOnPhone] = useState(false);
+  // The account page's + comes here as /?save=1, to open the sheet at once.
+  const [savingOnPhone, setSavingOnPhone] = useState(() => new URLSearchParams(initialSearch).has("save"));
+  // ...and save=1 then leaves the address, so a refresh doesn't open it again.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("save")) return;
+    params.delete("save");
+    window.history.replaceState(null, "", params.size ? `?${params}` : window.location.pathname);
+  }, []);
   const closeSaveSheet = useCallback(() => setSavingOnPhone(false), []);
   // Select mode: tick several links, then move them or mark them read.
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Phones: whether the sidebar is open as a drawer. Closing it puts focus
-  // back on the Folders tab that opened it.
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButton = useRef<HTMLButtonElement>(null);
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
-    menuButton.current?.focus();
-  }, []);
   // The open folder, and the folders inside it when those are included too.
   const shownFolders = activeFolder && withInside ? folderAndInside(folders, activeFolder) : null;
   const inFolder = shownFolders
@@ -185,6 +187,9 @@ export default function LinkManager({
   const rediscover = now ? pickRediscover(links, now, 10) : [];
   // Home is the first screen; a folder or a tag shows a list instead.
   const showHome = activeList === "home" && !activeFolder && !activeTag;
+  // The phone's tab for what's showing: a folder is in Folders.
+  const phoneTab: Tab | null =
+    activeFolder || activeList === "folders" ? "folders" : showHome ? "home" : activeList === "unread" ? "unread" : null;
   const selectedFolder = folders.find((folder) => folder.id === activeFolder);
   // The folders the open one is inside (for the trail above its name), and
   // the ones inside it (tiles above its links).
@@ -232,15 +237,12 @@ export default function LinkManager({
   }
 
   // A smart list and a folder are one choice: picking one leaves the other.
-  // Picking something in the phone drawer also closes it, to show the list.
   function selectList(list: SmartList) {
     updateAddress({ list, folder: null });
-    if (menuOpen) closeMenu();
   }
 
   function selectFolder(folderId: string | null) {
     updateAddress({ folder: folderId, list: "home" });
-    if (menuOpen) closeMenu();
   }
 
   // Why the list is empty, in words (and a drawing) that match what was chosen.
@@ -282,7 +284,6 @@ export default function LinkManager({
 
   function toggleTag(tag: string) {
     updateAddress({ tag: activeTag === tag ? null : tag });
-    if (menuOpen) closeMenu();
   }
 
   // Deleting puts links in the Trash, with Undo.
@@ -585,12 +586,32 @@ export default function LinkManager({
           onCreateFolder={addFolder}
           onChecked={setLinks}
           trashCount={trash.links.length + trash.folders.length}
-          open={menuOpen}
-          onClose={closeMenu}
         />
 
         <div className="min-w-0">
-          {activeList === "trash" && !activeFolder ? (
+          {activeList === "folders" && !activeFolder ? (
+            // Folders (the phone's Folders tab): every folder as a tree, and
+            // nothing else; a tap opens one.
+            <section aria-labelledby="folders-screen-heading">
+              <h2 id="folders-screen-heading" className="text-xl font-semibold text-ink">
+                Folders
+              </h2>
+              <div className="glass mt-4 rounded-2xl p-3">
+                {folders.length === 0 && (
+                  <p className="px-2 py-3 text-muted">No folders yet. Make one to keep links that belong together.</p>
+                )}
+                <FolderBar
+                  label="All folders"
+                  roomy
+                  folders={folders}
+                  counts={countWithInside(folders, links)}
+                  activeFolder={null}
+                  onSelect={(folderId) => folderId && selectFolder(folderId)}
+                  onCreate={addFolder}
+                />
+              </div>
+            </section>
+          ) : activeList === "trash" && !activeFolder ? (
             <TrashView
               links={trash.links}
               folders={trash.folders}
@@ -613,7 +634,9 @@ export default function LinkManager({
                 selectList("unsorted");
                 setSelecting(true);
               }}
-              onShowFolders={() => setMenuOpen(true)}
+              onShowFolders={() => selectList("folders")}
+              trashCount={trash.links.length + trash.folders.length}
+              onSelectTag={toggleTag}
             />
           ) : (
           <>
@@ -623,10 +646,17 @@ export default function LinkManager({
           {/* A folder's pencil sits right after its name; its edit panel wraps below. */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Where the open folder is: Work › Clients. On phones a long trail
-              keeps its first and last steps: Work › … › Clients. */}
-            {parentFolders.length > 0 && (
-              <nav aria-label="Folder path" className="basis-full text-sm text-muted">
+              keeps its first and last steps: Folders › Work › … › Clients. */}
+            {/* Phones also get "Folders ›" first: the way back to the Folders screen. */}
+            {selectedFolder && (
+              <nav aria-label="Folder path" className={`basis-full text-sm text-muted ${parentFolders.length > 0 ? "" : "md:hidden"}`}>
                 <ol className="flex min-w-0 flex-wrap items-center gap-1">
+                  <li className="flex items-center gap-1 md:hidden">
+                    <button onClick={() => selectList("folders")} className="hover:text-ink hover:underline">
+                      Folders
+                    </button>
+                    <span aria-hidden="true">›</span>
+                  </li>
                   {parentFolders.map((parent, index) => {
                     const middle = index > 0 && index < parentFolders.length - 1;
                     return (
@@ -954,13 +984,9 @@ export default function LinkManager({
       </div>
 
       <BottomBar
-        activeList={activeList}
-        inFolder={Boolean(activeFolder) || activeList === "trash"}
+        active={phoneTab}
         onSelectList={(list) => slideTo(() => selectList(list))}
         onSave={() => setSavingOnPhone(true)}
-        onOpenFolders={() => setMenuOpen(true)}
-        foldersOpen={menuOpen}
-        foldersButton={menuButton}
         accountHref={user ? "/account" : "/"}
         accountLabel={user ? "You" : "Sign in"}
       />

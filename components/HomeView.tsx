@@ -3,10 +3,11 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import FolderIconDrawing from "@/components/FolderIcon";
 import { Favicon, PreviewImage } from "@/components/LinkParts";
+import ListIcon from "@/components/ListIcon";
 import Rediscover from "@/components/Rediscover";
 import EmptyBox from "@/components/illustrations/EmptyBox";
 import { childFolders, countWithInside, folderAndInside, FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
-import { getDomain, timeAgo, type SmartList } from "@/lib/links";
+import { countTags, getDomain, timeAgo, type SmartList } from "@/lib/links";
 import type { Folder, Link } from "@/types/link";
 
 type HomeViewProps = {
@@ -20,8 +21,11 @@ type HomeViewProps = {
   onShowDetails: (linkId: string) => void;
   // Opens "Not in a folder" in Select mode, ready to move them.
   onSortThem: () => void;
-  // Phones: all folders (the sidebar's folder tree, full screen).
+  // Phones: the Folders screen (every folder, as a tree).
   onShowFolders: () => void;
+  // For the phone's More part (wide screens have these in the sidebar).
+  trashCount: number;
+  onSelectTag: (tag: string) => void;
 };
 
 // How many things each section shows before "See all". Unread shows one row
@@ -51,7 +55,7 @@ function today() {
 // A greeting with a one-line summary (and nudges about broken or unsorted
 // links), Rediscover, one row of Unread, then Recently saved and Your
 // folders side by side. Empty sections hide themselves.
-export default function HomeView({ links, folders, now, rediscover, onSelectList, onSelectFolder, onShowDetails, onSortThem, onShowFolders }: HomeViewProps) {
+export default function HomeView({ links, folders, now, rediscover, onSelectList, onSelectFolder, onShowDetails, onSortThem, onShowFolders, trashCount, onSelectTag }: HomeViewProps) {
   const hello = useSyncExternalStore(noSubscription, greeting, () => "Welcome back");
   const date = useSyncExternalStore(noSubscription, today, () => "");
 
@@ -71,6 +75,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
   const topFolders = childFolders(folders, null).sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
   const broken = links.filter((link) => link.status === "broken").length;
   const unsorted = links.filter((link) => !link.folderId).length;
+  const tags = countTags(links);
   const thisWeek = now ? links.filter((link) => now.getTime() - new Date(link.createdAt).getTime() < WEEK).length : 0;
 
   const summary = [
@@ -168,6 +173,56 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
           </Section>
         )}
       </div>
+
+      {/* Phones have no sidebar, so the rest of it lives here: the other
+        lists, the Trash and your tags. */}
+      <section aria-labelledby="home-more" className="md:hidden">
+        <h2 id="home-more" className="mb-3 text-base font-semibold text-ink">
+          More
+        </h2>
+        <ul aria-label="More lists" className="glass divide-y divide-line rounded-2xl">
+          {(
+            [
+              { list: "all", label: "All links", count: links.length },
+              ...(broken > 0 ? [{ list: "broken", label: "Broken", count: broken }] : []),
+              ...(unsorted > 0 ? [{ list: "unsorted", label: "Not in a folder", count: unsorted }] : []),
+              { list: "trash", label: "Trash", count: trashCount },
+            ] as { list: SmartList; label: string; count: number }[]
+          ).map((row) => (
+            <li key={row.list}>
+              <button onClick={() => onSelectList(row.list)} className="flex w-full items-center gap-3 px-4 py-3 text-left first:rounded-t-2xl last:rounded-b-2xl hover:bg-hover/50">
+                <ListIcon list={row.list} className={`size-5 ${row.list === "broken" ? "text-danger" : "text-muted"}`} />
+                <span className="flex-1 text-ink">{row.label}</span>
+                {row.count > 0 && (
+                  <span aria-hidden="true" className="text-sm text-muted">
+                    {row.count}
+                  </span>
+                )}
+                <span aria-hidden="true" className="text-muted">
+                  ›
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {tags.length > 0 && (
+          <ul aria-label="Your tags" className="mt-4 flex flex-wrap gap-2">
+            {tags.map(({ tag, count }) => (
+              <li key={tag}>
+                <button onClick={() => onSelectTag(tag)} className="glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-ink">
+                  <span aria-hidden="true" className="text-muted">
+                    #
+                  </span>
+                  {tag}
+                  <span aria-hidden="true" className="text-xs text-muted">
+                    {count}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

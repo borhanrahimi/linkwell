@@ -15,7 +15,7 @@ export type AddressState = {
   view: LinkView | null;
 };
 
-const LISTS: SmartList[] = ["home", "all", "unread", "broken", "unsorted", "trash"];
+const LISTS: SmartList[] = ["home", "all", "unread", "broken", "unsorted", "trash", "folders"];
 const listeners = new Set<() => void>();
 
 // Anything odd in the address (a typo, an old link) falls back to the default.
