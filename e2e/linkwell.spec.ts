@@ -392,10 +392,14 @@ test("the chosen list lives in the address: back, refresh and bookmarks keep it"
   await expect(page).toHaveURL(/\?list=unread$/);
   await expect(page.getByRole("link", { name: "Address two" })).toHaveCount(0);
 
-  // A refresh (or a bookmark) opens the same list.
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Address two" })).toHaveCount(0);
+  // A refresh (or a bookmark) opens the same list. Marking read shows at once
+  // and reaches the server a moment later, so on a slow machine the first
+  // reload can come too soon: toPass reloads again until the server caught up.
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Address two" })).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
 
   // Back goes to All links again.
   await page.goBack();
@@ -476,9 +480,14 @@ test("a deleted link goes to the Trash: Undo brings it back, and so does Restore
   await links.getByRole("listitem").first().hover();
   await links.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByRole("list", { name: "Links" })).toHaveCount(0);
-  await page.reload();
-  await page.getByRole("button", { name: "Trash", exact: true }).filter({ visible: true }).click();
-  await expect(page.getByText("30 days left")).toBeVisible();
+  // The delete reaches the server a moment after the screen changes (behind
+  // the Undo's restore), so reload until it's there: a slow machine (like
+  // GitHub's) can otherwise reload too soon.
+  await expect(async () => {
+    await page.reload();
+    await page.getByRole("button", { name: "Trash", exact: true }).filter({ visible: true }).click();
+    await expect(page.getByText("30 days left")).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await page.getByRole("button", { name: "Restore Trash me" }).click();
   await page.getByRole("button", { name: "All links" }).filter({ visible: true }).click();
   await expect(page.getByRole("list", { name: "Links" }).getByRole("link", { name: "Trash me" })).toBeVisible();
@@ -510,10 +519,12 @@ test("folders go inside folders, and deleting one moves what's inside up a level
   await page.getByRole("button", { name: "Edit folder" }).click();
   await page.getByRole("button", { name: "Delete folder" }).click();
   await expect(page.getByText('"Work" moved to the Trash')).toBeVisible();
-  // The page shows the change at once; let the server finish before reloading.
-  await page.waitForLoadState("networkidle");
-  await page.reload();
-  await expect(folders.getByRole("button", { name: "Work", exact: true })).toHaveCount(0);
+  // The page shows the change at once and the server catches up a moment
+  // later: reload until it has.
+  await expect(async () => {
+    await page.reload();
+    await expect(folders.getByRole("button", { name: "Work", exact: true })).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
   await folders.getByRole("button", { name: "Clients", exact: true }).click();
   await expect(page.getByRole("navigation", { name: "Folder path" })).toHaveCount(0);
 });
