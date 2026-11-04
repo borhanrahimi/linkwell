@@ -47,7 +47,7 @@ adding code. It describes how things are **now**; why they got that way is in
 | `__tests__/`, `e2e/` | Unit tests (Vitest) and browser tests (Playwright) |
 | `scripts/` | `npm run backup` / `restore` |
 | `extension/` | The browser extension: plain JavaScript that only opens `/share` |
-| `public/` | Static files: app icons, landing-page screenshots |
+| `public/` | Static files: app icons, landing-page screenshots (imported by `Landing.tsx`, so each version gets its own address), the demo's pictures |
 
 Root files: `proxy.ts` (runs before every page), `next.config.ts` (security
 headers), `drizzle.config.ts`, `vercel.json` (cron), `.env.local` (secrets,

@@ -170,7 +170,8 @@ test("a link sent to /share is saved after one click", async ({ page, signIn }) 
   await expect(page.getByText("Saved to Linkwell.")).toBeVisible();
 
   await page.getByRole("link", { name: "Go to my links" }).click();
-  await expect(page.getByRole("link", { name: "Shared link" })).toBeVisible();
+  // Home: the newest links are in Recently saved.
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Shared link" })).toBeVisible();
 });
 
 test("/share asks a signed-out visitor to sign in first", async ({ page }) => {
@@ -258,8 +259,8 @@ test("a user can import a bookmarks file, folders and all", async ({ page, signI
   await expect(page.getByText("Imported 2 links.")).toBeVisible();
 
   await page.getByRole("link", { name: "Go to my links" }).click();
-  await expect(page.getByRole("link", { name: "Imported loose link" })).toBeVisible();
-  await page.getByRole("button", { name: "Recipes" }).click();
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Imported loose link" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Your lists" }).getByRole("button", { name: "Recipes" }).click();
   await expect(page.getByRole("link", { name: "Imported soup" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Imported loose link" })).toHaveCount(0);
 });
@@ -312,7 +313,7 @@ test("every page sends security headers, and nothing on it is blocked by them", 
   // The page still works: React's scripts ran (the save form responds).
   await page.goto("/");
   await saveLink(page, "https://example.com/csp", "Scripts still run");
-  await expect(page.getByRole("link", { name: "Scripts still run" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Scripts still run" })).toBeVisible();
   expect(await violations()).toEqual([]);
 });
 
@@ -442,18 +443,18 @@ test("anyone can try the demo without an account, and nothing is saved", async (
   await page.goto("/?list=all");
   await page.getByRole("link", { name: "Try the demo" }).click();
   await expect(page).toHaveURL(/\/demo$/);
-  await expect(page.getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
   await expect(page.getByRole("region", { name: /^Rediscover/ })).toBeVisible();
 
   await saveLink(page, "https://example.com/tried-the-demo", "Tried the demo");
-  await expect(page.getByRole("link", { name: "Tried the demo" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Tried the demo" })).toBeVisible();
   await page.getByRole("navigation", { name: "Your lists" }).getByRole("button", { name: "Recipes" }).click();
   await expect(page).toHaveURL(/\/demo\?folder=demo-recipes$/);
   expect(posts).toEqual([]);
 
   // A refresh starts over.
   await page.goto("/demo");
-  await expect(page.getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Tried the demo" })).toHaveCount(0);
 });
 

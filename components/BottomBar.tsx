@@ -54,9 +54,10 @@ export default function BottomBar({ activeList, inFolder, onSelectList, onSave, 
 
   const tab = (name: string) =>
     `relative z-10 flex flex-col items-center gap-0.5 rounded-2xl py-1.5 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
-      active === name ? "text-accent" : "text-muted"
+      active === name ? "text-ink" : "text-muted"
     }`;
-  // The outline drawing fills in while its tab is the one you're on.
+  // The outline drawing fills in, in the accent blue, while its tab is the one
+  // you're on. The label stays ink: blue text on the blue pill is too faint.
   const icon = (name: string, children: ReactNode) => (
     <svg
       key={tapped?.tab === name ? tapped.count : 0}
@@ -68,7 +69,7 @@ export default function BottomBar({ activeList, inFolder, onSelectList, onSave, 
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className={`size-6 ${tapped?.tab === name ? "motion-safe:animate-tap" : ""}`}
+      className={`size-6 ${active === name ? "text-accent" : ""} ${tapped?.tab === name ? "motion-safe:animate-tap" : ""}`}
     >
       {children}
     </svg>

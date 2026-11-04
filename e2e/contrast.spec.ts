@@ -85,9 +85,11 @@ for (const colorScheme of ["light", "dark"] as const) {
     });
 
     test("every text on the demo is readable, details panel too", async ({ page }) => {
+      // Home first, then All links (its cards have Details).
       await page.goto("/demo");
-      await page.getByRole("link", { name: "Notes on CSS grid layouts" }).waitFor();
+      await page.getByRole("list", { name: "Recently saved" }).waitFor();
       const results = await measureContrast(page);
+      await page.getByRole("navigation", { name: "Your lists" }).getByRole("button", { name: "All links" }).click();
       await page.getByRole("button", { name: "Details" }).first().click();
       await page.getByRole("button", { name: "Close", exact: true }).waitFor();
       results.push(...(await measureContrast(page)));

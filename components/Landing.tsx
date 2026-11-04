@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import NextLink from "next/link";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
+// Imported, not linked by address: Next.js puts a fingerprint of each file in
+// its address, so new screenshots show at once instead of an old cached copy.
+import appDark from "@/public/screenshots/app-dark.png";
+import appLight from "@/public/screenshots/app-light.png";
+import phoneDark from "@/public/screenshots/phone-dark.png";
+import phoneLight from "@/public/screenshots/phone-light.png";
 import Footer from "@/components/Footer";
 import LogoMark from "@/components/LogoMark";
 import SignInButton from "@/components/SignInButton";
@@ -144,7 +150,8 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
           <div className="relative mx-auto max-w-4xl md:pr-16">
             <figure className="hidden overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/10 md:block">
               <ThemeScreenshot
-                name="app"
+                light={appLight}
+                dark={appDark}
                 width={2560}
                 height={1600}
                 alt="Linkwell on a computer: Home, with a greeting, a Rediscover banner bringing back an old link, unread links as cards, and recently saved links next to your folders."
@@ -153,7 +160,8 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
             </figure>
             <figure className="mx-auto w-60 overflow-hidden rounded-[1.75rem] border-4 border-ink/80 shadow-2xl shadow-black/20 md:absolute md:-bottom-10 md:right-0 md:w-44">
               <ThemeScreenshot
-                name="phone"
+                light={phoneLight}
+                dark={phoneDark}
                 width={780}
                 height={1688}
                 alt="Linkwell on a phone: Home, with a floating tab bar for Home, Folders, saving a link, Unread and your account."
@@ -240,11 +248,11 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
 
 // A screenshot of the app in light and dark mode: both are in the page, and
 // CSS shows the one matching the visitor's mode (the hidden one isn't loaded).
-function ThemeScreenshot({ name, alt, ...props }: { name: string; width: number; height: number; alt: string; sizes: string }) {
+function ThemeScreenshot({ light, dark, alt, ...props }: { light: StaticImageData; dark: StaticImageData; width: number; height: number; alt: string; sizes: string }) {
   return (
     <>
-      <Image {...props} alt={alt} src={`/screenshots/${name}-light.png`} className="block h-auto w-full dark:hidden" />
-      <Image {...props} alt={alt} src={`/screenshots/${name}-dark.png`} className="hidden h-auto w-full dark:block" />
+      <Image {...props} alt={alt} src={light} className="block h-auto w-full dark:hidden" />
+      <Image {...props} alt={alt} src={dark} className="hidden h-auto w-full dark:block" />
     </>
   );
 }

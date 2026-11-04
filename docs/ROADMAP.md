@@ -16,8 +16,8 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 **To ship them (when everything on the branch is done):**
 - [x] Migrations `0014` and `0015` on dev and test
-- [ ] Migration `0016` (pinned folders) on dev and test, then `npm run e2e` (the browser tests for Home and the tab bar haven't run yet)
-- [ ] `npm run screenshots`, so the landing page and README show the new Home (needs `0016` on the test database), and commit the pictures
+- [x] Migration `0016` (pinned folders) on dev and test; `npm run e2e` passes (40 tests)
+- [x] `npm run screenshots`: the landing page and README show the new Home
 - [ ] Push the branch and open a pull request (a draft is fine, to show the work in progress)
 - [ ] Right before merging: `npm run backup`, then migrations `0014`, `0015` and `0016` on production (`MAINTENANCE.md` → Database changes)
 - [ ] Merge with a normal merge (not "Squash and merge", so every commit keeps its own day on the contribution graph)
@@ -500,7 +500,7 @@ Choices made while finishing the plan (2026-11-03):
 
 **You'll learn:** a foreign key to its own table, trees and recursion (building the tree in the browser from the flat list we already load), preventing loops, and `WITH RECURSIVE` in SQL.
 
-## 🔜 v2.3: A real Home screen 🏡 (built 2026-11-03; migration `0016` and browser tests left)
+## 🔜 v2.3: A real Home screen 🏡 (built 2026-11-03; production migration left)
 
 The first screen is one long list today, so nothing feels organised. A **Home** view becomes the first screen, with short sections that each show a few things and a **See all**. On phones, a new floating tab bar to move around.
 
@@ -549,7 +549,11 @@ RECENTLY SAVED                                See all →
 - [x] Home: the date, the greeting and a one-line summary ("7 unread · 4 saved this week") with the broken and unsorted nudges right under it; Unread is one row on wide screens; Recently saved and Your folders side by side; sites without a picture get their icon on a colour of their own instead of a grey box
 - [x] Sidebar: every list has an icon like the folders; counts of 0 are hidden; Check links is a quiet row; the Trash sits apart at the bottom; a folder's ▸ arrow hangs in the margin, so all icons line up
 - [x] Select mode: with nothing ticked, only the hint, **Select all** and Done (no greyed-out buttons squeezed together); the actions appear once something is ticked
-- [ ] **You:** run migration `0016` on dev and test, then `npm run e2e`: the contrast and browser tests now cover Home, the bar and the Folders screen (written, not run yet). Production before merging
+- [x] Phones: the top bar is just the logo and your picture (Sign out moved to the account page); a smaller greeting; smaller Unread cards so the next one peeks in; folders as a compact row before Recently saved
+- [x] The landing page imports its screenshots, so Next.js gives each version its own address and new pictures show at once (same-named files were served from an old cached copy); `npm run screenshots` gives the sample links the demo's pictures and the folders their icons, so the pictures look like real use
+- [x] Dark mode: the active tab's label is ink, not blue (blue on the blue pill measured 4.43:1, under the 4.5:1 needed)
+- [x] Migration `0016` on dev and test; the contrast and browser tests cover Home, the bar and the Folders screen
+- [ ] **You:** migration `0016` on production before merging
 
 **You'll learn:** designing from what the user needs first, sideways scrolling sections, combining several views of the same data on one screen, frosted glass with `backdrop-filter`, animating with CSS transforms, and page transitions.
 

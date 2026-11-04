@@ -84,7 +84,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
         <p suppressHydrationWarning className="text-sm font-medium text-muted">
           {date}
         </p>
-        <p suppressHydrationWarning className="text-3xl font-semibold tracking-tight text-ink">
+        <p suppressHydrationWarning className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
           {hello}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -146,8 +146,10 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
         )}
 
         {topFolders.length > 0 && (
-          // Wide screens have every folder in the sidebar already: See all is for phones.
-          <Section id="home-folders" title="Your folders" seeAllLabel="See all folders" onSeeAll={onShowFolders} seeAllOnPhonesOnly>
+          // Wide screens have every folder in the sidebar already: See all is
+          // for phones. On phones folders come first: a quick row to swipe.
+          <Section
+            className="max-lg:order-first" id="home-folders" title="Your folders" seeAllLabel="See all folders" onSeeAll={onShowFolders} seeAllOnPhonesOnly>
             <ul aria-label="Your folders" className={`${ROW} sm:grid-cols-3 lg:grid-cols-2`}>
               {topFolders.slice(0, FOLDERS_SHOWN).map((folder) => (
                 <FolderTile
@@ -175,6 +177,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
 const ROW = "-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:overflow-visible sm:px-0 sm:pb-0";
 
 function Section({
+  className = "",
   id,
   title,
   count,
@@ -183,6 +186,7 @@ function Section({
   seeAllOnPhonesOnly = false,
   children,
 }: {
+  className?: string;
   id: string;
   title: string;
   count?: number;
@@ -192,9 +196,9 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={id} className="min-w-0">
+    <section aria-labelledby={id} className={`min-w-0 ${className}`}>
       <div className="mb-3 flex items-center justify-between gap-4">
-        <h2 id={id} className="flex items-center gap-2 text-lg font-semibold text-ink">
+        <h2 id={id} className="flex items-center gap-2 text-base font-semibold text-ink sm:text-lg">
           {title}
           {count !== undefined && <span className="rounded-full bg-hover px-2 py-0.5 text-xs font-semibold text-muted">{count}</span>}
         </h2>
@@ -222,7 +226,7 @@ function LinkTile({ link, onShowDetails, hideWhenWide }: { link: Link; onShowDet
       onClick={(event) => {
         if (!(event.target as Element).closest("a")) onShowDetails(link.id);
       }}
-      className={`glass flex w-60 shrink-0 cursor-pointer snap-start flex-col overflow-hidden rounded-2xl transition-shadow hover:shadow-lg sm:w-auto ${hideWhenWide ? "sm:hidden" : ""}`}
+      className={`glass flex w-44 shrink-0 cursor-pointer snap-start flex-col overflow-hidden rounded-2xl transition-shadow hover:shadow-lg sm:w-auto ${hideWhenWide ? "sm:hidden" : ""}`}
     >
       {link.image ? (
         <PreviewImage src={link.image} className="w-full" />
@@ -234,7 +238,7 @@ function LinkTile({ link, onShowDetails, hideWhenWide }: { link: Link; onShowDet
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col p-3">
-        <a href={link.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 font-medium text-ink hover:text-accent hover:underline">
+        <a href={link.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-ink hover:text-accent hover:underline sm:text-base">
           {link.title || domain}
         </a>
         <p className="mt-auto truncate pt-1 text-xs text-muted">{domain}</p>
@@ -248,7 +252,7 @@ function LinkTile({ link, onShowDetails, hideWhenWide }: { link: Link; onShowDet
 function FolderTile({ folder, count, images, onOpen }: { folder: Folder; count: number; images: string[]; onOpen: () => void }) {
   const color = folder.color ?? "gray";
   return (
-    <li className="w-36 shrink-0 snap-start sm:w-auto">
+    <li className="w-28 shrink-0 snap-start sm:w-auto">
       <button onClick={onOpen} className="group w-full text-left focus:outline-none">
         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl ring-1 ring-line transition-shadow group-hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-blue-400">
           {images.length > 0 ? (

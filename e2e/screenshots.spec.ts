@@ -1,4 +1,7 @@
 import { expect, test } from "./fixtures";
+import { and, eq, inArray } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/neon-http";
+import * as schema from "../db/schema";
 
 // Takes the landing page's screenshots of the app (public/screenshots/), in
 // light and dark mode, on a computer and a phone. Not a test: it only runs
@@ -19,6 +22,39 @@ const SAMPLES = [
   ["Recipes", "https://example.com/sourdough", "Sourdough starter, step by step", 2, "food"],
   ["", "https://example.org/css-grid", "Notes on CSS grid layouts", 1, "css,web,design"],
 ] as const;
+
+// The test server can't fetch real preview pictures, so the sample links get
+// the demo's own drawings (public/demo/), and the folders their icons, written
+// straight into the test database. Then the pictures look like real use.
+const PICTURES: Record<string, string> = {
+  "https://example.org/hyperlink-history": "/demo/hyperlink.svg",
+  "https://example.com/sourdough": "/demo/sourdough.svg",
+  "https://example.com/calm-interfaces": "/demo/calm-interfaces.svg",
+  "https://example.org/coast-hikes": "/demo/coast-hikes.svg",
+  "https://example.org/css-grid": "/demo/css-grid.svg",
+};
+const ICONS = { Reading: "book", Recipes: "coffee", Work: "briefcase" } as const;
+
+// userId: the signed-in test user's (light and dark run at the same time,
+// each with its own user, so it comes from that browser's session).
+async function dressUp(db: ReturnType<typeof drizzle<typeof schema>>, userId: string) {
+  const user = { id: userId };
+  for (const [url, image] of Object.entries(PICTURES)) {
+    await db.update(schema.links).set({ image }).where(and(eq(schema.links.userId, user.id), eq(schema.links.url, url)));
+  }
+  const folders = await db
+    .select()
+    .from(schema.folders)
+    .where(and(eq(schema.folders.userId, user.id), inArray(schema.folders.name, Object.keys(ICONS))));
+  for (const folder of folders) {
+    await db.update(schema.folders).set({ icon: ICONS[folder.name as keyof typeof ICONS] }).where(eq(schema.folders.id, folder.id));
+  }
+  // A folder inside a folder, so the sidebar's tree shows.
+  const reading = folders.find((folder) => folder.name === "Reading");
+  if (reading) {
+    await db.insert(schema.folders).values({ userId: user.id, name: "Design", color: "purple", icon: "star", parentId: reading.id });
+  }
+}
 
 function bookmarksFile() {
   const folders = [...new Set(SAMPLES.map(([folder]) => folder).filter(Boolean))];
@@ -55,6 +91,8 @@ for (const colorScheme of ["light", "dark"] as const) {
       });
       await page.getByRole("button", { name: /Import \d+ links/ }).click();
       await page.getByText(/Imported \d+ links/).waitFor();
+      const session = await (await page.request.get("/api/auth/get-session")).json();
+      await dressUp(drizzle(process.env.E2E_DATABASE_URL!, { schema }), session.user.id);
 
       await page.goto("/?list=all");
       // One link read, one with a note.

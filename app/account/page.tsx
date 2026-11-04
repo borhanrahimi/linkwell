@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import Bookmarklet from "@/components/Bookmarklet";
+import SignOutButton from "@/components/SignOutButton";
 import DeleteAccount from "@/components/DeleteAccount";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
@@ -40,6 +41,8 @@ export default async function AccountPage() {
                 <p className="truncate text-sm text-muted">{user.email}</p>
                 <p className="text-sm text-muted">Joined {joined}</p>
               </div>
+              {/* Phones: the top bar has no room for Sign out, so it's here. */}
+              <SignOutButton className="btn-secondary ml-auto shrink-0 md:hidden" />
             </div>
 
             <div className="mt-6 border-t border-line pt-6">
