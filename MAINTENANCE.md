@@ -224,7 +224,7 @@ curl -i -H "Authorization: Bearer $(grep '^CRON_SECRET=' .env.local | cut -d= -f
 
 | How often | What |
 |---|---|
-| Daily, by itself | Vercel Cron calls `/api/cron/check-links` at 06:00 UTC: checks every link and clears old rate-limit counts |
+| Daily, by itself | Vercel Cron calls `/api/cron/check-links` at 06:00 UTC: checks every link, clears old rate-limit counts, and deletes for good what has been in the Trash for more than 30 days |
 | Weekly | Dependabot's pull requests (above) |
 | Monthly | `npm run backup`, and copy the file off your computer |
 | When the look changes | `npm run screenshots` retakes the landing page's pictures; commit them |

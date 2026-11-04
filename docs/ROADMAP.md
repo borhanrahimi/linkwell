@@ -10,9 +10,19 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ---
 
-## 📌 Next time (written 2026-10-21)
+## 📌 Next time (updated 2026-11-03)
 
-Where we stopped: v2.0 "Runs on its own" is mostly done (checks, Dependabot, `main` protected, health check, uptime monitor, backups). Pick up here:
+**Where we are:** v2.1 Trash and Undo, v2.2 Folders inside folders and v2.3 A real Home screen are built and committed on the branch **`trash-and-folder-tree`** (not on `main` yet, so the live site hasn't changed). Next on the roadmap: v2.4 Drag and drop.
+
+**To ship them (when everything on the branch is done):**
+- [x] Migrations `0014` and `0015` on dev and test
+- [ ] Migration `0016` (pinned folders) on dev and test, then `npm run e2e` (the browser tests for Home and the tab bar haven't run yet)
+- [ ] `npm run screenshots`, so the landing page and README show the new Home (needs `0016` on the test database), and commit the pictures
+- [ ] Push the branch and open a pull request (a draft is fine, to show the work in progress)
+- [ ] Right before merging: `npm run backup`, then migrations `0014`, `0015` and `0016` on production (`MAINTENANCE.md` → Database changes)
+- [ ] Merge with a normal merge (not "Squash and merge", so every commit keeps its own day on the contribution graph)
+
+**Still open from 2026-10-21:** v2.0 "Runs on its own" is mostly done (checks, Dependabot, `main` protected, health check, uptime monitor, backups). Pick up here:
 
 **You (with Claude walking you through it):**
 - [ ] Neon's restore window: Neon → production project → **Settings** → "Instant restore" / "History retention". Tell Claude the number, for `MAINTENANCE.md`

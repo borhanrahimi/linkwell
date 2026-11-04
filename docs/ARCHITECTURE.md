@@ -28,7 +28,7 @@ adding code. It describes how things are **now**; why they got that way is in
 | Web app | Vercel, Next.js 16 | Pages, Server Actions and API routes |
 | Database | Neon Postgres, via Drizzle | Users, links, folders, rate limits. Three branches: production, dev, test |
 | Sign-in | Better Auth + Google | Sessions in Postgres, signed with `BETTER_AUTH_SECRET` |
-| Daily job | Vercel Cron (`vercel.json`) | Checks every link, clears old rate-limit counts |
+| Daily job | Vercel Cron (`vercel.json`) | Checks every link, clears old rate-limit counts, empties what's been in the Trash for 30 days |
 | Monitoring | UptimeRobot → `/api/health` | Emails when the app or database is down |
 | CI | GitHub Actions (`.github/workflows/ci.yml`) | The same `npm run check` and `npm run e2e` as on your computer |
 
@@ -40,7 +40,7 @@ adding code. It describes how things are **now**; why they got that way is in
 |---|---|
 | `app/` | Pages, layouts, `actions.ts` (Server Actions), `api/` (auth, cron, export, health), metadata files (`manifest.ts`, icons, sharing pictures) |
 | `components/` | React components. `illustrations/` holds the drawings: the character's parts in `Character.tsx`, one scene per file |
-| `lib/` | Plain TypeScript, no React: rules and helpers (`links.ts`), the database (`data.ts`), fetching other sites (`safeUrl.ts`, `fetchTitle.ts`, `checkLink.ts`), security (`csp.ts`, `limits.ts`), sign-in (`auth.ts`, `session.ts`) |
+| `lib/` | Plain TypeScript, no React: rules and helpers (`links.ts`), the folder tree (`folders.ts`), the database (`data.ts`), fetching other sites (`safeUrl.ts`, `fetchTitle.ts`, `checkLink.ts`), security (`csp.ts`, `limits.ts`), sign-in (`auth.ts`, `session.ts`) |
 | `db/` | Connection and table definitions (`schema.ts`, `auth-schema.ts`). Server-only |
 | `drizzle/` | Generated SQL migrations. Committed, never edited |
 | `types/` | Shared types (`Link`, `Folder`) |
@@ -83,9 +83,10 @@ Each layer only uses the layers **below** it:
 1. `proxy.ts` makes a fresh **nonce** and sends the Content-Security-Policy
    (`lib/csp.ts`). Only scripts carrying that nonce can run.
 2. `app/page.tsx` (a Server Component) reads the session. Signed out, it shows
-   `Landing`. Signed in, it loads links and folders together
-   (`Promise.all([getLinks(), getFolders()])`) and renders `LinkManager` with
-   them, the server's time (`now`) and the address's query (`initialSearch`).
+   `Landing`. Signed in, it loads links, folders and the Trash together
+   (`Promise.all([getLinks(), getFolders(), getTrash()])`) and renders
+   `LinkManager` with them, the server's time (`now`) and the address's query
+   (`initialSearch`).
 3. `LinkManager` (client) keeps the links and folders in state from then on.
 
 ### Saving a link
@@ -111,12 +112,50 @@ The card only appears with what the server saved, so screen and database
 agree. Smaller changes (read, move, delete, edit) update the screen first and
 then call their action: they feel instant and rarely fail. After an `await`,
 state is always updated with the updater form (`setLinks((current) => …)`).
+A link that's in the Trash isn't saved again: the form offers **Restore it**.
+
+### Deleting, Undo and the Trash
+
+```
+ Delete ──► LinkManager.deleteLinks ── moves the links into `trash` state
+              │                       └─ showToast("Link moved to the Trash", undo)
+              ▼
+     removeLink / removeLinks   (Server Action)  ──► trashLinks: deleted_at = now
+                                                       (the row stays)
+ Undo / Restore ──► restoreLinks ──► deleted_at = null; a folder that's gone → no folder
+ Daily job ──► deleteOldTrash: rows with deleted_at older than 30 days are deleted
+```
+
+- **Soft deletes**: `deleted_at` instead of `DELETE`. `ownLink` / `ownFolder`
+  and `getLinks` / `getFolders` skip deleted rows, so every list, count,
+  search, the export and the daily check leave the Trash out without their own
+  changes. Only the Trash's functions in `lib/data.ts` see deleted rows.
+- **Deleting a folder** never deletes links: its links and the folders inside
+  it move up one level in one batch (a transaction) and remember it in
+  `came_from_folder_id`. Restoring it moves back only what's still where the
+  delete left it, so something moved by hand since stays put. Moving by hand
+  clears `came_from_folder_id`.
+- **Undo** (`components/UndoToast.tsx`): one message at a time, 6 seconds,
+  paused on hover or focus, `role="status"`. It puts back each link's own
+  earlier value (old folder, old read date via `setReadDates`), not a guess.
+
+### Folders inside folders
+
+`folders.parent_id` points at another folder (`null` = top level). The browser
+gets the flat list and builds the tree itself with the helpers in
+`lib/folders.ts` (`childFolders`, `folderPath`, `folderAndInside`,
+`flattenTree`, `countWithInside`); the server and the demo use the same ones.
+Names are unique among neighbours only. The "not inside itself" check asks
+the database: `getFolderAncestors` follows `parent_id` up with `WITH
+RECURSIVE`. The sidebar's open folders are remembered per device
+(`useOpenFolders`).
 
 ### What the list shows
 
-`LinkManager` stores only facts: `links`, `folders`, the search text, the sort
-order, the open details panel and whether the phone drawer is open. Everything
-else is **derived** on each render and never stored:
+`LinkManager` stores only facts: `links`, `folders`, the `trash`, the search
+text, the sort order, the open details panel, the Undo message and whether the
+phone's Folders screen is open. Everything else is **derived** on each render
+and never stored:
 
 ```
 visibleLinks = sort(search(filterByTag(filterByFolder(filterByList(links)))))
@@ -124,7 +163,8 @@ visibleLinks = sort(search(filterByTag(filterByFolder(filterByList(links)))))
 
 The chosen **list, folder, tag and view live in the address**
 (`/?folder=…&tag=react&view=list`, `components/useAddressState.ts`), so Back,
-refresh and bookmarks keep your place. Per-device choices (the view, the share
+refresh and bookmarks keep your place. `/` is **Home** (`HomeView`); the lists
+are `?list=all`, `unread`, `broken`, `unsorted` (not in a folder) and `trash`. Per-device choices (the view, the share
 page's last folder) live in `localStorage`.
 
 **Server and browser must render the same first time (hydration).** The server
@@ -137,8 +177,8 @@ snapshot matches what the server rendered.
 | Path | Flow |
 |---|---|
 | Save from anywhere | Bookmarklet, extension and phone share all open `/share?url=…`. Nothing is saved until the user clicks **Save link** (any site could open that address) |
-| Daily check | Vercel Cron → `/api/cron/check-links` (needs `CRON_SECRET`) → `checkLink` per link via `safeFetch` → `updateLinkStatus`; then preview pictures for up to 50 older links (`fetchPageInfo` → `updateLinkImage`) |
-| Export | `/api/export` → the user's links as a bookmarks file |
+| Daily check | Vercel Cron → `/api/cron/check-links` (needs `CRON_SECRET`) → `checkLink` per link via `safeFetch` → `updateLinkStatus`; then preview pictures for up to 50 older links (`fetchPageInfo` → `updateLinkImage`); then the Trash's 30-day clean-up (`deleteOldTrash`) |
+| Export | `/api/export` → the user's links as a bookmarks file, nested folders as nested lists (the Trash is left out) |
 | Health | `/api/health` → `select 1` → 200 `ok` or 503 `down`, never cached |
 
 ## 5. Server and client components
@@ -150,9 +190,9 @@ possible: pages load data on the server and hand it to one client component.
 | Area | Main files |
 |---|---|
 | Pages | `app/page.tsx` (landing or the app), `account/`, `share/`, `demo/`, `privacy/`, `terms/` |
-| The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, folders, tags; a drawer on phones), `BottomBar` (phones: All, Unread, +, Lists), `Rediscover` (banner), `LinkCard` (card or list row; Select mode ticks), `LinkDetails` (panel; a bottom sheet below `lg`), `FolderActions` (the pencil next to a folder's name and its Edit folder panel), `AddLinksSheet` (fill a folder like a playlist), `FolderPicker` |
-| Shared pieces | `LinkParts` (`Favicon`, `PreviewImage`, `Badges`, `StickyNote`, `EditForm`), `Sheet` (bottom sheet on phones, dialog on wider screens), `LogoMark`, `FolderIcon` |
-| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
+| The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, the folder tree, tags, Trash; full screen on phones), `HomeView` (the first screen), `TrashView`, `UndoToast`, `BottomBar` (phones: Home, Folders, +, Unread, You), `Rediscover` (banner on Home), `LinkCard` (card or list row; Select mode ticks), `LinkDetails` (panel; a bottom sheet below `lg`), `FolderActions` (the pencil next to a folder's name and its Edit folder panel: name, colour, icon, Pin to Home, New folder inside, Move folder to, Delete), `AddLinksSheet` (fill a folder like a playlist), `FolderPicker` |
+| Shared pieces | `LinkParts` (`Favicon`, `PreviewImage`, `Badges`, `StickyNote`, `EditForm`), `Sheet` (bottom sheet on phones, dialog on wider screens), `LogoMark`, `FolderIcon`, `ListIcon` |
+| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useOpenFolders` (open folders in the tree, per device), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
 | Around it | `Landing`, `ShareForm`, `ImportBookmarks`, `Bookmarklet`, `UsernameForm`, `DeleteAccount`, `LegalPage`, `Footer` |
 
 Props from server to client must be serializable (plain data and `Date`s; no
@@ -168,8 +208,8 @@ signed-in user's id, and every read, update and delete matches it
 
 | Table | Holds | Notes |
 |---|---|---|
-| `links` | url, title, tags (`text[]`), note, `created_at`, `status` + `checked_at` (link check), `read_at`, `folder_id`, `image`, `user_id` | `folder_id` → `folders`, `ON DELETE SET NULL`. `image`: the page's sharing picture (https), `""` when it has none, `null` when not looked for yet |
-| `folders` | name, colour, icon, `user_id` | Names unique per user, ignoring case (checked by the actions) |
+| `links` | url, title, tags (`text[]`), note, `created_at`, `status` + `checked_at` (link check), `read_at`, `folder_id`, `came_from_folder_id`, `image`, `deleted_at`, `user_id` | `folder_id` → `folders`, `ON DELETE SET NULL`. `image`: the page's sharing picture (https), `""` when it has none, `null` when not looked for yet. `deleted_at`: in the Trash since then. `came_from_folder_id`: the deleted folder it moved out of |
+| `folders` | name, colour, icon, `parent_id`, `came_from_folder_id`, `pinned_at`, `deleted_at`, `user_id` | `parent_id` → `folders` (its own table), `null` = top level. Names unique among folders with the same parent, ignoring case (checked by the actions). `pinned_at`: shown first on Home |
 | `rate_limits` | `user_id`, action, window start, count | One row per window; `INSERT … ON CONFLICT DO UPDATE` counts atomically |
 | `user`, `session`, `account`, `verification` | Better Auth's tables (`db/auth-schema.ts`) | Deleting a user deletes everything of theirs (`ON DELETE CASCADE`) |
 
@@ -215,7 +255,7 @@ How to report a problem: [SECURITY.md](../SECURITY.md).
 | Kind | Tool | Covers |
 |---|---|---|
 | Unit | Vitest + Testing Library (jsdom) | `lib/` rules, Server Actions (with `lib/data` mocked), components acting like a user, the demo never calling the server |
-| Browser | Playwright (`e2e/`), against the test database | Sign-in, saving, folders, the phone drawer, Back and refresh, the share page, the demo, security headers (no blocked resources), health |
+| Browser | Playwright (`e2e/`), against the test database | Sign-in, saving, folders inside folders, Trash and Undo, Home and the phone's tab bar, Back and refresh, the share page, the demo, security headers (no blocked resources), health |
 | Accessibility | Playwright, `e2e/contrast.ts` | Every text on every page and state meets WCAG AA contrast, in light and dark mode |
 
 Rules:
@@ -240,6 +280,6 @@ Rules:
 - **State:** keep it in the lowest component that needs it; never change it in place; compute what can be computed.
 - **Optional fields:** new `Link` fields are optional, so old data still shows.
 - **URLs:** parse with `new URL()` inside `try/catch`; old data may not be valid.
-- **Database code** starts with `import "server-only"`, and every `update` / `delete` has a `.where(...)`.
+- **Database code** starts with `import "server-only"`, and every `update` / `delete` has a `.where(...)`. Reads and updates skip the Trash (`deleted_at is null`) unless they're the Trash's own.
 - **User-facing text** names no other companies or products ("your browser", "other bookmark apps").
 - **Next.js 16 differs from older versions** (`proxy.ts`, `PageProps`, `connection()`): read the docs in `node_modules/next/dist/docs/` before using an API (see `AGENTS.md`).

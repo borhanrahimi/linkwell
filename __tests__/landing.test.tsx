@@ -32,10 +32,22 @@ test("every button signs in with Google", () => {
   expect(authClient.signIn.social).toHaveBeenCalledWith({ provider: "google", callbackURL: "/" });
 });
 
+test("says what makes it calm: Home, folders inside folders, Trash and Undo", () => {
+  render(<Landing />);
+
+  const section = screen.getByRole("region", { name: "Calm by design" });
+  expect(within(section).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+    "A Home that shows a little of everything",
+    "Folders inside folders",
+    "Nothing lost by one wrong tap",
+  ]);
+});
+
 test("answers the common questions", () => {
   render(<Landing />);
 
   expect(screen.getByText("Is Linkwell free?")).toBeDefined();
+  expect(screen.getByText("What if I delete something by mistake?")).toBeDefined();
   expect(screen.getByText("Can I take my links with me?")).toBeDefined();
 });
 

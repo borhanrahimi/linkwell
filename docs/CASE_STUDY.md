@@ -21,10 +21,14 @@ breaks, and bringing back the ones you forgot.
   a folder, with tags and a note on why it was saved.
 - **Keep them alive**: a daily job checks every saved link. A broken one gets a
   red badge and a link to an archived copy of the page.
-- **Come back to them**: Rediscover brings back links saved weeks ago and
-  never read, one at a time.
-- **Organise**: folders with colours and hand-drawn icons, tags, search, sort,
-  Cards or List view, a details panel, and smart lists (Unread, Broken).
+- **Come back to them**: a Home screen with a greeting, what's unread, what
+  was saved lately and your folders; Rediscover brings back links saved weeks
+  ago and never read, one at a time.
+- **Organise**: folders with colours and hand-drawn icons, folders inside
+  folders (as deep as you like), tags, search, sort, Cards or List view, a
+  details panel, Select mode, and smart lists (Unread, Broken, Not in a folder).
+- **Nothing lost by one wrong tap**: a Trash that keeps deleted links and
+  folders for 30 days, and Undo after every delete, move or read change.
 - **Around it**: Google sign-in, an account page (export, delete), a landing
   page, privacy and terms pages, and a demo that needs no account.
 
@@ -48,6 +52,9 @@ The full list, with the reasoning, is the
 | **Test what users experience**: accessibility contrast measured in a real browser, in light and dark mode | Colours drift as a design grows; a test catches it. It caught a real one: a "Broken" badge too faint to read in light mode |
 | **The demo swaps the server for stand-ins** through a React context | The real components run unchanged; the demo's actions never reach the server, and a test proves it |
 | **Backups leave out sign-in tokens and sessions** | They're secrets that expire anyway. A leaked backup then holds no keys to anyone's account |
+| **Soft deletes**: a `deleted_at` column instead of deleting the row, and a daily clean-up after 30 days | Every delete can be undone. The data layer hides the Trash in one place, so lists, counts, search, the export and the daily check didn't need their own changes |
+| **Undo puts back exact earlier values**, per link | Select mode changes many links that each had their own folder and read date; an Undo that guesses would be wrong |
+| **Folders form a tree from one flat list**, and the database refuses loops (`WITH RECURSIVE`) | The page already loads every folder, so the browser builds the tree itself; the server asks the database whether a move would put a folder inside itself |
 
 ## What was hard
 
@@ -62,6 +69,10 @@ The full list, with the reasoning, is the
 - **Server and browser agreeing on the first render.** Things only the browser
   knows (the saved view, the clipboard, the address) go through
   `useSyncExternalStore`, so the first render matches the server's.
+- **Undoing a folder delete.** Deleting a folder moves its links and
+  subfolders up a level; restoring it has to move them back, but not the ones
+  you've moved somewhere else since. Each moved thing remembers the folder it
+  came from (`came_from_folder_id`), and moving it by hand clears that.
 - **Keeping it running without me.** CI caught the first two big package
   upgrades (TypeScript 7, ESLint 10) failing *before* they reached the live
   site; it turned out the tools Next.js's lint setup is built on don't support
@@ -81,6 +92,7 @@ line on each roadmap milestone are the trail of what I learned along the way.
 - Full-stack Next.js: Server Components and Actions, Route Handlers, the proxy,
   metadata, and rendering per request.
 - Data: Postgres schemas, migrations and their order (database before code),
+  soft deletes, a table that points at itself (a tree) and recursive queries,
   and backups that are restored, not just taken.
 - Security: input validation, SSRF, CSP, rate limiting, least privilege for
   secrets.
@@ -106,3 +118,6 @@ Questions I should be able to answer, and where the answer lives:
 | What runs on every pull request, and what's protected? | `.github/workflows/ci.yml`, `MAINTENANCE.md` |
 | How would you restore the database? | `MAINTENANCE.md` → Backups, `scripts/backup-lib.mjs` |
 | How do you know the colours are readable? | `e2e/contrast.ts`, `e2e/contrast.spec.ts` |
+| How does the Trash work, and why not just `DELETE`? | `lib/data.ts` (`trashLinks`, `restoreLinks`, `deleteOldTrash`), `docs/DECISIONS.md` |
+| How does Undo know what to put back? | `components/LinkManager.tsx` (`moveMany`, `markManyRead`), `components/UndoToast.tsx` |
+| How do you store a tree in a table, and stop a folder going inside itself? | `db/schema.ts` (`parent_id`), `lib/folders.ts`, `getFolderAncestors` in `lib/data.ts` |

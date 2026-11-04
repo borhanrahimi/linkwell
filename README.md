@@ -6,21 +6,23 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/screenshots/app-dark.png">
-  <img alt="Linkwell: a sidebar with lists, folders and tags, a Rediscover banner bringing back an old link, and saved links as cards" src="public/screenshots/app-light.png">
+  <img alt="Linkwell's Home: a greeting, a Rediscover banner bringing back an old link, unread links as cards, and recently saved links next to folders" src="public/screenshots/app-light.png">
 </picture>
 
 Most bookmark tools are where links go to die. Linkwell keeps three promises:
 
-- **Save links** from anywhere: the app, a bookmarklet, a browser extension, your phone's share menu, or an imported bookmarks file. Straight into a folder, with tags and a note.
+- **Save links** from anywhere: the app, a bookmarklet, a browser extension, your phone's share menu, or an imported bookmarks file. Straight into a folder (folders can hold folders), with tags and a note.
 - **Keep them alive**: every link is checked daily. A broken one gets a badge and a link to an archived copy.
-- **Actually come back to them**: Rediscover brings back links you saved weeks ago and never read.
+- **Actually come back to them**: Home shows what's unread and what you saved lately, and Rediscover brings back links you saved weeks ago and never read.
 
 ## Highlights
 
-- **Tested**: ~400 unit tests and ~37 browser tests, including WCAG AA contrast checks on every page, in light and dark mode.
+- **Tested**: ~490 unit tests and ~40 browser tests, including WCAG AA contrast checks on every page, in light and dark mode.
+- **Nothing lost by one wrong tap**: a Trash that keeps deleted links and folders for 30 days (soft deletes and a daily clean-up), and Undo after every delete, move or read change, putting back each link's own earlier state.
+- **Folders inside folders**: a tree built in the browser from one flat list, loops refused by a `WITH RECURSIVE` query, and nested bookmark folders kept on import and export.
 - **Secure by default**: server-side validation on every action, SSRF protection on every fetch and redirect, a per-request nonce CSP, rate limits, and per-user data access.
 - **Runs on its own**: CI on every pull request, a protected `main`, weekly dependency updates, a health check with uptime monitoring, and tested backups.
-- **Its own look**: a calm glass design with preview pictures, Cards and List views, folders you fill like playlists, a phone layout with a bottom bar and sheets, and hand-drawn pen doodles of the Linkwell character.
+- **Its own look**: a calm glass design with a Home screen, preview pictures, Cards and List views, folders you fill like playlists, a floating frosted tab bar on phones with page transitions, and hand-drawn pen doodles of the Linkwell character.
 
 ## Built with
 
