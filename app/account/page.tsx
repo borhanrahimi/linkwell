@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import Bookmarklet from "@/components/Bookmarklet";
+import BottomBar from "@/components/BottomBar";
 import SignOutButton from "@/components/SignOutButton";
 import DeleteAccount from "@/components/DeleteAccount";
 import Footer from "@/components/Footer";
@@ -85,6 +86,9 @@ export default async function AccountPage() {
           <Footer />
         </div>
       </div>
+      {/* Phones: the same tab bar as the app, so you can always get back. */}
+      <BottomBar active="you" accountHref="/account" accountLabel="You" />
+      <div aria-hidden="true" className="h-24 md:hidden" />
     </main>
   );
 }

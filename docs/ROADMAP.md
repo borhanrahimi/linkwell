@@ -12,15 +12,14 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ## 📌 Next time (updated 2026-11-03)
 
-**Where we are:** v2.1 Trash and Undo, v2.2 Folders inside folders and v2.3 A real Home screen are built and committed on the branch **`trash-and-folder-tree`** (not on `main` yet, so the live site hasn't changed). Next on the roadmap: v2.4 Drag and drop.
+**Where we are:** v2.1 Trash and Undo, v2.2 Folders inside folders and v2.3 A real Home screen are **live** (pull request #16, merged 2026-11-03). The phone navigation round (the Folders screen, the tab bar everywhere, sliding between tabs) is on the branch **`phone-navigation`**. Next on the roadmap: v2.4 Drag and drop.
 
-**To ship them (when everything on the branch is done):**
-- [x] Migrations `0014` and `0015` on dev and test
-- [x] Migration `0016` (pinned folders) on dev and test; `npm run e2e` passes (40 tests)
-- [x] `npm run screenshots`: the landing page and README show the new Home
-- [ ] Push the branch and open a pull request (a draft is fine, to show the work in progress)
-- [ ] Right before merging: `npm run backup`, then migrations `0014`, `0015` and `0016` on production (`MAINTENANCE.md` → Database changes)
-- [ ] Merge with a normal merge (not "Squash and merge", so every commit keeps its own day on the contribution graph)
+**Shipping `phone-navigation`:**
+- [x] `npm run check` (496 tests) and `npm run e2e` (40 tests) pass
+- [ ] Commit, push the branch and open a pull request
+- [ ] Merge once the checks pass, with a normal merge (not "Squash and merge", so every commit keeps its own day on the contribution graph). No database changes this time, so no migration first
+
+**Lesson from v2.1–v2.3:** pull request #16 was merged before production had migrations `0014`–`0016`, so the signed-in page broke until they were run. Always back up and migrate production **before** merging code that needs new columns.
 
 **Still open from 2026-10-21:** v2.0 "Runs on its own" is mostly done (checks, Dependabot, `main` protected, health check, uptime monitor, backups). Pick up here:
 
@@ -387,7 +386,7 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 | v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
 | v2.6 A private vault 🔐 | Links only you can read, not even the developer. Last, because it changes what the server can do for you (see its trade-offs), and it's easiest once everything else is settled |
 
-## 🔜 v2.1: Trash and Undo 🗑️ (built 2026-11-03; production migration left)
+## ✅ v2.1: Trash and Undo 🗑️ (done 2026-11-03)
 
 Today a deleted link or folder is gone for good, and a wrong tap in Select mode can move 50 links at once. Make every change easy to take back.
 
@@ -410,7 +409,7 @@ Choices made while finishing the plan (2026-11-03):
 **Step 1: the database**
 - [x] A `deleted_at` column on `links` and `folders` (`null` = not deleted), and `came_from_folder_id` on `links` (points to `folders`, `on delete set null`). Migration `0014`
 - [x] Migration `0014` run on dev and test (2026-11-03)
-- [ ] **You:** run it on production right before merging (`npm run backup` first; the command is in `MAINTENANCE.md` → Database changes)
+- [x] Migration `0014` on production (2026-11-03)
 - [x] `getLinks` and `getFolders` (`lib/data.ts`) return only things that aren't deleted, so every list, count, search and Rediscover in the browser skips the Trash without more changes; a new `getTrash` returns the rest
 - [x] The daily job (`app/api/cron/check-links/route.ts`) doesn't check deleted links or look for their pictures
 - [x] The 10,000-link and 200-folder limits (`lib/limits.ts`) don't count the Trash
@@ -439,7 +438,7 @@ Choices made while finishing the plan (2026-11-03):
 
 **You'll learn:** soft deletes (`deleted_at` instead of `DELETE`), undo patterns, toast messages that work for everyone, and scheduled clean-up jobs.
 
-## 🔜 v2.2: Folders inside folders 📁 (built 2026-11-03; production migration left)
+## ✅ v2.2: Folders inside folders 📁 (done 2026-11-03)
 
 One level of folders isn't enough once you have many links: "Work" wants "Clients" and "Ideas" inside it. Folders can now hold other folders, as deep as you like.
 
@@ -466,7 +465,7 @@ Choices made while finishing the plan (2026-11-03):
 **Step 1: the database**
 - [x] A `parent_id` column on `folders` that points to another folder (a foreign key to its own table, `on delete set null`); `null` = a top-level folder. Also `came_from_folder_id` (see above). Migration `0015`; every folder today becomes top level, so nothing changes for anyone at first
 - [x] Migration `0015` run on dev and test (2026-11-03)
-- [ ] **You:** run it on production together with `0014`
+- [x] Migration `0015` on production (2026-11-03)
 - [x] Folder names are unique (ignoring case) **within the same parent**, so "Ideas" can live under both Work and Home. `createFolder`, `renameFolder` and `moveFolder` all check it
 - [x] The server checks that the parent is one of your own folders (and not in the Trash), and that a folder never goes inside itself or one of its own subfolders (a loop). The 200-folder limit still counts every folder
 - [x] The `Folder` type (`types/link.ts`) gets `parentId`; small tree helpers in `lib/folders.ts` (`childFolders`, `folderPath`, `folderAndInside`, `flattenTree`, `countWithInside`), with tests
@@ -500,7 +499,7 @@ Choices made while finishing the plan (2026-11-03):
 
 **You'll learn:** a foreign key to its own table, trees and recursion (building the tree in the browser from the flat list we already load), preventing loops, and `WITH RECURSIVE` in SQL.
 
-## 🔜 v2.3: A real Home screen 🏡 (built 2026-11-03; production migration left)
+## ✅ v2.3: A real Home screen 🏡 (done 2026-11-03)
 
 The first screen is one long list today, so nothing feels organised. A **Home** view becomes the first screen, with short sections that each show a few things and a **See all**. On phones, a new floating tab bar to move around.
 
@@ -552,8 +551,15 @@ RECENTLY SAVED                                See all →
 - [x] Phones: the top bar is just the logo and your picture (Sign out moved to the account page); a smaller greeting; smaller Unread cards so the next one peeks in; folders as a compact row before Recently saved
 - [x] The landing page imports its screenshots, so Next.js gives each version its own address and new pictures show at once (same-named files were served from an old cached copy); `npm run screenshots` gives the sample links the demo's pictures and the folders their icons, so the pictures look like real use
 - [x] Dark mode: the active tab's label is ink, not blue (blue on the blue pill measured 4.43:1, under the 4.5:1 needed)
+
+**Phone navigation (2026-11-03, branch `phone-navigation`, not merged yet)**
+- [x] The tab bar never disappears: the Folders tab opens a **Folders screen** (`/?list=folders`) with only your folders, instead of a full-screen overlay that hid the bar; the account page has the bar too (its tabs are links back into the app, and its + opens the save box through `/?save=1`)
+- [x] An open folder on a phone starts its path with **Folders ›**, the way back
+- [x] Phones have no sidebar any more: Home's **More** part has All links, Broken, Not in a folder, the Trash and your tags
+- [x] **Press and slide along the tab bar**, like Instagram: the pill follows your finger (a little bigger), the tab under it lights up, a tiny buzz on each new tab where phones support it, and letting go opens it (the + opens the save box; sliding up off the bar cancels). Pointer events, so it works with a finger, a pen or a mouse
+- [x] While developing, Next.js's "N" badge sits top-left (`devIndicators` in `next.config.ts`): bottom-left, it covered the Home tab and caught taps
 - [x] Migration `0016` on dev and test; the contrast and browser tests cover Home, the bar and the Folders screen
-- [ ] **You:** migration `0016` on production before merging
+- [x] Migration `0016` on production (2026-11-03)
 
 **You'll learn:** designing from what the user needs first, sideways scrolling sections, combining several views of the same data on one screen, frosted glass with `backdrop-filter`, animating with CSS transforms, and page transitions.
 

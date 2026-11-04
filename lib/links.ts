@@ -337,15 +337,15 @@ export function countLinks(links: Link[]) {
 }
 
 // What the page shows: Home (the first screen, a few of everything), the
-// smart lists, links not in a folder (for sorting them), and the Trash
-// (which shows deleted things instead).
-export type SmartList = "home" | "all" | "unread" | "broken" | "unsorted" | "trash";
+// smart lists, links not in a folder (for sorting them), the Trash (which
+// shows deleted things instead) and Folders (all folders, as a tree).
+export type SmartList = "home" | "all" | "unread" | "broken" | "unsorted" | "trash" | "folders";
 
 export function filterByList(links: Link[], list: SmartList): Link[] {
   if (list === "unread") return links.filter((link) => !link.readAt);
   if (list === "broken") return links.filter((link) => link.status === "broken");
   if (list === "unsorted") return links.filter((link) => !link.folderId);
-  if (list === "trash") return [];
+  if (list === "trash" || list === "folders") return [];
   return links;
 }
 

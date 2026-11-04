@@ -52,12 +52,12 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "Home", exact: true }).click();
       await page.getByRole("list", { name: "Recently saved" }).waitFor();
       results.push(...(await measureContrast(page)));
-      // And on a phone, the tab bar, then the Folders screen.
+      // And on a phone, the tab bar and Home's More part, then the Folders screen.
       await page.setViewportSize({ width: 390, height: 844 });
       await page.getByRole("navigation", { name: "Phone menu" }).waitFor();
       results.push(...(await measureContrast(page)));
       await page.getByRole("button", { name: "Folders", exact: true }).click();
-      await page.getByRole("navigation", { name: "Your lists" }).waitFor();
+      await page.getByRole("list", { name: "All folders" }).waitFor();
       results.push(...(await measureContrast(page)));
       const tooLow = results.filter((result) => result.ratio < result.needed);
 

@@ -14,6 +14,10 @@ type FolderBarProps = {
   activeFolder: string | null;
   onSelect: (folderId: string | null) => void;
   onCreate: (name: string) => Promise<string | null>;
+  // The list's name for screen readers ("Folders" in the sidebar).
+  label?: string;
+  // Bigger rows, for fingers (the phone's Folders screen).
+  roomy?: boolean;
 };
 
 // Deep folders stop indenting after 4 levels, so the sidebar fits on phones.
@@ -25,7 +29,7 @@ const INDENT = ["", "pl-4", "pl-8", "pl-12", "pl-16"];
 // open); which are open is remembered per device. The keyboard works it like
 // a tree: ↑/↓ move between folders, → opens (or goes in), ← closes (or goes
 // to the folder it's in).
-export default function FolderBar({ folders, counts, activeFolder, onSelect, onCreate }: FolderBarProps) {
+export default function FolderBar({ folders, counts, activeFolder, onSelect, onCreate, label = "Folders", roomy = false }: FolderBarProps) {
   const [stored, setOpen] = useOpenFolders();
   // The open folder's own parents are always open, so it can be seen.
   const open = new Set(stored);
@@ -86,7 +90,7 @@ export default function FolderBar({ folders, counts, activeFolder, onSelect, onC
 
   return (
     <div>
-      <ul ref={list} aria-label="Folders" onKeyDown={onKeyDown} className="space-y-0.5">
+      <ul ref={list} aria-label={label} onKeyDown={onKeyDown} className="space-y-0.5">
         {rows.map(({ folder, depth }) => {
           const hasInside = childFolders(folders, folder.id).length > 0;
           const isOpen = open.has(folder.id);
@@ -115,7 +119,7 @@ export default function FolderBar({ folders, counts, activeFolder, onSelect, onC
               // Screen readers hear whether its folders are showing, and how deep it is.
               aria-expanded={hasInside ? isOpen : undefined}
               aria-description={depth > 0 ? `Inside ${folderPath(folders, folder.id).at(-2)?.name}` : undefined}
-              className={`sidebar-item ${folder.id === activeFolder ? "sidebar-item-active" : ""}`}
+              className={`sidebar-item ${roomy ? "py-3 text-base" : ""} ${folder.id === activeFolder ? "sidebar-item-active" : ""}`}
             >
               {folder.icon ? (
                 <FolderIcon name={folder.icon} className={`size-4 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`} />
