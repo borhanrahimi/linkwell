@@ -1,5 +1,8 @@
 import type { FolderColor, FolderIcon } from "@/types/link";
 
+// The longest folder name (lib/links.ts checks names against it).
+export const FOLDER_NAME_MAX_LENGTH = 100;
+
 // The folder palette: Apple's system colours. The shades live in globals.css
 // (--folder-blue, ...), with brighter ones for dark mode.
 export const FOLDER_COLORS: FolderColor[] = ["blue", "green", "yellow", "orange", "red", "purple", "pink", "gray"];
@@ -47,4 +50,124 @@ export const FOLDER_ICONS: FolderIcon[] = [
 
 export function isFolderIcon(value: unknown): value is FolderIcon {
   return FOLDER_ICONS.includes(value as FolderIcon);
+}
+
+// ---- Folders inside folders ----
+// The browser and the server both get the flat list of folders (each knows
+// its parentId); these build the tree from it. A folder whose parent isn't in
+// the list (deleted, or never there) counts as a top-level folder.
+
+type TreeFolder = { id: string; name: string; parentId?: string };
+
+function parentOf<F extends TreeFolder>(folders: F[], folder: F): string | undefined {
+  return folder.parentId && folders.some((other) => other.id === folder.parentId) ? folder.parentId : undefined;
+}
+
+// The folders directly inside `parentId` (null: the top level), in list order.
+export function childFolders<F extends TreeFolder>(folders: F[], parentId: string | null): F[] {
+  return folders.filter((folder) => (parentOf(folders, folder) ?? null) === parentId);
+}
+
+// The folder and the folders it's inside, from the top level down to it:
+// [Work, Clients] for Clients. Stops if the list ever holds a loop.
+export function folderPath<F extends TreeFolder>(folders: F[], id: string): F[] {
+  const path: F[] = [];
+  let current = folders.find((folder) => folder.id === id);
+  while (current && !path.includes(current)) {
+    path.unshift(current);
+    const parentId = parentOf(folders, current);
+    current = parentId ? folders.find((folder) => folder.id === parentId) : undefined;
+  }
+  return path;
+}
+
+// The folder's id and the ids of every folder inside it, at any depth.
+export function folderAndInside<F extends TreeFolder>(folders: F[], id: string): Set<string> {
+  const found = new Set([id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const folder of folders) {
+      const parentId = parentOf(folders, folder);
+      if (parentId && found.has(parentId) && !found.has(folder.id)) {
+        found.add(folder.id);
+        grew = true;
+      }
+    }
+  }
+  return found;
+}
+
+// Every folder in tree order (each followed by what's inside it) with its
+// depth, 0 for the top level: for menus that show the tree with indents.
+export function flattenTree<F extends TreeFolder>(folders: F[]): { folder: F; depth: number }[] {
+  const rows: { folder: F; depth: number }[] = [];
+  const seen = new Set<string>();
+  function visit(parentId: string | null, depth: number) {
+    for (const folder of childFolders(folders, parentId)) {
+      if (seen.has(folder.id)) continue;
+      seen.add(folder.id);
+      rows.push({ folder, depth });
+      visit(folder.id, depth + 1);
+    }
+  }
+  visit(null, 0);
+  return rows;
+}
+
+// A folder's name in a menu (<option> can't be styled): indented by its depth.
+export function indentedName(name: string, depth: number): string {
+  return "   ".repeat(depth) + name;
+}
+
+// True when another folder in the same place (same parent) has this name,
+// ignoring case. Names only have to be unique among neighbours.
+export function nameTakenIn<F extends TreeFolder>(folders: F[], name: string, parentId: string | null, exceptId?: string): boolean {
+  return childFolders(folders, parentId).some(
+    (folder) => folder.id !== exceptId && folder.name.toLowerCase() === name.toLowerCase()
+  );
+}
+
+// How many links each folder holds, counting the folders inside it too.
+export function countWithInside<F extends TreeFolder>(folders: F[], links: { folderId?: string }[]): Record<string, number> {
+  const own: Record<string, number> = {};
+  for (const link of links) {
+    if (link.folderId) own[link.folderId] = (own[link.folderId] ?? 0) + 1;
+  }
+  const counts: Record<string, number> = {};
+  for (const folder of folders) {
+    let total = 0;
+    for (const id of folderAndInside(folders, folder.id)) total += own[id] ?? 0;
+    counts[folder.id] = total;
+  }
+  return counts;
+}
+
+// A folder's name, or "Reading (2)", "Reading (3)"… when it's taken (any
+// case), still within the length limit. For restoring a folder from the Trash.
+export function freeFolderName(name: string, taken: string[]): string {
+  const used = new Set(taken.map((other) => other.toLowerCase()));
+  if (!used.has(name.toLowerCase())) return name;
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})`;
+    const candidate = name.slice(0, FOLDER_NAME_MAX_LENGTH - suffix.length) + suffix;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+// Deleting a folder moves the folders inside it up one level. Those whose
+// name is already taken up there get a free one: the renames to make.
+export function renamesMovingUp<F extends TreeFolder>(folders: F[], id: string): { id: string; name: string }[] {
+  const folder = folders.find((f) => f.id === id);
+  const parentId = folder ? (parentOf(folders, folder) ?? null) : null;
+  const taken = childFolders(folders, parentId)
+    .filter((f) => f.id !== id)
+    .map((f) => f.name);
+  const renames: { id: string; name: string }[] = [];
+  for (const child of childFolders(folders, id)) {
+    const name = freeFolderName(child.name, taken);
+    taken.push(name);
+    if (name !== child.name) renames.push({ id: child.id, name });
+  }
+  return renames;
 }

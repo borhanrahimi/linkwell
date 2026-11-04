@@ -4,6 +4,10 @@
 export const MAX_LINKS = 10_000;
 export const MAX_FOLDERS = 200;
 
+// Deleted things stay in the Trash this long (the daily job then deletes
+// them for good). The Trash doesn't count toward the limits above.
+export const TRASH_DAYS = 30;
+
 // Rate limits for the expensive actions: at most `max` uses per window.
 export const RATE_LIMITS = {
   // Saving visits the page to read its title.

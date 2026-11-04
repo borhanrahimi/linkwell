@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import ShareForm from "@/components/ShareForm";
-import { createFolder, saveLink } from "@/app/actions";
+import { createFolder, restoreLinkByUrl, saveLink } from "@/app/actions";
+import { IN_TRASH } from "@/lib/links";
 
 vi.mock("@/app/actions", () => ({
   saveLink: vi.fn(async (link) => link),
+  restoreLinkByUrl: vi.fn(async (url: string) => ({ id: "l1", url, createdAt: "2026-10-01T12:00:00.000Z" })),
   createFolder: vi.fn(async (name: string) => ({ id: "f9", name })),
 }));
 
@@ -24,6 +26,20 @@ async function save() {
 }
 
 describe("the share page's form", () => {
+  test("a link that's in the Trash is offered back instead of saved again", async () => {
+    vi.mocked(saveLink).mockResolvedValueOnce(IN_TRASH);
+    render(<ShareForm url="https://example.com/soup" title="Soup" initialFolders={folders} />);
+
+    await save();
+    expect(screen.getByRole("alert").textContent).toContain(IN_TRASH);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore it" }));
+    });
+
+    expect(restoreLinkByUrl).toHaveBeenCalledWith("https://example.com/soup");
+    expect(screen.getByRole("status").textContent).toContain("Restored from your Trash.");
+  });
+
   test("saves into the chosen folder, and says where", async () => {
     render(<ShareForm url="https://example.com/soup" title="Soup" initialFolders={folders} />);
 

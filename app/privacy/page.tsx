@@ -80,6 +80,8 @@ export default async function PrivacyPage() {
         </li>
         <li>
           <strong>Change your details:</strong> edit or delete any link, and change your username, whenever you like.
+          A deleted link or folder stays in your Trash for 30 days, so you can restore it, and is then deleted for
+          good. Empty the Trash to delete it sooner.
         </li>
       </ul>
 

@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import LinkManager from "@/components/LinkManager";
-import { checkAllLinks, createFolder, deleteFolder, markLinksRead, moveLinksToFolder, moveToFolder, renameFolder, setFolderColor, setFolderIcon, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
+import { checkAllLinks, createFolder, deleteFolder, deleteForever, moveFolder, setFolderPinned, emptyTrash, removeLinks, restoreFolder, restoreLinks, setReadDates, markLinksRead, moveLinksToFolder, moveToFolder, renameFolder, setFolderColor, setFolderIcon, removeLink, saveLink, saveReadStatus, saveLinkDetails } from "@/app/actions";
 import { STORAGE_KEY } from "@/lib/links";
 import type { Link } from "@/types/link";
 
@@ -30,13 +30,26 @@ vi.mock("@/app/actions", () => ({
     note: input.note.trim() || undefined,
   })),
   saveReadStatus: vi.fn(async () => {}),
+  removeLinks: vi.fn(async () => {}),
+  restoreLinks: vi.fn(async () => []),
+  restoreFolder: vi.fn(async (id: string) => ({ id, name: "Restored" })),
+  deleteForever: vi.fn(async () => {}),
+  emptyTrash: vi.fn(async () => {}),
+  moveFolder: vi.fn(async () => null),
+  setFolderPinned: vi.fn(async () => {}),
+  setReadDates: vi.fn(async () => {}),
 }));
+
+// The chosen list, folder and tag live in the address. "/" is Home; most
+// tests here are about the list, so they start on All links. Home's own
+// tests go to "/" first.
+beforeEach(() => {
+  window.history.replaceState(null, "", "/?list=all");
+});
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
-  // The chosen list, folder and tag live in the address: start each test at "/".
-  window.history.replaceState(null, "", "/");
   vi.clearAllMocks();
 });
 
@@ -322,7 +335,7 @@ describe("Home page", () => {
     await addLink("https://first.com");
     await addLink("https://second.com");
 
-    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+    expect(cards().getAllByRole("link").map((link) => link.textContent)).toEqual([
       "second.com",
       "first.com",
     ]);
@@ -338,7 +351,7 @@ describe("Home page", () => {
       target: { value: "title" },
     });
 
-    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual([
+    expect(cards().getAllByRole("link").map((link) => link.textContent)).toEqual([
       "apple.com",
       "mango.com",
       "zebra.com",
@@ -618,9 +631,9 @@ describe("sidebar", () => {
     expect(shownTitles()).toEqual(["A"]);
   });
 
-  test("on phones, the Lists button opens it as a drawer, and picking a list closes it", () => {
+  test("on phones, the Folders tab opens it full screen, and picking a list closes it", () => {
     render(<LinkManager initialLinks={links} initialFolders={folders} />);
-    const menu = screen.getByRole("button", { name: "Lists" });
+    const menu = screen.getByRole("button", { name: "Folders" });
     expect(menu.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.click(menu);
@@ -637,7 +650,7 @@ describe("sidebar", () => {
 
   test("the drawer closes with its Close button or Esc", () => {
     render(<LinkManager initialLinks={links} initialFolders={folders} />);
-    const menu = screen.getByRole("button", { name: "Lists" });
+    const menu = screen.getByRole("button", { name: "Folders" });
 
     fireEvent.click(menu);
     fireEvent.click(sidebar().getByRole("button", { name: "Close" }));
@@ -662,6 +675,9 @@ describe("sidebar", () => {
     expect(window.location.search).toBe("?folder=f1&tag=react&view=list");
 
     fireEvent.click(sidebar().getByRole("button", { name: "All links" }));
+    expect(window.location.search).toBe("?list=all&tag=react&view=list");
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Home" }));
     expect(window.location.search).toBe("?tag=react&view=list");
   });
 
@@ -671,21 +687,20 @@ describe("sidebar", () => {
     expect(screen.getByRole("heading", { name: "Broken" })).toBeDefined();
     expect(shownTitles()).toEqual(["C"]);
 
-    // Going back to a page without a choice: all links again.
+    // Going back to a page without a choice: Home.
     act(() => {
       window.history.replaceState(null, "", "/");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
-    expect(screen.getByRole("heading", { name: "All links" })).toBeDefined();
-    expect(shownTitles()).toEqual(["A", "B", "C"]);
+    expect(screen.getByRole("heading", { name: "Recently saved" })).toBeDefined();
   });
 
   test("ignores an address with a folder that doesn't exist (anymore)", () => {
     window.history.replaceState(null, "", "/?folder=gone&list=nonsense");
     render(<LinkManager initialLinks={links} initialFolders={folders} />);
 
-    expect(screen.getByRole("heading", { name: "All links" })).toBeDefined();
-    expect(shownTitles()).toEqual(["A", "B", "C"]);
+    // Home, the first screen.
+    expect(screen.getByRole("heading", { name: "Recently saved" })).toBeDefined();
   });
 
   test("the heading says how many links the list is showing", () => {
@@ -746,7 +761,7 @@ describe("checking links", () => {
       fireEvent.click(screen.getByRole("button", { name: "Check links" }));
     });
 
-    expect(screen.getByRole("status").textContent).toBe("You're going a bit fast. Please wait a moment and try again.");
+    expect(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("status").textContent).toBe("You're going a bit fast. Please wait a moment and try again.");
     expect(screen.getByRole("link", { name: "working.com" })).toBeDefined();
   });
 
@@ -768,7 +783,7 @@ describe("checking links", () => {
     });
 
     expect(checkAllLinks).toHaveBeenCalled();
-    expect(screen.getByRole("status").textContent).toBe("Checked 2 links: 1 broken.");
+    expect(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("status").textContent).toBe("Checked 2 links: 1 broken.");
   });
 
   test("says when every link works", async () => {
@@ -779,7 +794,7 @@ describe("checking links", () => {
       fireEvent.click(screen.getByRole("button", { name: "Check links" }));
     });
 
-    expect(screen.getByRole("status").textContent).toBe("Checked 1 link: all working.");
+    expect(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("status").textContent).toBe("Checked 1 link: all working.");
   });
 });
 
@@ -861,6 +876,8 @@ describe("read and unread", () => {
 });
 
 describe("rediscover", () => {
+  // Rediscover is on Home.
+  beforeEach(() => window.history.replaceState(null, "", "/"));
   const now = new Date("2026-10-20T12:00:00.000Z");
   const old = { id: "1", url: "https://old.com", title: "Old article", createdAt: "2026-09-29T12:00:00.000Z" };
   const recent = { id: "2", url: "https://recent.com", createdAt: "2026-10-19T12:00:00.000Z" };
@@ -910,8 +927,10 @@ describe("rediscover", () => {
   test("lets go of a link once it is marked as read", async () => {
     render(<LinkManager initialLinks={[old]} now={now} />);
 
+    // On Home, a link's details open from its row in Recently saved.
+    fireEvent.click(within(screen.getByRole("list", { name: "Recently saved" })).getByRole("listitem"));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
+      fireEvent.click(within(screen.getByRole("complementary")).getByRole("button", { name: "Mark read" }));
     });
 
     expect(screen.queryByRole("region", { name: /^Rediscover/ })).toBeNull();
@@ -941,7 +960,7 @@ describe("folders", () => {
 
     await createFolderNamed("Recipes");
 
-    expect(createFolder).toHaveBeenCalledWith("Recipes");
+    expect(createFolder).toHaveBeenCalledWith("Recipes", null);
     expect(within(screen.getByRole("list", { name: "Folders" })).getByText("Recipes")).toBeDefined();
     expect(screen.queryByRole("textbox", { name: "Folder name" })).toBeNull();
   });
@@ -1008,7 +1027,7 @@ describe("saving straight into a folder", () => {
       fireEvent.keyDown(nameBox, { key: "Enter" });
     });
 
-    expect(createFolder).toHaveBeenCalledWith("Travel");
+    expect(createFolder).toHaveBeenCalledWith("Travel", null);
     expect(saveLink).not.toHaveBeenCalled();
     expect(folderMenu()).toHaveProperty("value", "f3");
     // The new folder is in the sidebar too.
@@ -1121,13 +1140,13 @@ describe("showing one folder", () => {
     expect(screen.getByRole("button", { name: "All links", pressed: true })).toBeDefined();
   });
 
-  test("clicking the chosen folder again shows every link", () => {
+  test("clicking the chosen folder again goes back Home", () => {
     render(<LinkManager initialLinks={[github, react]} initialFolders={[work]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Work" }));
     fireEvent.click(screen.getByRole("button", { name: "Work" }));
 
-    expect(screen.getByRole("link", { name: "react.dev" })).toBeDefined();
+    expect(within(screen.getByRole("list", { name: "Recently saved" })).getByRole("link", { name: "react.dev" })).toBeDefined();
   });
 
   test("says when a folder is empty", () => {
@@ -1213,8 +1232,7 @@ describe("editing folders", () => {
     expect(screen.getByRole("alert").textContent).toBe('You already have a folder called "Recipes".');
   });
 
-  test("deletes the folder after asking, and keeps its links", async () => {
-    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+  test("deletes the folder without asking, keeps its links, and Undo puts them back", async () => {
     openWork();
     edit();
 
@@ -1224,21 +1242,206 @@ describe("editing folders", () => {
 
     expect(deleteFolder).toHaveBeenCalledWith("f1");
     expect(screen.queryByRole("button", { name: "Work" })).toBeNull();
-    expect(screen.getByRole("link", { name: "github.com" })).toBeDefined();
-  });
+    // Back on Home, where the link is still there.
+    expect(within(screen.getByRole("list", { name: "Recently saved" })).getByRole("link", { name: "github.com" })).toBeDefined();
+    expect(screen.getByText('"Work" moved to the Trash')).toBeDefined();
 
-  test("does nothing when you cancel the delete", () => {
-    vi.spyOn(window, "confirm").mockReturnValueOnce(false);
-    openWork();
-    edit();
+    vi.mocked(restoreFolder).mockResolvedValueOnce({ id: "f1", name: "Work" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
-
-    expect(deleteFolder).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Work" })).toBeDefined();
+    expect(restoreFolder).toHaveBeenCalledWith("f1");
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
+    expect(cards().getByRole("link", { name: "github.com" })).toBeDefined();
   });
 });
 
+describe("Trash and Undo", () => {
+  const a = { id: "5f0c6c1e-1b1a-4c3e-9a7e-00000000000a", url: "https://a.com", title: "A", createdAt: "2026-10-01T12:00:00.000Z" };
+  const b = { id: "5f0c6c1e-1b1a-4c3e-9a7e-00000000000b", url: "https://b.com", title: "B", createdAt: "2026-10-02T12:00:00.000Z", folderId: "f1" };
+  const work = { id: "f1", name: "Work" };
+  const now = new Date("2026-10-20T12:00:00.000Z");
+  const trashedLink = { id: "5f0c6c1e-1b1a-4c3e-9a7e-00000000000c", url: "https://c.com", title: "C", createdAt: "2026-09-01T12:00:00.000Z", deletedAt: "2026-10-17T12:00:00.000Z" };
+  const trashedFolder = { id: "f9", name: "Old", deletedAt: "2026-10-19T12:00:00.000Z" };
+  const openTrash = () => fireEvent.click(screen.getByRole("button", { name: "Trash" }));
+
+  test("deleting a link puts it in the Trash, and Undo brings it back", async () => {
+    render(<LinkManager initialLinks={[a]} />);
+
+    await act(async () => {
+      fireEvent.click(cards().getByRole("button", { name: "Delete" }));
+    });
+    expect(removeLink).toHaveBeenCalledWith(a.id);
+    expect(cardCount()).toBe(0);
+    expect(screen.getByText("Link moved to the Trash")).toBeDefined();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    expect(restoreLinks).toHaveBeenCalledWith([a.id]);
+    expect(cards().getByRole("link", { name: "A" })).toBeDefined();
+    expect(screen.queryByText("Link moved to the Trash")).toBeNull();
+  });
+
+  test("the Trash lists deleted things, newest first, with the days they have left", () => {
+    render(<LinkManager initialLinks={[a]} initialTrash={{ links: [trashedLink], folders: [trashedFolder] }} now={now} />);
+
+    openTrash();
+
+    expect(screen.getByRole("heading", { name: "Trash" })).toBeDefined();
+    const rows = within(screen.getByRole("list", { name: "In the Trash" })).getAllByRole("listitem");
+    expect(rows.map((row) => row.querySelector("p")?.textContent)).toEqual(["Folder: Old", "C"]);
+    expect(rows[0].textContent).toContain("29 days left");
+    expect(rows[1].textContent).toContain("27 days left");
+  });
+
+  test("Restore puts a link back; its folder, if that's in the Trash too, isn't", async () => {
+    const inOld = { ...trashedLink, folderId: "f9" };
+    render(<LinkManager initialLinks={[]} initialTrash={{ links: [inOld], folders: [trashedFolder] }} now={now} />);
+    openTrash();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore C" }));
+    });
+
+    expect(restoreLinks).toHaveBeenCalledWith([inOld.id]);
+    fireEvent.click(screen.getByRole("button", { name: "All links" }));
+    expect(cards().getByRole("link", { name: "C" })).toBeDefined();
+    expect(cards().queryByText("Old")).toBeNull();
+  });
+
+  test("a folder restored under a new name says so", async () => {
+    vi.mocked(restoreFolder).mockResolvedValueOnce({ id: "f9", name: "Old (2)" });
+    render(<LinkManager initialLinks={[]} initialFolders={[{ id: "f2", name: "Old" }]} initialTrash={{ links: [], folders: [trashedFolder] }} now={now} />);
+    openTrash();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore Old" }));
+    });
+
+    expect(screen.getByText('Restored as "Old (2)"')).toBeDefined();
+    expect(screen.getByRole("button", { name: "Old (2)" })).toBeDefined();
+  });
+
+  test("a refused restore stays in the Trash and says why", async () => {
+    vi.mocked(restoreLinks).mockResolvedValueOnce("You've reached the limit of 10,000 links.");
+    render(<LinkManager initialLinks={[]} initialTrash={{ links: [trashedLink], folders: [] }} now={now} />);
+    openTrash();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore C" }));
+    });
+
+    expect(screen.getByText("You've reached the limit of 10,000 links.")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Restore C" })).toBeDefined();
+  });
+
+  test("Delete forever and Empty trash ask first", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true).mockReturnValueOnce(true);
+    render(<LinkManager initialLinks={[]} initialTrash={{ links: [trashedLink], folders: [trashedFolder] }} now={now} />);
+    openTrash();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete C forever" }));
+    expect(deleteForever).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete C forever" }));
+    });
+    expect(deleteForever).toHaveBeenCalledWith([trashedLink.id], []);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Empty trash" }));
+    });
+    expect(confirm).toHaveBeenCalledTimes(3);
+    expect(emptyTrash).toHaveBeenCalled();
+    expect(screen.getByText("Nothing in the Trash.")).toBeDefined();
+  });
+
+  test("saving a link that's in the Trash offers to restore it instead", async () => {
+    render(<LinkManager initialLinks={[]} initialTrash={{ links: [trashedLink], folders: [] }} />);
+
+    await addLink("https://c.com");
+    expect(saveLink).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore it" }));
+    });
+
+    expect(restoreLinks).toHaveBeenCalledWith([trashedLink.id]);
+    expect(cards().getByRole("link", { name: "C" })).toBeDefined();
+  });
+
+  test("Undo after a move puts each link back in its own folder", async () => {
+    render(<LinkManager initialLinks={[a, b]} initialFolders={[work, { id: "f2", name: "Home" }]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select A" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select B" }));
+    await act(async () => {
+      fireEvent.change(screen.getByRole("combobox", { name: "Move selected links to folder" }), { target: { value: "f2" } });
+    });
+    expect(screen.getByText("2 links moved to Home")).toBeDefined();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    expect(moveLinksToFolder).toHaveBeenCalledWith([a.id], null);
+    expect(moveLinksToFolder).toHaveBeenCalledWith([b.id], "f1");
+  });
+
+  test("Undo after marking read puts back each link's own read date", async () => {
+    const read = { ...a, readAt: "2026-10-05T12:00:00.000Z" };
+    render(<LinkManager initialLinks={[read, b]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select A" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select B" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
+    });
+    expect(screen.getByText("2 links marked as read")).toBeDefined();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    expect(setReadDates).toHaveBeenCalledWith([
+      { id: a.id, readAt: "2026-10-05T12:00:00.000Z" },
+      { id: b.id, readAt: null },
+    ]);
+  });
+
+  test("Select mode deletes many links at once", async () => {
+    render(<LinkManager initialLinks={[a, b]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select A" }));
+    fireEvent.click(cards().getByRole("checkbox", { name: "Select B" }));
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("toolbar", { name: "Selected links" })).getByRole("button", { name: "Delete" }));
+    });
+
+    expect(removeLinks).toHaveBeenCalledWith([a.id, b.id]);
+    expect(screen.getByText("2 links moved to the Trash")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Trash" }).textContent).toContain("2");
+  });
+
+  test("the message goes away after a few seconds, but waits while the mouse is over it", async () => {
+    vi.useFakeTimers();
+    render(<LinkManager initialLinks={[a, b]} />);
+    await act(async () => {
+      fireEvent.click(cards().getAllByRole("button", { name: "Delete" })[0]);
+    });
+    const message = screen.getByText("Link moved to the Trash").parentElement!;
+
+    fireEvent.mouseEnter(message);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByText("Link moved to the Trash")).toBeDefined();
+
+    fireEvent.mouseLeave(message);
+    act(() => vi.advanceTimersByTime(6_000));
+    expect(screen.queryByText("Link moved to the Trash")).toBeNull();
+    vi.useRealTimers();
+  });
+});
 
 describe("paste button", () => {
   function fakeClipboard(readText: () => Promise<string>) {
@@ -1566,6 +1769,18 @@ describe("select mode", () => {
     expect(cards().getAllByText("Read")).toHaveLength(1);
   });
 
+  test("with nothing ticked, it offers Select all instead of greyed-out actions", () => {
+    render(<LinkManager initialLinks={[a, b]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    const bar = within(screen.getByRole("toolbar", { name: "Selected links" }));
+
+    expect(bar.queryByRole("button", { name: "Delete" })).toBeNull();
+    fireEvent.click(bar.getByRole("button", { name: "Select all" }));
+
+    expect(bar.getByText("2 selected")).toBeDefined();
+    expect(bar.getByRole("button", { name: "Delete" })).toBeDefined();
+  });
+
   test("outside select mode, tapping a card's empty space opens its details", () => {
     render(<LinkManager initialLinks={[a]} />);
 
@@ -1580,15 +1795,43 @@ describe("the phone's bottom bar", () => {
   const b = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000b2", url: "https://b.com", title: "B", createdAt: "2026-10-02T12:00:00.000Z" };
   const bar = () => within(screen.getByRole("navigation", { name: "Phone menu" }));
 
-  test("switches between all links and unread, within thumb's reach", () => {
+  test("switches between Home and Unread, within thumb's reach", () => {
     render(<LinkManager initialLinks={[a, b]} />);
 
-    fireEvent.click(bar().getByRole("button", { name: "Show unread links" }));
+    fireEvent.click(bar().getByRole("button", { name: "Unread" }));
     expect(screen.getByRole("heading", { name: "Unread" })).toBeDefined();
-    expect(bar().getByRole("button", { name: "Show unread links" }).getAttribute("aria-pressed")).toBe("true");
+    expect(bar().getByRole("button", { name: "Unread" }).getAttribute("aria-pressed")).toBe("true");
 
-    fireEvent.click(bar().getByRole("button", { name: "Show all links" }));
-    expect(screen.getByRole("heading", { name: "All links" })).toBeDefined();
+    fireEvent.click(bar().getByRole("button", { name: "Home" }));
+    expect(screen.getByRole("heading", { name: "Recently saved" })).toBeDefined();
+    expect(bar().getByRole("button", { name: "Home" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("You goes to the account page; in the demo (no account) it offers signing in", () => {
+    const { unmount } = render(<LinkManager initialLinks={[a]} user={{ name: "Ada" }} />);
+    expect(bar().getByRole("link", { name: "You" }).getAttribute("href")).toBe("/account");
+    unmount();
+
+    render(<LinkManager initialLinks={[a]} />);
+    expect(bar().getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/");
+  });
+
+  test("slides away while scrolling down to read, and comes back when scrolling up", () => {
+    render(<LinkManager initialLinks={[a, b]} />);
+    const nav = screen.getByRole("navigation", { name: "Phone menu" });
+
+    act(() => {
+      window.scrollY = 400;
+      window.dispatchEvent(new Event("scroll"));
+    });
+    expect(nav.className).toContain("translate-y-[calc(100%+2rem)]");
+
+    act(() => {
+      window.scrollY = 300;
+      window.dispatchEvent(new Event("scroll"));
+    });
+    expect(nav.className).not.toContain("translate-y-[calc(100%+2rem)]");
+    window.scrollY = 0;
   });
 
   test("+ opens the save box in a sheet, ready to type, and saving closes it", async () => {
@@ -1621,3 +1864,253 @@ describe("the phone's bottom bar", () => {
     expect(sheet.getByRole("alert").textContent).toBe("You already saved this link!");
   });
 });
+
+describe("folders inside folders", () => {
+  const work = { id: "f1", name: "Work" };
+  const clients = { id: "f2", name: "Clients", parentId: "f1" };
+  const acme = { id: "f3", name: "Acme", parentId: "f2" };
+  const home = { id: "f4", name: "Home" };
+  const brief = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000c1", url: "https://brief.com", title: "Brief", createdAt: "2026-10-01T12:00:00.000Z", folderId: "f3" };
+  const plan = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000c2", url: "https://plan.com", title: "Plan", createdAt: "2026-10-02T12:00:00.000Z", folderId: "f1" };
+  const sidebar = () => within(screen.getByRole("list", { name: "Folders" }));
+  const show = (name: string) => fireEvent.click(sidebar().getByRole("button", { name: `Show folders in ${name}` }));
+
+  function renderTree(links = [brief, plan]) {
+    return render(<LinkManager initialLinks={links} initialFolders={[work, clients, acme, home]} />);
+  }
+
+  test("the sidebar shows a tree: folders inside open with an arrow, and counts include them", () => {
+    renderTree();
+
+    expect(sidebar().queryByRole("button", { name: "Clients" })).toBeNull();
+    expect(sidebar().getByRole("button", { name: "Work" }).textContent).toContain("2");
+    show("Work");
+    expect(sidebar().getByRole("button", { name: "Clients" }).textContent).toContain("1");
+    expect(sidebar().getByRole("button", { name: "Hide folders in Work" }).getAttribute("aria-expanded")).toBe("true");
+    // Remembered on this device.
+    expect(localStorage.getItem("linkwell:open-folders")).toBe('["f1"]');
+  });
+
+  test("the keyboard moves through the tree, opens and closes it", () => {
+    renderTree();
+    const workButton = sidebar().getByRole("button", { name: "Work" });
+    workButton.focus();
+
+    fireEvent.keyDown(workButton, { key: "ArrowRight" });
+    expect(sidebar().getByRole("button", { name: "Clients" })).toBeDefined();
+    fireEvent.keyDown(workButton, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(sidebar().getByRole("button", { name: "Clients" }));
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(sidebar().getByRole("button", { name: "Home" }));
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(workButton);
+    fireEvent.keyDown(workButton, { key: "ArrowLeft" });
+    expect(sidebar().queryByRole("button", { name: "Clients" })).toBeNull();
+  });
+
+  test("an open folder shows where it is, the folders inside as tiles, then its own links", () => {
+    renderTree();
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    show("Work");
+    fireEvent.click(sidebar().getByRole("button", { name: "Clients" }));
+
+    const trail = within(screen.getByRole("navigation", { name: "Folder path" }));
+    expect(trail.getByRole("button", { name: "Work" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Clients" })).toBeDefined();
+    const tiles = within(screen.getByRole("list", { name: "Folders in Clients" }));
+    expect(tiles.getByRole("button", { name: "Acme" }).textContent).toContain("1");
+    expect(screen.getByText("No links in Clients itself.")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Also show the links in these folders" }));
+    expect(cards().getByRole("link", { name: "Brief" })).toBeDefined();
+
+    fireEvent.click(tiles.getByRole("button", { name: "Acme" }));
+    expect(screen.getByRole("heading", { name: "Acme" })).toBeDefined();
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Folder path" })).getByRole("button", { name: "Work" }));
+    expect(screen.getByRole("heading", { name: "Work" })).toBeDefined();
+    expect(cards().getByRole("link", { name: "Plan" })).toBeDefined();
+  });
+
+  test("makes a folder inside the open one", async () => {
+    vi.mocked(createFolder).mockResolvedValueOnce({ id: "f9", name: "Ideas", parentId: "f4" });
+    renderTree();
+    fireEvent.click(sidebar().getByRole("button", { name: "Home" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+
+    fireEvent.change(screen.getByRole("textbox", { name: "New folder inside" }), { target: { value: "Ideas" } });
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("region", { name: "Edit folder" })).getByRole("button", { name: "Create" }));
+    });
+
+    expect(createFolder).toHaveBeenCalledWith("Ideas", "f4");
+    expect(within(screen.getByRole("list", { name: "Folders in Home" })).getByRole("button", { name: "Ideas" })).toBeDefined();
+  });
+
+  test("moves a folder, never into itself, with Undo", async () => {
+    renderTree();
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+    const menu = screen.getByRole("combobox", { name: "Move folder to" });
+
+    // Work, and the folders inside it, aren't offered.
+    expect(within(menu).getAllByRole("option").map((option) => option.textContent)).toEqual(["Top level", "Home"]);
+    await act(async () => {
+      fireEvent.change(menu, { target: { value: "f4" } });
+    });
+    expect(moveFolder).toHaveBeenCalledWith("f1", "f4");
+    expect(screen.getByText('"Work" moved to Home')).toBeDefined();
+    expect(within(screen.getByRole("navigation", { name: "Folder path" })).getByRole("button", { name: "Home" })).toBeDefined();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    expect(moveFolder).toHaveBeenLastCalledWith("f1", null);
+  });
+
+  test("a refused move says why", async () => {
+    vi.mocked(moveFolder).mockResolvedValueOnce('There\'s already a folder called "Work" in Home.');
+    renderTree();
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+
+    await act(async () => {
+      fireEvent.change(screen.getByRole("combobox", { name: "Move folder to" }), { target: { value: "f4" } });
+    });
+
+    expect(screen.getByRole("alert").textContent).toBe('There\'s already a folder called "Work" in Home.');
+    expect(screen.queryByRole("navigation", { name: "Folder path" })).toBeNull();
+  });
+
+  test("deleting a folder with folders inside asks, moves everything up, and Undo moves it back", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    const inClients = { ...brief, folderId: "f2" };
+    renderTree([inClients, plan]);
+    show("Work");
+    fireEvent.click(sidebar().getByRole("button", { name: "Clients" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+    });
+
+    expect(confirm).toHaveBeenCalledWith('Delete "Clients"? Its 1 folder and 1 link move up into Work.');
+    expect(deleteFolder).toHaveBeenCalledWith("f2");
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    expect(within(screen.getByRole("list", { name: "Folders in Work" })).getByRole("button", { name: "Acme" })).toBeDefined();
+    expect(cards().getByRole("link", { name: "Brief" })).toBeDefined();
+
+    vi.mocked(restoreFolder).mockResolvedValueOnce({ id: "f2", name: "Clients", parentId: "f1" });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    const tiles = within(screen.getByRole("list", { name: "Folders in Work" }));
+    expect(tiles.getByRole("button", { name: "Clients" })).toBeDefined();
+    expect(tiles.queryByRole("button", { name: "Acme" })).toBeNull();
+    expect(cards().queryByRole("link", { name: "Brief" })).toBeNull();
+  });
+
+  test("cancelling that question keeps the folder", () => {
+    vi.spyOn(window, "confirm").mockReturnValueOnce(false);
+    renderTree();
+    fireEvent.click(sidebar().getByRole("button", { name: "Work" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete folder" }));
+
+    expect(deleteFolder).not.toHaveBeenCalled();
+  });
+
+  test("folder menus show the tree, indented", () => {
+    renderTree();
+    fireEvent.change(screen.getByPlaceholderText("Paste a link..."), { target: { value: "https://new.com" } });
+
+    const options = within(screen.getByRole("combobox", { name: "Save to folder" })).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "No folder",
+      "Work",
+      "   Clients",
+      "      Acme",
+      "Home",
+      "New folder…",
+    ]);
+  });
+});
+
+describe("Home", () => {
+  beforeEach(() => window.history.replaceState(null, "", "/"));
+  const work = { id: "f1", name: "Work" };
+  const home = { id: "f2", name: "Home stuff", pinned: true };
+  const inside = { id: "f3", name: "Clients", parentId: "f1" };
+  const a = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000d1", url: "https://a.com", title: "A", createdAt: "2026-10-01T12:00:00.000Z", folderId: "f3", image: "https://a.com/a.png" };
+  const b = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000d2", url: "https://b.com", title: "B", createdAt: "2026-10-02T12:00:00.000Z", readAt: "2026-10-03T12:00:00.000Z" };
+  const c = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000d3", url: "https://c.com", title: "C", createdAt: "2026-10-03T12:00:00.000Z", status: "broken" as const };
+
+  test("is the first screen: a greeting, then short sections with See all", () => {
+    render(<LinkManager initialLinks={[a, b, c]} initialFolders={[work, home, inside]} />);
+
+    expect(screen.getByText(/^Good (night|morning|afternoon|evening)$/)).toBeDefined();
+    expect(within(screen.getByRole("list", { name: "Unread links" })).getAllByRole("link").map((l) => l.textContent)).toEqual(["C", "A"]);
+    expect(within(screen.getByRole("list", { name: "Recently saved" })).getAllByRole("link").map((l) => l.textContent)).toEqual(["C", "B", "A"]);
+    expect(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Home" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "See all unread links" }));
+    expect(screen.getByRole("heading", { name: "Unread" })).toBeDefined();
+    expect(window.location.search).toBe("?list=unread");
+  });
+
+  test("shows top-level folders as tiles, pinned ones first, with pictures from the folders inside too", () => {
+    render(<LinkManager initialLinks={[a, b, c]} initialFolders={[work, home, inside]} />);
+
+    const tiles = within(screen.getByRole("list", { name: "Your folders" })).getAllByRole("button");
+    expect(tiles.map((tile) => tile.textContent)).toEqual(["Home stuff0 links", "Work1 link"]);
+    expect(within(tiles[0]).getByRole("img", { name: "Pinned" })).toBeDefined();
+    expect(tiles[1].querySelector("img")?.getAttribute("src")).toBe("https://a.com/a.png");
+
+    fireEvent.click(tiles[1]);
+    expect(screen.getByRole("heading", { name: "Work" })).toBeDefined();
+  });
+
+  test("nudges about broken links and links not in a folder; Sort them opens them in Select mode", () => {
+    render(<LinkManager initialLinks={[a, b, c]} initialFolders={[work]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sort them" }));
+
+    expect(screen.getByRole("heading", { name: "Not in a folder" })).toBeDefined();
+    expect(shownTitlesOnCards().filter((title) => title !== "View archived copy")).toEqual(["C", "B"]);
+    expect(screen.getByRole("toolbar", { name: "Selected links" })).toBeDefined();
+  });
+
+  test("empty sections hide themselves", () => {
+    render(<LinkManager initialLinks={[b]} />);
+
+    expect(screen.queryByRole("list", { name: "Unread links" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "Your folders" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sort them" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /broken/ })).toBeNull();
+  });
+
+  test("with nothing saved yet, shows the drawing and how to start", () => {
+    render(<LinkManager initialLinks={[]} />);
+
+    expect(screen.getByText("No links yet. Add your first one above.")).toBeDefined();
+  });
+
+  test("a folder can be pinned to Home from its Edit folder panel", async () => {
+    render(<LinkManager initialLinks={[a]} initialFolders={[work, { id: "f4", name: "Later" }]} />);
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Later" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("checkbox", { name: "Pin to Home (shown first there)" }));
+    });
+    expect(setFolderPinned).toHaveBeenCalledWith("f4", true);
+
+    fireEvent.click(within(screen.getByRole("navigation", { name: "Your lists" })).getByRole("button", { name: "Home" }));
+    expect(within(screen.getByRole("list", { name: "Your folders" })).getAllByRole("button")[0].textContent).toContain("Later");
+  });
+});
+
+function shownTitlesOnCards() {
+  return cards().getAllByRole("link").map((link) => link.textContent);
+}

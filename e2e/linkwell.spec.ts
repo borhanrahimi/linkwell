@@ -28,7 +28,7 @@ test("a signed-in user sees their name and can sign out", async ({
 
 test("a saved link is still there after a reload", async ({ page, signIn }) => {
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
 
   await saveLink(page, "https://example.com/e2e", "My test link");
   await expect(page.getByRole("link", { name: "My test link" })).toBeVisible();
@@ -40,14 +40,14 @@ test("a saved link is still there after a reload", async ({ page, signIn }) => {
 
 test("users can't see each other's links", async ({ page, signIn }) => {
   await signIn("First");
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://example.com/private", "First's private link");
   await expect(
     page.getByRole("link", { name: "First's private link" })
   ).toBeVisible();
 
   await signIn("Second");
-  await page.goto("/");
+  await page.goto("/?list=all");
 
   await expect(page.getByRole("link", { name: "Second" })).toBeVisible();
   await expect(
@@ -62,7 +62,7 @@ test("a user can choose a username on the account page", async ({
   // Usernames are unique across Linkwell, so each run picks a new one.
   const username = `ada_${Date.now().toString(36)}`;
   await signIn("Ada Lovelace");
-  await page.goto("/");
+  await page.goto("/?list=all");
 
   await page.getByRole("link", { name: "Ada Lovelace" }).click();
   await expect(
@@ -93,7 +93,7 @@ test("a user can download their links as a bookmarks file", async ({
   signIn,
 }) => {
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://example.com/export-me", "Export me");
   await expect(page.getByRole("link", { name: "Export me" })).toBeVisible();
 
@@ -114,7 +114,7 @@ test("a user can delete their account, and their links go with it", async ({
   signIn,
 }) => {
   await signIn("Leaving User");
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://example.com/goodbye", "Goodbye link");
   await expect(page.getByRole("link", { name: "Goodbye link" })).toBeVisible();
 
@@ -139,7 +139,7 @@ test("a user can delete their account, and their links go with it", async ({
 
 test("a user can edit a link's title, tags and note", async ({ page, signIn }) => {
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://example.com/edit-me", "Edit me");
 
   await page.getByRole("button", { name: "Edit" }).click();
@@ -200,7 +200,7 @@ test("the bookmarklet opens /share for the page it's clicked on", async ({ page,
 });
 
 test("the app can be installed: the page links to a manifest with a share target", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?list=all");
 
   const href = await page.locator('link[rel="manifest"]').getAttribute("href");
   const response = await page.request.get(href!);
@@ -227,7 +227,7 @@ test("Android's share format (link inside text) opens the save card", async ({ p
 test("the Paste button fills in a copied link", async ({ page, context, signIn }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
   await page.evaluate(() => navigator.clipboard.writeText("https://example.com/copied"));
 
   await page.getByRole("button", { name: "Paste" }).click();
@@ -266,7 +266,7 @@ test("a user can import a bookmarks file, folders and all", async ({ page, signI
 
 test("checking links is rate limited: the sixth check in an hour is refused", async ({ page, signIn }) => {
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://gone.linkwell-test.invalid/", "Rate limit test");
 
   const button = page.getByRole("button", { name: "Check links" });
@@ -346,10 +346,10 @@ test("pages carry a title, a description and a sharing preview picture", async (
   await expect(page).toHaveTitle("Privacy · Linkwell");
 });
 
-test("on a phone, the lists open in a drawer and close once one is picked", async ({ page, signIn }) => {
+test("on a phone, the Folders tab opens the lists full screen, and they close once one is picked", async ({ page, signIn }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://example.com/phone-one", "Phone one");
   await saveLink(page, "https://example.com/phone-two", "Phone two");
   // The newest link comes first: "Phone two" is the one marked as read.
@@ -358,9 +358,9 @@ test("on a phone, the lists open in a drawer and close once one is picked", asyn
   await expect(page.getByRole("button", { name: "Mark unread" })).toBeVisible();
   const lists = page.getByRole("navigation", { name: "Your lists" });
 
-  // The links come first; the sidebar waits behind the Lists button.
+  // The links come first; the sidebar waits behind the Folders tab.
   await expect(lists).toBeHidden();
-  await page.getByRole("button", { name: "Lists", exact: true }).click();
+  await page.getByRole("button", { name: "Folders", exact: true }).click();
   await expect(lists).toBeVisible();
 
   await lists.getByRole("button", { name: "Unread" }).click();
@@ -370,14 +370,14 @@ test("on a phone, the lists open in a drawer and close once one is picked", asyn
   await expect(page.getByRole("link", { name: "Phone one" })).toBeVisible();
 
   // Esc closes it too.
-  await page.getByRole("button", { name: "Lists", exact: true }).click();
+  await page.getByRole("button", { name: "Folders", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(lists).toBeHidden();
 });
 
 test("the chosen list lives in the address: back, refresh and bookmarks keep it", async ({ page, signIn }) => {
   await signIn();
-  await page.goto("/");
+  await page.goto("/?list=all");
   await saveLink(page, "https://example.com/address-one", "Address one");
   await expect(page.getByRole("link", { name: "Address one" })).toBeVisible();
   await saveLink(page, "https://example.com/address-two", "Address two");
@@ -396,7 +396,7 @@ test("the chosen list lives in the address: back, refresh and bookmarks keep it"
   await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Address two" })).toHaveCount(0);
 
-  // Back goes to all links again.
+  // Back goes to All links again.
   await page.goBack();
   await expect(page.getByRole("heading", { name: "All links" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Address two" })).toBeVisible();
@@ -419,7 +419,7 @@ test("saving from anywhere can make a folder on the spot and save into it, like 
   await page.getByRole("button", { name: "Save link" }).click();
   await expect(page.getByText("Saved to Linkwell in Travel.")).toBeVisible();
 
-  await page.goto("/");
+  await page.goto("/?list=all");
   await page.getByRole("navigation", { name: "Your lists" }).getByRole("button", { name: "Travel" }).click();
   await expect(page.getByRole("link", { name: "Trip ideas" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Beaches" })).toBeVisible();
@@ -439,7 +439,7 @@ test("anyone can try the demo without an account, and nothing is saved", async (
     if (request.method() === "POST") posts.push(request.url());
   });
 
-  await page.goto("/");
+  await page.goto("/?list=all");
   await page.getByRole("link", { name: "Try the demo" }).click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
@@ -455,4 +455,88 @@ test("anyone can try the demo without an account, and nothing is saved", async (
   await page.goto("/demo");
   await expect(page.getByRole("link", { name: "Notes on CSS grid layouts" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Tried the demo" })).toHaveCount(0);
+});
+
+test("a deleted link goes to the Trash: Undo brings it back, and so does Restore after a reload", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/?list=all");
+  await saveLink(page, "https://example.com/trash-me", "Trash me");
+  const links = page.getByRole("list", { name: "Links" });
+  await expect(links.getByRole("link", { name: "Trash me" })).toBeVisible();
+
+  // Delete shows on hover; Undo is in the message that follows.
+  await links.getByRole("listitem").first().hover();
+  await links.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Link moved to the Trash")).toBeVisible();
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(links.getByRole("link", { name: "Trash me" })).toBeVisible();
+
+  // Deleted again, it's in the Trash after a reload, and Restore puts it back.
+  await links.getByRole("listitem").first().hover();
+  await links.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByRole("list", { name: "Links" })).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Trash", exact: true }).filter({ visible: true }).click();
+  await expect(page.getByText("30 days left")).toBeVisible();
+  await page.getByRole("button", { name: "Restore Trash me" }).click();
+  await page.getByRole("button", { name: "All links" }).filter({ visible: true }).click();
+  await expect(page.getByRole("list", { name: "Links" }).getByRole("link", { name: "Trash me" })).toBeVisible();
+});
+
+test("folders go inside folders, and deleting one moves what's inside up a level", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/?list=all");
+  const folders = page.getByRole("list", { name: "Folders", exact: true }).filter({ visible: true });
+
+  await page.getByRole("button", { name: "+ New folder" }).filter({ visible: true }).click();
+  await page.getByRole("textbox", { name: "Folder name" }).fill("Work");
+  await page.getByRole("button", { name: "Create" }).click();
+  await folders.getByRole("button", { name: "Work", exact: true }).click();
+  await page.getByRole("button", { name: "Edit folder" }).click();
+  await page.getByRole("textbox", { name: "New folder inside" }).fill("Clients");
+  await page.getByRole("region", { name: "Edit folder" }).getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("list", { name: "Folders in Work" }).getByRole("button", { name: "Clients", exact: true })).toBeVisible();
+
+  // Still there after a reload, inside Work.
+  await page.reload();
+  await folders.getByRole("button", { name: "Show folders in Work" }).click();
+  await folders.getByRole("button", { name: "Clients", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Folder path" }).getByRole("button", { name: "Work", exact: true })).toBeVisible();
+
+  // Deleting Work asks, then Clients moves up to the top level.
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("navigation", { name: "Folder path" }).getByRole("button", { name: "Work", exact: true }).click();
+  await page.getByRole("button", { name: "Edit folder" }).click();
+  await page.getByRole("button", { name: "Delete folder" }).click();
+  await expect(page.getByText('"Work" moved to the Trash')).toBeVisible();
+  // The page shows the change at once; let the server finish before reloading.
+  await page.waitForLoadState("networkidle");
+  await page.reload();
+  await expect(folders.getByRole("button", { name: "Work", exact: true })).toHaveCount(0);
+  await folders.getByRole("button", { name: "Clients", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Folder path" })).toHaveCount(0);
+});
+
+test("Home is the first screen: a few of everything, and the phone's tab bar gets around", async ({ page, signIn }) => {
+  await signIn();
+  await page.goto("/");
+  await saveLink(page, "https://example.com/home-one", "Home one");
+  await expect(page.getByRole("list", { name: "Recently saved" }).getByRole("link", { name: "Home one" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Unread links" }).getByRole("link", { name: "Home one" })).toBeVisible();
+  await page.getByRole("button", { name: "See all links" }).click();
+  await expect(page).toHaveURL(/\?list=all$/);
+  await expect(page.getByRole("heading", { name: "All links" })).toBeVisible();
+
+  // On a phone: Unread and Home in the bar, Folders full screen, You to the account.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const bar = page.getByRole("navigation", { name: "Phone menu" });
+  await bar.getByRole("button", { name: "Unread" }).click();
+  await expect(page.getByRole("heading", { name: "Unread" })).toBeVisible();
+  await bar.getByRole("button", { name: "Home" }).click();
+  await expect(page.getByRole("list", { name: "Recently saved" })).toBeVisible();
+  await bar.getByRole("button", { name: "Folders" }).click();
+  await expect(page.getByRole("navigation", { name: "Your lists" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await bar.getByRole("link", { name: "You" }).click();
+  await expect(page).toHaveURL(/\/account$/);
 });

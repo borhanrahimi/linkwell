@@ -61,6 +61,30 @@ describe("restoring a backup", () => {
     expect(inserts[3].params).toContain("https://example.com");
   });
 
+  test("puts nested folders back even when a folder comes before the one it's inside", async () => {
+    const db = fakeDatabase(0);
+    const nested = {
+      ...backup,
+      tables: {
+        ...backup.tables,
+        folders: [
+          { id: "f2", name: "Clients", parent_id: "f1", user_id: "u1" },
+          { id: "f1", name: "Work", user_id: "u1", deleted_at: "2026-10-20T00:00:00.000Z" },
+        ],
+      },
+    };
+
+    expect(await restoreBackup(db, nested)).toBeNull();
+
+    const folderInserts = db.queries.filter((q) => q.text.startsWith('insert into "folders"'));
+    const parentColumn = TABLES.folders.indexOf("parent_id");
+    expect(folderInserts.map((q) => q.params[parentColumn])).toEqual([null, null]);
+    expect(folderInserts[1].params).toContain("2026-10-20T00:00:00.000Z");
+    const updates = db.queries.filter((q) => q.text.startsWith('update "folders"'));
+    expect(updates).toHaveLength(1);
+    expect(updates[0].params).toEqual(["f1", null, "f2"]);
+  });
+
   test("refuses a database that already has data, and changes nothing", async () => {
     const db = fakeDatabase(3);
 

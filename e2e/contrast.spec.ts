@@ -14,7 +14,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       signIn,
     }) => {
       await signIn();
-      await page.goto("/");
+      await page.goto("/?list=all");
       await saveLink(page, "https://example.com/one", "A link");
       await saveLink(page, "https://example.com/two", "A read link");
       await page.getByRole("button", { name: "Mark read" }).first().click();
@@ -47,10 +47,16 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: "Details" }).last().click();
       await page.getByRole("button", { name: "Close", exact: true }).waitFor();
       results.push(...(await measureContrast(page)));
-      // And on a phone, the Lists drawer over the dimmed page.
+      // And Home, with its sections and folder tiles.
       await page.getByRole("button", { name: "Close", exact: true }).click();
+      await page.getByRole("button", { name: "Home", exact: true }).click();
+      await page.getByRole("list", { name: "Recently saved" }).waitFor();
+      results.push(...(await measureContrast(page)));
+      // And on a phone, the tab bar, then the Folders screen.
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.getByRole("button", { name: "Lists", exact: true }).click();
+      await page.getByRole("navigation", { name: "Phone menu" }).waitFor();
+      results.push(...(await measureContrast(page)));
+      await page.getByRole("button", { name: "Folders", exact: true }).click();
       await page.getByRole("navigation", { name: "Your lists" }).waitFor();
       results.push(...(await measureContrast(page)));
       const tooLow = results.filter((result) => result.ratio < result.needed);

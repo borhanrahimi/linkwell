@@ -13,6 +13,10 @@ export type Link = {
   folderId?: string;
   // The page's sharing picture (https), shown on its card.
   image?: string;
+  // The folder this link was in before that folder went to the Trash.
+  cameFromFolderId?: string;
+  // When it went to the Trash (only links in the Trash have one).
+  deletedAt?: string;
 };
 
 // The palette in lib/folders.ts (FOLDER_COLORS).
@@ -28,6 +32,14 @@ export type Folder = {
   name: string;
   color?: FolderColor;
   icon?: FolderIcon;
+  // The folder it's inside; none for a top-level folder.
+  parentId?: string;
+  // The folder it was inside before that folder went to the Trash.
+  cameFromFolderId?: string;
+  // Pinned to Home: shown first in Home's "Your folders".
+  pinned?: boolean;
+  // When it went to the Trash (only folders in the Trash have one).
+  deletedAt?: string;
 };
 // What the Edit form sends: the raw text from its three boxes.
 export type LinkDetailsInput = {
@@ -48,6 +60,9 @@ export type ImportedBookmark = {
   url: string;
   title?: string;
   tags: string[];
+  // The folder it's in (the nearest one), and the whole path of folders down
+  // to it, outermost first: ["Work", "Clients"].
   folder?: string;
+  folderPath?: string[];
   addDate?: string;
 };

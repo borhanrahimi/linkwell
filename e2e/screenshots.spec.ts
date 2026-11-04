@@ -56,7 +56,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       await page.getByRole("button", { name: /Import \d+ links/ }).click();
       await page.getByText(/Imported \d+ links/).waitFor();
 
-      await page.goto("/");
+      await page.goto("/?list=all");
       // One link read, one with a note.
       const card = (title: string) =>
         page.getByRole("listitem").filter({ has: page.getByRole("link", { name: title, exact: true }) });

@@ -1,6 +1,7 @@
-import { deleteOldRateLimits, getLinksToCheck, getLinksWithoutImage, updateLinkImage, updateLinkStatus } from "@/lib/data";
+import { deleteOldRateLimits, deleteOldTrash, getLinksToCheck, getLinksWithoutImage, updateLinkImage, updateLinkStatus } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchPageInfo } from "@/lib/fetchTitle";
+import { TRASH_DAYS } from "@/lib/limits";
 
 // Preview pictures for links saved before Linkwell looked for them: a batch
 // a day, so the job stays short.
@@ -35,9 +36,12 @@ export async function GET(request: Request) {
   // Rate limit counts older than a day are never needed again.
   await deleteOldRateLimits(new Date(Date.now() - 24 * 60 * 60 * 1000));
 
+  const trashEmptied = await deleteOldTrash(new Date(Date.now() - TRASH_DAYS * 24 * 60 * 60 * 1000));
+
   return Response.json({
     checked: results.length,
     broken: results.filter((status) => status === "broken").length,
     imagesLookedFor: withoutImage.length,
+    trashEmptied,
   });
 }

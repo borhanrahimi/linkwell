@@ -1,5 +1,21 @@
-import { expect, test } from "vitest";
-import { FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_ICONS, FOLDER_TEXT_CLASS, isFolderColor, isFolderIcon, nextFolderColor } from "@/lib/folders";
+import { describe, expect, test } from "vitest";
+import {
+  childFolders,
+  countWithInside,
+  flattenTree,
+  folderAndInside,
+  folderPath,
+  FOLDER_COLORS,
+  FOLDER_DOT_CLASS,
+  FOLDER_ICONS,
+  FOLDER_TEXT_CLASS,
+  indentedName,
+  isFolderColor,
+  isFolderIcon,
+  nameTakenIn,
+  nextFolderColor,
+  renamesMovingUp,
+} from "@/lib/folders";
 
 test("new folders go through the palette in order, then start again", () => {
   expect(nextFolderColor(0)).toBe("blue");
@@ -24,4 +40,69 @@ test("only the drawn icons count", () => {
   expect(FOLDER_ICONS).toHaveLength(12);
   expect(isFolderIcon("coffee")).toBe(true);
   expect(isFolderIcon("rocket")).toBe(false);
+});
+
+describe("folders inside folders", () => {
+  // Work › Clients › Acme, Work › Ideas, Home.
+  const folders = [
+    { id: "w", name: "Work" },
+    { id: "c", name: "Clients", parentId: "w" },
+    { id: "a", name: "Acme", parentId: "c" },
+    { id: "i", name: "Ideas", parentId: "w" },
+    { id: "h", name: "Home" },
+  ];
+
+  test("finds the folders directly inside one, or at the top level", () => {
+    expect(childFolders(folders, null).map((f) => f.name)).toEqual(["Work", "Home"]);
+    expect(childFolders(folders, "w").map((f) => f.name)).toEqual(["Clients", "Ideas"]);
+  });
+
+  test("a folder whose parent is gone counts as top level", () => {
+    expect(childFolders([{ id: "x", name: "Lost", parentId: "gone" }], null).map((f) => f.name)).toEqual(["Lost"]);
+  });
+
+  test("knows a folder's path from the top, and everything inside it", () => {
+    expect(folderPath(folders, "a").map((f) => f.name)).toEqual(["Work", "Clients", "Acme"]);
+    expect([...folderAndInside(folders, "w")].sort()).toEqual(["a", "c", "i", "w"]);
+    expect([...folderAndInside(folders, "h")]).toEqual(["h"]);
+  });
+
+  test("never loops forever, even if the data ever held a loop", () => {
+    const loop = [
+      { id: "1", name: "One", parentId: "2" },
+      { id: "2", name: "Two", parentId: "1" },
+    ];
+    expect(folderPath(loop, "1").map((f) => f.id)).toEqual(["2", "1"]);
+    expect([...folderAndInside(loop, "1")].sort()).toEqual(["1", "2"]);
+    expect(flattenTree(loop)).toEqual([]);
+  });
+
+  test("lists the tree in order, with each folder's depth, for indented menus", () => {
+    expect(flattenTree(folders).map(({ folder, depth }) => indentedName(folder.name, depth))).toEqual([
+      "Work",
+      "   Clients",
+      "      Acme",
+      "   Ideas",
+      "Home",
+    ]);
+  });
+
+  test("names only clash with neighbours, ignoring case", () => {
+    expect(nameTakenIn(folders, "ideas", "w")).toBe(true);
+    expect(nameTakenIn(folders, "Ideas", "h")).toBe(false);
+    expect(nameTakenIn(folders, "Ideas", null)).toBe(false);
+    expect(nameTakenIn(folders, "ideas", "w", "i")).toBe(false);
+  });
+
+  test("counts a folder's links together with those in the folders inside it", () => {
+    const links = [{ folderId: "w" }, { folderId: "c" }, { folderId: "a" }, { folderId: "a" }, {}];
+    expect(countWithInside(folders, links)).toEqual({ w: 4, c: 3, a: 2, i: 0, h: 0 });
+  });
+
+  test("renames folders moving up next to one with the same name", () => {
+    const clash = [...folders, { id: "i2", name: "ideas" }];
+    // Deleting Work moves Clients and Ideas to the top level, next to "ideas".
+    expect(renamesMovingUp(clash, "w")).toEqual([{ id: "i", name: "Ideas (2)" }]);
+    expect(renamesMovingUp(folders, "c")).toEqual([]);
+  });
 });

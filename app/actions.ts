@@ -2,9 +2,18 @@
 
 import { after } from "next/server";
 import {
-  deleteFolderById,
-  deleteLinkById,
+  deleteForever as deleteForeverFromTrash,
+  emptyTrash as emptyTrashNow,
+  findTrashedLink,
+  getFolderAncestors,
+  updateFolderParent,
+  updateFolderPinned,
   getLinks,
+  getTrash,
+  restoreFolder as restoreFolderFromTrash,
+  restoreLinks as restoreLinksFromTrash,
+  trashFolder,
+  trashLinks,
   getFolders,
   insertFolder,
   insertLink,
@@ -26,9 +35,9 @@ import {
 import { checkLink } from "@/lib/checkLink";
 import { fetchPageInfo } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
-import { cleanDetails, cleanFolderName, cleanIds, cleanNewLink, isDuplicate, normalizeUrl } from "@/lib/links";
+import { cleanDate, cleanDetails, cleanFolderName, cleanIds, cleanNewLink, IN_TRASH, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
-import { isFolderColor, isFolderIcon, nextFolderColor } from "@/lib/folders";
+import { childFolders, freeFolderName, isFolderColor, isFolderIcon, nameTakenIn, nextFolderColor, renamesMovingUp } from "@/lib/folders";
 import {
   MAX_FOLDERS,
   MAX_LINKS,
@@ -75,6 +84,10 @@ export async function saveLink(input: Link): Promise<Link | string> {
   if (isDuplicate(saved, link.url)) {
     return "You already saved this link!";
   }
+  // Not a copy of a link in the Trash: the browser offers to restore that one.
+  if (await findTrashedLink(userId, [link.url, normalizeUrl(link.url)])) {
+    return IN_TRASH;
+  }
   if (saved.length >= MAX_LINKS) {
     return TOO_MANY_LINKS;
   }
@@ -102,8 +115,66 @@ export async function saveLink(input: Link): Promise<Link | string> {
   return stored;
 }
 
+// Deleting puts things in the Trash; they're gone for good after 30 days
+// (the daily job), or sooner with Delete forever or Empty trash.
 export async function removeLink(id: string) {
-  await deleteLinkById(await getUserId(), id);
+  await trashLinks(await getUserId(), cleanIds([id]));
+}
+
+export async function removeLinks(ids: string[]) {
+  await trashLinks(await getUserId(), cleanIds(ids));
+}
+
+// Returns the restored links (a link whose folder is gone comes back without
+// one), or a message when they'd go over the link limit.
+export async function restoreLinks(ids: string[]): Promise<Link[] | string> {
+  const userId = await getUserId();
+  const chosen = cleanIds(ids);
+  if ((await getLinks(userId)).length + chosen.length > MAX_LINKS) {
+    return TOO_MANY_LINKS;
+  }
+  return restoreLinksFromTrash(userId, chosen);
+}
+
+// For the share page: saving a link that's in the Trash offers this instead.
+export async function restoreLinkByUrl(url: string): Promise<Link | string> {
+  const userId = await getUserId();
+  const address = typeof url === "string" ? url.trim() : "";
+  const trashed = address && (await findTrashedLink(userId, [address, normalizeUrl(address)]));
+  if (!trashed) {
+    return "That link isn't in your Trash any more.";
+  }
+  const restored = await restoreLinks([trashed.id]);
+  return typeof restored === "string" ? restored : (restored[0] ?? "That link isn't in your Trash any more.");
+}
+
+// Returns the restored folder, or a message. It goes back into the folder it
+// was in (the top level if that one is gone too), renamed "Reading (2)" if a
+// folder there took its name meanwhile.
+export async function restoreFolder(id: string): Promise<Folder | string> {
+  const userId = await getUserId();
+  const [live, trash] = await Promise.all([getFolders(userId), getTrash(userId)]);
+  const folder = trash.folders.find((f) => f.id === id);
+  if (!folder) {
+    return "That folder isn't in your Trash any more.";
+  }
+  if (live.length >= MAX_FOLDERS) {
+    return TOO_MANY_FOLDERS;
+  }
+  const movedTo = folder.parentId ?? null;
+  const parentId = movedTo && live.some((f) => f.id === movedTo) ? movedTo : null;
+  const name = freeFolderName(folder.name, childFolders(live, parentId).map((f) => f.name));
+  return (
+    (await restoreFolderFromTrash(userId, id, name, parentId, movedTo)) ?? "That folder isn't in your Trash any more."
+  );
+}
+
+export async function deleteForever(linkIds: string[], folderIds: string[]) {
+  await deleteForeverFromTrash(await getUserId(), cleanIds(linkIds), cleanIds(folderIds));
+}
+
+export async function emptyTrash() {
+  await emptyTrashNow(await getUserId());
 }
 
 // Saves the Edit form. The server cleans the text itself (never trust the
@@ -148,6 +219,24 @@ export async function markLinksRead(ids: string[], read: boolean) {
   await updateLinksReadAt(await getUserId(), cleanIds(ids), read === true ? new Date() : null);
 }
 
+// Undo for marking read or unread: puts back each link's own earlier read
+// date (or none). Only real dates that aren't in the future.
+export async function setReadDates(changes: { id: string; readAt: string | null }[]) {
+  const userId = await getUserId();
+  if (!Array.isArray(changes)) return;
+  const byDate = new Map<string | null, string[]>();
+  for (const change of changes) {
+    const [id] = cleanIds([change?.id]);
+    if (!id) continue;
+    const readAt = change.readAt === null ? null : (cleanDate(change.readAt) ?? null);
+    byDate.set(readAt, [...(byDate.get(readAt) ?? []), id]);
+  }
+  // Usually one or two groups: the links that were unread, and one date.
+  await Promise.all(
+    [...byDate].map(([readAt, ids]) => updateLinksReadAt(userId, cleanIds(ids), readAt ? new Date(readAt) : null))
+  );
+}
+
 // Links from this browser's localStorage, from before v0.5.
 const OLD_LINKS_MAX = 1000;
 
@@ -159,8 +248,9 @@ export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
   if (await isTooFast(userId, "importLinks")) {
     return [];
   }
-  const saved = await getLinks(userId);
-  const known = new Set(saved.map((link) => normalizeUrl(link.url)));
+  const [saved, trash] = await Promise.all([getLinks(userId), getTrash(userId)]);
+  // Links in the Trash count as saved: importing doesn't make copies of them.
+  const known = new Set([...saved, ...trash.links].map((link) => normalizeUrl(link.url)));
   const imported: Link[] = [];
 
   for (const old of oldLinks) {
@@ -210,8 +300,8 @@ export async function importBookmarks(
     return TOO_FAST;
   }
 
-  const saved = await getLinks(userId);
-  const known = new Set(saved.map((link) => normalizeUrl(link.url)));
+  const [saved, trash] = await Promise.all([getLinks(userId), getTrash(userId)]);
+  const known = new Set([...saved, ...trash.links].map((link) => normalizeUrl(link.url)));
   const folders = await getFolders(userId);
   const added: Link[] = [];
 
@@ -221,18 +311,18 @@ export async function importBookmarks(
     if (!bookmark || known.has(normalizeUrl(bookmark.url))) continue;
     known.add(normalizeUrl(bookmark.url));
 
+    // Each level of the path is found (by name, among its neighbours) or
+    // made. At the folder limit, the link stays in the deepest one there is.
     let folderId: string | undefined;
-    if (bookmark.folder) {
-      const name = bookmark.folder;
-      let folder = folders.find(
-        (f) => f.name.toLowerCase() === name.toLowerCase()
-      );
-      // At the folder limit, the link is still imported, just without a folder.
+    for (const name of bookmark.folderPath ?? []) {
+      const parentId = folderId ?? null;
+      let folder = childFolders(folders, parentId).find((f) => f.name.toLowerCase() === name.toLowerCase());
       if (!folder && folders.length < MAX_FOLDERS) {
-        folder = await insertFolder(userId, name, nextFolderColor(folders.length));
+        folder = await insertFolder(userId, name, nextFolderColor(folders.length), parentId);
         folders.push(folder);
       }
-      folderId = folder?.id;
+      if (!folder) break;
+      folderId = folder.id;
     }
 
     added.push({
@@ -249,7 +339,15 @@ export async function importBookmarks(
   return { added: added.length, skipped: input.length - added.length };
 }
 
-export async function createFolder(name: string): Promise<Folder | string> {
+// What creating, renaming or moving a folder says when the name is taken
+// where it would go: "Work" for the top level, "Ideas in Work" inside a folder.
+function nameTaken(name: string, parent?: Folder) {
+  return parent ? `There's already a folder called "${name}" in ${parent.name}.` : `You already have a folder called "${name}".`;
+}
+
+// parentId: make it inside that folder (one of the user's own), or null for
+// the top level.
+export async function createFolder(name: string, parentId: string | null = null): Promise<Folder | string> {
   const userId = await getUserId();
   const cleaned = cleanFolderName(name);
   if ("error" in cleaned) {
@@ -260,14 +358,14 @@ export async function createFolder(name: string): Promise<Folder | string> {
   if (existing.length >= MAX_FOLDERS) {
     return TOO_MANY_FOLDERS;
   }
-  if (
-    existing.some(
-      (folder) => folder.name.toLowerCase() === trimmed.toLowerCase()
-    )
-  ) {
-    return `You already have a folder called "${trimmed}".`;
+  const parent = typeof parentId === "string" ? existing.find((folder) => folder.id === parentId) : undefined;
+  if (parentId !== null && !parent) {
+    return "That folder doesn't exist any more.";
   }
-  return insertFolder(userId, trimmed, nextFolderColor(existing.length));
+  if (nameTakenIn(existing, trimmed, parent?.id ?? null)) {
+    return nameTaken(trimmed, parent);
+  }
+  return insertFolder(userId, trimmed, nextFolderColor(existing.length), parent?.id ?? null);
 }
 
 export async function renameFolder(
@@ -280,15 +378,34 @@ export async function renameFolder(
     return cleaned.error;
   }
   const trimmed = cleaned.name;
-  const others = (await getFolders(userId)).filter(
-    (folder) => folder.id !== id
-  );
-  if (
-    others.some((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())
-  ) {
-    return `You already have a folder called "${trimmed}".`;
+  const folders = await getFolders(userId);
+  const parentId = folders.find((folder) => folder.id === id)?.parentId ?? null;
+  if (nameTakenIn(folders, trimmed, parentId, id)) {
+    return nameTaken(trimmed, folders.find((folder) => folder.id === parentId));
   }
   await updateFolderName(userId, id, trimmed);
+  return null;
+}
+
+// Moves a folder, with everything inside it, into another folder (or to the
+// top level with null). Never into itself or a folder inside it: that would
+// make a loop, a folder inside itself. Returns a message, or null when moved.
+export async function moveFolder(id: string, parentId: string | null): Promise<string | null> {
+  const userId = await getUserId();
+  const folders = await getFolders(userId);
+  const folder = folders.find((f) => f.id === id);
+  const parent = typeof parentId === "string" ? folders.find((f) => f.id === parentId) : undefined;
+  if (!folder || (parentId !== null && !parent)) {
+    return "That folder doesn't exist any more.";
+  }
+  // Asked of the database, so it's right even if another tab moved folders.
+  if (parent && (parent.id === id || (await getFolderAncestors(userId, parent.id)).includes(id))) {
+    return "A folder can't go inside itself.";
+  }
+  if (nameTakenIn(folders, folder.name, parent?.id ?? null, id)) {
+    return nameTaken(folder.name, parent);
+  }
+  await updateFolderParent(userId, id, parent?.id ?? null);
   return null;
 }
 
@@ -301,6 +418,11 @@ export async function setFolderColor(id: string, color: FolderColor) {
   await updateFolderColor(userId, id, color);
 }
 
+// Pinned folders come first in Home's "Your folders".
+export async function setFolderPinned(id: string, pinned: boolean) {
+  await updateFolderPinned(await getUserId(), id, pinned === true);
+}
+
 // null takes the icon away, and the folder shows its dot again.
 export async function setFolderIcon(id: string, icon: FolderIcon | null) {
   const userId = await getUserId();
@@ -310,8 +432,16 @@ export async function setFolderIcon(id: string, icon: FolderIcon | null) {
   await updateFolderIcon(userId, id, icon);
 }
 
+// The folder goes to the Trash; its links and the folders inside it move up
+// one level (see trashFolder). A folder moving up next to one with the same
+// name becomes "Ideas (2)".
 export async function deleteFolder(id: string) {
-  await deleteFolderById(await getUserId(), id);
+  const userId = await getUserId();
+  const folders = await getFolders(userId);
+  const folder = folders.find((f) => f.id === id);
+  if (!folder) return;
+  const parentId = folders.some((f) => f.id === folder.parentId) ? folder.parentId! : null;
+  await trashFolder(userId, id, parentId, renamesMovingUp(folders, id));
 }
 
 // Returns an error message, or null when the username was saved.

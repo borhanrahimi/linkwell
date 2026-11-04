@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { flattenTree, indentedName } from "@/lib/folders";
 import { FOLDER_NAME_MAX_LENGTH } from "@/lib/links";
 import type { Folder } from "@/types/link";
 
@@ -99,9 +100,10 @@ export default function FolderPicker({ folders, value, onChange, onCreate }: Fol
       className="field min-w-0"
     >
       <option value="">No folder</option>
-      {folders.map((folder) => (
+      {/* The tree, with folders inside folders indented under them. */}
+      {flattenTree(folders).map(({ folder, depth }) => (
         <option key={folder.id} value={folder.id}>
-          {folder.name}
+          {indentedName(folder.name, depth)}
         </option>
       ))}
       <option value={NEW_FOLDER}>New folder…</option>

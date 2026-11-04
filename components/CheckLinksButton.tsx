@@ -33,16 +33,16 @@ export default function CheckLinksButton({ onChecked }: CheckLinksButtonProps) {
   }
 
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-      <button
-        onClick={handleClick}
-        disabled={isChecking}
-        className="btn-secondary"
-      >
+    // A quiet row under the lists, like them; what it found shows below it.
+    <div className="mt-0.5">
+      <button onClick={handleClick} disabled={isChecking} className="sidebar-item font-normal text-muted hover:text-ink disabled:opacity-60">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`size-4 shrink-0 ${isChecking ? "motion-safe:animate-spin" : ""}`}>
+          <path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4" />
+        </svg>
         {isChecking ? "Checking..." : "Check links"}
       </button>
       {message && (
-        <p role="status" className="text-muted">
+        <p role="status" className="px-2 pb-1 pl-8 text-xs text-muted">
           {message}
         </p>
       )}
