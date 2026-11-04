@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import LinkManager from "@/components/LinkManager";
 import Landing from "@/components/Landing";
 import { auth } from "@/lib/auth";
-import { getFolders, getLinks } from "@/lib/data";
+import { getFolders, getLinks, getTrash } from "@/lib/data";
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -13,9 +13,10 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     return <Landing deleted={Boolean(deleted)} />;
   }
 
-  const [links, folders] = await Promise.all([
+  const [links, folders, trash] = await Promise.all([
     getLinks(session.user.id),
     getFolders(session.user.id),
+    getTrash(session.user.id),
   ]);
   // The list, folder, tag and view chosen in the address, for the first render.
   const params = new URLSearchParams();
@@ -26,7 +27,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     <main className="min-h-screen p-4 sm:p-8">
       <div className="mx-auto max-w-6xl">
         {/* LinkManager draws the top bar itself, because the save box in it is part of its state. */}
-        <LinkManager initialLinks={links} initialFolders={folders} now={new Date()} user={session.user} initialSearch={params.toString()} />
+        <LinkManager initialLinks={links} initialFolders={folders} initialTrash={trash} now={new Date()} user={session.user} initialSearch={params.toString()} />
       </div>
     </main>
   );

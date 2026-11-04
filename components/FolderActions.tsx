@@ -2,12 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import FolderIcon from "@/components/FolderIcon";
-import { FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_ICONS, FOLDER_TEXT_CLASS } from "@/lib/folders";
+import { flattenTree, folderAndInside, FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_ICONS, FOLDER_TEXT_CLASS, indentedName } from "@/lib/folders";
 import { FOLDER_NAME_MAX_LENGTH } from "@/lib/links";
 import type { Folder, FolderColor, FolderIcon as FolderIconName } from "@/types/link";
 
 type FolderActionsProps = {
   folder: Folder;
+  // All folders, for "Move folder to…".
+  folders: Folder[];
+  // Each returns an error message, or null when it worked.
+  onCreateInside: (name: string) => Promise<string | null>;
+  onMove: (parentId: string | null) => Promise<string | null>;
+  onPin: (pinned: boolean) => void;
   onRename: (id: string, name: string) => Promise<string | null>;
   onRecolor: (id: string, color: FolderColor) => void;
   onChangeIcon: (id: string, icon: FolderIconName | null) => void;
@@ -16,13 +22,19 @@ type FolderActionsProps = {
 
 // Editing the selected folder. Most of the time a folder is opened to read
 // it, so all that shows is a small pencil next to its name. It opens one panel
-// with the name, colour and icon, and Delete; Done or Esc closes it again.
+// with the name, colour and icon, a new folder inside it, where it lives, and
+// Delete; Done or Esc closes it again.
 // Sits in the heading row: the pencil after the name, the panel on a row of
 // its own underneath (order-last, basis-full).
-export default function FolderActions({ folder, onRename, onRecolor, onChangeIcon, onDelete }: FolderActionsProps) {
+export default function FolderActions({ folder, folders, onCreateInside, onMove, onPin, onRename, onRecolor, onChangeIcon, onDelete }: FolderActionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState(folder.name);
   const [error, setError] = useState<string | null>(null);
+  const [insideName, setInsideName] = useState("");
+  const [insideError, setInsideError] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  // Where it can move: anywhere but into itself or a folder inside it.
+  const cantGoInto = folderAndInside(folders, folder.id);
   const pencil = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -57,10 +69,21 @@ export default function FolderActions({ folder, onRename, onRecolor, onChangeIco
     setError(message);
   }
 
+  async function handleCreateInside(e: React.FormEvent) {
+    e.preventDefault();
+    const message = await onCreateInside(insideName);
+    setInsideError(message);
+    if (!message) setInsideName("");
+  }
+
+  async function handleMove(parentId: string) {
+    setMoveError(await onMove(parentId || null));
+  }
+
+  // The folder goes to the Trash, with Undo (it asks first only when folders
+  // inside it would move).
   function handleDelete() {
-    if (window.confirm(`Delete the folder "${folder.name}"? Its links stay, just without a folder.`)) {
-      onDelete(folder.id);
-    }
+    onDelete(folder.id);
   }
 
   const current = folder.color ?? "gray";
@@ -161,6 +184,73 @@ export default function FolderActions({ folder, onRename, onRecolor, onChangeIco
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Only top-level folders show on Home, so only they can be pinned there. */}
+          {!folder.parentId && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={Boolean(folder.pinned)}
+                onChange={(e) => onPin(e.target.checked)}
+                className="size-4 accent-[#0071e3]"
+              />
+              Pin to Home (shown first there)
+            </label>
+          )}
+
+          <form onSubmit={handleCreateInside} className="space-y-1">
+            <label htmlFor="new-folder-inside" className={label}>
+              New folder inside
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="new-folder-inside"
+                type="text"
+                value={insideName}
+                onChange={(e) => {
+                  setInsideName(e.target.value);
+                  setInsideError(null);
+                }}
+                maxLength={FOLDER_NAME_MAX_LENGTH}
+                placeholder={`A folder in ${folder.name}`}
+                className="field min-w-0 flex-1"
+              />
+              <button type="submit" disabled={!insideName.trim()} className="btn-secondary">
+                Create
+              </button>
+            </div>
+            {insideError && (
+              <p role="alert" className="text-sm text-danger">
+                {insideError}
+              </p>
+            )}
+          </form>
+
+          <div className="space-y-1">
+            <label htmlFor="move-folder" className={label}>
+              Move folder to
+            </label>
+            <select
+              id="move-folder"
+              value={folder.parentId ?? ""}
+              onChange={(e) => handleMove(e.target.value)}
+              className="field w-full"
+            >
+              <option value="">Top level</option>
+              {flattenTree(folders)
+                .filter(({ folder: other }) => !cantGoInto.has(other.id))
+                .map(({ folder: other, depth }) => (
+                  <option key={other.id} value={other.id}>
+                    {indentedName(other.name, depth)}
+                  </option>
+                ))}
+            </select>
+            {moveError && (
+              <p role="alert" className="text-sm text-danger">
+                {moveError}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between border-t border-line pt-3">

@@ -1,6 +1,7 @@
 import type { Folder, Link, LinkDetails, LinkDetailsInput } from "@/types/link";
 import type { FolderRow, LinkRow } from "@/db/schema";
-import { isFolderColor, isFolderIcon } from "@/lib/folders";
+import { FOLDER_NAME_MAX_LENGTH, isFolderColor, isFolderIcon } from "@/lib/folders";
+import { TRASH_DAYS } from "@/lib/limits";
 
 export const STORAGE_KEY = "linkwell:links";
 
@@ -89,7 +90,7 @@ export const TITLE_MAX_LENGTH = 500;
 export const NOTE_MAX_LENGTH = 500;
 export const TAG_MAX_LENGTH = 50;
 export const TAGS_MAX = 20;
-export const FOLDER_NAME_MAX_LENGTH = 100;
+export { FOLDER_NAME_MAX_LENGTH };
 
 // Text from the browser, or "" for anything that isn't text (a number, an
 // object, nothing at all), so the checks below never crash on odd input.
@@ -184,6 +185,18 @@ export function cleanFolderName(input: unknown): { name: string } | { error: str
   return { name };
 }
 
+// How many days something deleted at `deletedAt` has left in the Trash
+// before the daily job deletes it for good: 30 just after deleting, 1 on the last day.
+export function trashDaysLeft(deletedAt: string, now = new Date()): number {
+  const DAY = 24 * 60 * 60 * 1000;
+  const gone = new Date(deletedAt).getTime() + TRASH_DAYS * DAY;
+  // `now` can be a little older than the delete (the time the page loaded).
+  return Math.min(TRASH_DAYS, Math.max(1, Math.ceil((gone - now.getTime()) / DAY)));
+}
+
+// What saving a link that's in the Trash answers; the page then offers Restore.
+export const IN_TRASH = "This link is in your Trash.";
+
 export function updateDetails(
   links: Link[],
   id: string,
@@ -192,12 +205,13 @@ export function updateDetails(
   return links.map((link) => (link.id === id ? { ...link, ...details } : link));
 }
 
+// Moved by hand: restoring the folder it came out of no longer takes it back.
 export function setFolder(
   links: Link[],
   id: string,
   folderId: string | undefined
 ): Link[] {
-  return links.map((link) => (link.id === id ? { ...link, folderId } : link));
+  return links.map((link) => (link.id === id ? { ...link, folderId, cameFromFolderId: undefined } : link));
 }
 
 export function clearFolder(links: Link[], folderId: string): Link[] {
@@ -296,6 +310,8 @@ export function toLink(row: LinkRow): Link {
     folderId: row.folderId ?? undefined,
     // "" means the page had none: the same as no picture, for the app.
     image: row.image || undefined,
+    cameFromFolderId: row.cameFromFolderId ?? undefined,
+    deletedAt: row.deletedAt?.toISOString(),
   };
 }
 
@@ -305,6 +321,10 @@ export function toFolder(row: FolderRow): Folder {
     name: row.name,
     color: isFolderColor(row.color) ? row.color : undefined,
     icon: isFolderIcon(row.icon) ? row.icon : undefined,
+    parentId: row.parentId ?? undefined,
+    pinned: row.pinnedAt ? true : undefined,
+    cameFromFolderId: row.cameFromFolderId ?? undefined,
+    deletedAt: row.deletedAt?.toISOString(),
   };
 }
 
@@ -316,12 +336,16 @@ export function countLinks(links: Link[]) {
   };
 }
 
-// The sidebar's smart lists.
-export type SmartList = "all" | "unread" | "broken";
+// What the page shows: Home (the first screen, a few of everything), the
+// smart lists, links not in a folder (for sorting them), and the Trash
+// (which shows deleted things instead).
+export type SmartList = "home" | "all" | "unread" | "broken" | "unsorted" | "trash";
 
 export function filterByList(links: Link[], list: SmartList): Link[] {
   if (list === "unread") return links.filter((link) => !link.readAt);
   if (list === "broken") return links.filter((link) => link.status === "broken");
+  if (list === "unsorted") return links.filter((link) => !link.folderId);
+  if (list === "trash") return [];
   return links;
 }
 

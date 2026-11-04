@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import NextLink from "next/link";
-import { createFolder, saveLink } from "@/app/actions";
+import { createFolder, restoreLinkByUrl, saveLink } from "@/app/actions";
 import FolderPicker, { useLastFolder } from "@/components/FolderPicker";
-import { createLink, getDomain, parseTags, TITLE_MAX_LENGTH } from "@/lib/links";
+import { createLink, getDomain, IN_TRASH, parseTags, TITLE_MAX_LENGTH } from "@/lib/links";
 import type { Folder } from "@/types/link";
 
 // Saving waits for a click instead of happening when the page opens: any
@@ -29,6 +29,8 @@ export default function ShareForm({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // Saved before and now in the Trash: restored instead of saved again.
+  const [restored, setRestored] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +46,18 @@ export default function ShareForm({
     }
   }
 
+  async function restore() {
+    setSaving(true);
+    const result = await restoreLinkByUrl(url);
+    setSaving(false);
+    if (typeof result === "string") {
+      setMessage(result);
+    } else {
+      setRestored(true);
+      setSaved(true);
+    }
+  }
+
   async function addFolder(name: string) {
     const result = await createFolder(name);
     if (typeof result !== "string") setFolders((current) => [...current, result]);
@@ -54,7 +68,9 @@ export default function ShareForm({
     return (
       <div role="status">
         <p className="mt-4 text-ink">
-          Saved to Linkwell{folderId && ` in ${folders.find((folder) => folder.id === folderId)?.name}`}.
+          {restored
+            ? "Restored from your Trash."
+            : `Saved to Linkwell${folderId ? ` in ${folders.find((folder) => folder.id === folderId)?.name}` : ""}.`}
         </p>
         <NextLink href="/" className="btn-primary mt-6 inline-block">
           Go to my links
@@ -91,10 +107,19 @@ export default function ShareForm({
         <span aria-hidden="true">Folder</span>
         <FolderPicker folders={folders} value={folderId} onChange={setChosenFolder} onCreate={addFolder} />
       </div>
-      {message && (
-        <p role="alert" className="text-sm text-danger">
+      {message === IN_TRASH ? (
+        <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-ink">
           {message}
+          <button type="button" onClick={restore} disabled={saving} className="btn-secondary py-1">
+            Restore it
+          </button>
         </p>
+      ) : (
+        message && (
+          <p role="alert" className="text-sm text-danger">
+            {message}
+          </p>
+        )
       )}
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className="btn-primary">

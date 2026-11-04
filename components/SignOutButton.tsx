@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
-export default function SignOutButton() {
+export default function SignOutButton({ className = "btn-quiet" }: { className?: string }) {
   const router = useRouter();
 
   return (
@@ -13,7 +13,7 @@ export default function SignOutButton() {
         // Re-render the Server Component page, which now finds no session.
         router.refresh();
       }}
-      className="btn-quiet"
+      className={className}
     >
       Sign out
     </button>

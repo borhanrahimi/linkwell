@@ -13,8 +13,11 @@ const noSubscription = () => () => {};
 const browserCanPaste = () => typeof navigator.clipboard?.readText === "function";
 const serverCanPaste = () => false;
 
+// What went wrong with saving, and maybe a way out ("Restore it").
+export type SaveProblem = string | { message: string; actionLabel: string; onAction: () => void };
+
 type LinkFormProps = {
-  onAdd: (url: string, title: string, tags: string, folderId: string) => Promise<string | null>;
+  onAdd: (url: string, title: string, tags: string, folderId: string) => Promise<SaveProblem | null>;
   folders?: Folder[];
   // The folder being looked at: new links go there unless you pick another.
   currentFolder?: string | null;
@@ -33,11 +36,12 @@ export default function LinkForm({ onAdd, folders = [], currentFolder = null, on
   const [tags, setTags] = useState("");
   const [chosenFolder, setChosenFolder] = useState<string | null>(null);
   const folderId = chosenFolder ?? currentFolder ?? "";
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SaveProblem | null>(null);
   const canPaste = useSyncExternalStore(noSubscription, browserCanPaste, serverCanPaste);
 
+  // A message goes away by itself; one with a button waits for you.
   useEffect(() => {
-    if (error) {
+    if (typeof error === "string") {
       const timer = setTimeout(() => setError(null), 5000);
       return () => clearTimeout(timer);
     }
@@ -72,7 +76,11 @@ export default function LinkForm({ onAdd, folders = [], currentFolder = null, on
       return;
     }
 
-    // Only clear what is still the saved link, never what you typed since.
+    clearSent(sent);
+  }
+
+  // Only clear what is still the saved link, never what you typed since.
+  function clearSent(sent: { url: string; title: string; tags: string }) {
     setUrl((current) => (current === sent.url ? "" : current));
     setTitle((current) => (current === sent.title ? "" : current));
     setTags((current) => (current === sent.tags ? "" : current));
@@ -129,9 +137,25 @@ export default function LinkForm({ onAdd, folders = [], currentFolder = null, on
           </div>
         )}
       </form>
-      {error && (
+      {typeof error === "string" && (
         <p role="alert" className="mt-2 px-1 text-sm text-danger">
           {error}
+        </p>
+      )}
+      {error && typeof error === "object" && (
+        <p role="alert" className="mt-2 flex flex-wrap items-center gap-x-2 px-1 text-sm text-ink">
+          {error.message}
+          <button
+            type="button"
+            onClick={() => {
+              error.onAction();
+              setError(null);
+              clearSent({ url, title, tags });
+            }}
+            className="btn-secondary py-1"
+          >
+            {error.actionLabel}
+          </button>
         </p>
       )}
     </div>

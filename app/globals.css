@@ -9,6 +9,7 @@
   --animate-sheet-up: sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --animate-fade-in: fade-in 180ms ease-out;
   --animate-rise-in: rise-in 260ms ease-out both;
+  --animate-tap: tap 320ms cubic-bezier(0.3, 1.6, 0.5, 1);
 
   @keyframes sheet-up {
     from {
@@ -25,6 +26,39 @@
       opacity: 0;
       transform: translateY(6px);
     }
+  }
+  /* A tab's icon when it's tapped: a quick squash and a little bounce. */
+  @keyframes tap {
+    40% {
+      transform: scale(0.82);
+    }
+    75% {
+      transform: scale(1.12);
+    }
+  }
+}
+
+/* Tapping a tab in the phone's bottom bar slides the page across (the View
+   Transitions API, started in LinkManager). The bar itself has its own
+   view-transition-name, so it stays still while the page moves. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: 160ms ease-in both page-out;
+  }
+  ::view-transition-new(root) {
+    animation: 220ms ease-out both page-in;
+  }
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
   }
 }
 

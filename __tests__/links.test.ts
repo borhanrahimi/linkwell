@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
+import { freeFolderName } from "@/lib/folders";
 import {
   STORAGE_KEY,
   createLink,
@@ -28,6 +29,8 @@ import {
   cleanTags,
   cleanDate,
   cleanFolderName,
+  FOLDER_NAME_MAX_LENGTH,
+  trashDaysLeft,
 } from "@/lib/links";
 
 afterEach(() => {
@@ -376,6 +379,34 @@ describe("sortLinks", () => {
   });
 });
 
+describe("freeFolderName", () => {
+  test("keeps a free name, and numbers a taken one (ignoring case)", () => {
+    expect(freeFolderName("Reading", ["Work"])).toBe("Reading");
+    expect(freeFolderName("Reading", ["reading"])).toBe("Reading (2)");
+    expect(freeFolderName("Reading", ["Reading", "reading (2)"])).toBe("Reading (3)");
+  });
+
+  test("stays within the folder name limit", () => {
+    const long = "x".repeat(FOLDER_NAME_MAX_LENGTH);
+    const name = freeFolderName(long, [long]);
+    expect(name).toHaveLength(FOLDER_NAME_MAX_LENGTH);
+    expect(name.endsWith(" (2)")).toBe(true);
+  });
+});
+
+describe("trashDaysLeft", () => {
+  const deleted = "2026-10-01T12:00:00.000Z";
+
+  test("30 days just after deleting, then counting down, never below 1", () => {
+    expect(trashDaysLeft(deleted, new Date("2026-10-01T12:00:00.000Z"))).toBe(30);
+    expect(trashDaysLeft(deleted, new Date("2026-10-11T13:00:00.000Z"))).toBe(20);
+    expect(trashDaysLeft(deleted, new Date("2026-10-31T11:00:00.000Z"))).toBe(1);
+    expect(trashDaysLeft(deleted, new Date("2026-11-05T12:00:00.000Z"))).toBe(1);
+    // Deleted after the page loaded: still 30, not 31.
+    expect(trashDaysLeft(deleted, new Date("2026-10-01T11:00:00.000Z"))).toBe(30);
+  });
+});
+
 describe("toLink", () => {
   const row = {
     id: "1",
@@ -390,6 +421,8 @@ describe("toLink", () => {
     userId: "u1",
     note: null,
     image: null,
+    cameFromFolderId: null,
+    deletedAt: null,
   };
 
   test("turns the date into an ISO string", () => {
@@ -559,6 +592,10 @@ describe("toFolder", () => {
     color: null,
     icon: null,
     createdAt: new Date("2026-10-09T12:00:00.000Z"),
+    deletedAt: null,
+    parentId: null,
+    cameFromFolderId: null,
+    pinnedAt: null,
     userId: "u1",
   };
 

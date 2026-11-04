@@ -99,6 +99,27 @@
       "when": 1792647884375,
       "tag": "0013_add_link_image",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793763549166,
+      "tag": "0014_add_trash",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793764287077,
+      "tag": "0015_add_folder_parent",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793765382415,
+      "tag": "0016_add_folder_pinned",
+      "breakpoints": true
     }
   ]
 }

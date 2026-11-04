@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import Header from "@/components/Header";
 import LinkForm from "@/components/LinkForm";
 import LinkCard from "@/components/LinkCard";
 import LinkDetails from "@/components/LinkDetails";
 import ImportBanner from "@/components/ImportBanner";
-import Rediscover from "@/components/Rediscover";
+import HomeView from "@/components/HomeView";
 import AllWell from "@/components/illustrations/AllWell";
 import CaughtUp from "@/components/illustrations/CaughtUp";
 import EmptyBox from "@/components/illustrations/EmptyBox";
@@ -16,25 +17,37 @@ import Sidebar from "@/components/Sidebar";
 import { useLinkView, type LinkView } from "@/components/useLinkView";
 import { useAddressState } from "@/components/useAddressState";
 import FolderIconDrawing from "@/components/FolderIcon";
-import { FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
+import {
+  childFolders,
+  countWithInside,
+  flattenTree,
+  folderAndInside,
+  folderPath,
+  FOLDER_DOT_CLASS,
+  FOLDER_TEXT_CLASS,
+  indentedName,
+  renamesMovingUp,
+} from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
 import AddLinksSheet from "@/components/AddLinksSheet";
 import BottomBar from "@/components/BottomBar";
 import Sheet from "@/components/Sheet";
+import TrashView from "@/components/TrashView";
+import UndoToast, { type Toast } from "@/components/UndoToast";
 import { useLinkActions } from "@/components/LinkActions";
+import type { SaveProblem } from "@/components/LinkForm";
 import {
   createLink,
   filterByFolder,
   filterByList,
   type SmartList,
   isDuplicate,
+  normalizeUrl,
   pickRediscover,
-  setFolder,
   setReadAt,
   cleanDetails,
   updateDetails,
   parseTags,
-  clearFolder,
   filterByTag,
   searchLinks,
   type SortOrder,
@@ -54,14 +67,20 @@ const VIEWS: { id: LinkView; label: string }[] = [
 ];
 
 const LIST_TITLES: Record<SmartList, string> = {
+  // Home with a tag chosen shows every link with that tag.
+  home: "All links",
   all: "All links",
+  unsorted: "Not in a folder",
   unread: "Unread",
   broken: "Broken",
+  trash: "Trash",
 };
 
 type LinkManagerProps = {
   initialLinks: Link[];
   initialFolders?: Folder[];
+  // What's in the Trash when the page opens.
+  initialTrash?: { links: Link[]; folders: Folder[] };
   now?: Date;
   // The signed-in user, for the top bar. Tests may leave it out: then the
   // save box is shown on its own.
@@ -75,6 +94,7 @@ type LinkManagerProps = {
 export default function LinkManager({
   initialLinks,
   initialFolders = [],
+  initialTrash = { links: [], folders: [] },
   now,
   user,
   topBarEnd,
@@ -94,9 +114,26 @@ export default function LinkManager({
     setFolderIcon,
     moveLinksToFolder,
     markLinksRead,
+    removeLinks,
+    restoreLinks,
+    restoreFolder,
+    deleteForever,
+    emptyTrash,
+    setReadDates,
+    moveFolder,
+    setFolderPinned,
   } = useLinkActions();
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
+  const [trash, setTrash] = useState(initialTrash);
+  // The small message after a change, with Undo (see UndoToast).
+  const [toast, setToast] = useState<Toast | null>(null);
+  const toastCount = useRef(0);
+  const closeToast = useCallback(() => setToast(null), []);
+  function showToast(message: string, onUndo?: () => void) {
+    toastCount.current += 1;
+    setToast({ id: toastCount.current, message, onUndo });
+  }
   // What the list shows: a smart list (all, unread, broken) or one folder,
   // optionally narrowed to one tag and a search.
   // The chosen list, folder, tag and view live in the address (see useAddressState).
@@ -106,6 +143,8 @@ export default function LinkManager({
   const activeFolder = folders.some((folder) => folder.id === address.folder) ? address.folder : null;
   const activeTag = address.tag;
   const [query, setQuery] = useState("");
+  // In a folder: also show the links in the folders inside it.
+  const [withInside, setWithInside] = useState(false);
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   // The address can choose the view; otherwise the device remembers its own.
   const [storedView, storeView] = useLinkView();
@@ -129,31 +168,45 @@ export default function LinkManager({
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Phones: whether the sidebar is open as a drawer. Closing it puts focus
-  // back on the Lists button that opened it.
+  // back on the Folders tab that opened it.
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
     menuButton.current?.focus();
   }, []);
-  const visibleLinks = sortLinks(
-    searchLinks(
-      filterByTag(
-        filterByFolder(filterByList(links, activeList), activeFolder),
-        activeTag,
-      ),
-      query,
-    ),
-    sortOrder,
-  );
+  // The open folder, and the folders inside it when those are included too.
+  const shownFolders = activeFolder && withInside ? folderAndInside(folders, activeFolder) : null;
+  const inFolder = shownFolders
+    ? filterByList(links, activeList).filter((link) => link.folderId && shownFolders.has(link.folderId))
+    : filterByFolder(filterByList(links, activeList), activeFolder);
+  const visibleLinks = sortLinks(searchLinks(filterByTag(inFolder, activeTag), query), sortOrder);
   // Up to ten old links; the banner shows one at a time.
   const rediscover = now ? pickRediscover(links, now, 10) : [];
-  const showRediscover = now !== undefined && rediscover.length > 0;
+  // Home is the first screen; a folder or a tag shows a list instead.
+  const showHome = activeList === "home" && !activeFolder && !activeTag;
   const selectedFolder = folders.find((folder) => folder.id === activeFolder);
+  // The folders the open one is inside (for the trail above its name), and
+  // the ones inside it (tiles above its links).
+  const parentFolders = selectedFolder ? folderPath(folders, selectedFolder.id).slice(0, -1) : [];
+  const insideFolders = selectedFolder ? childFolders(folders, selectedFolder.id) : [];
+  const counts = countWithInside(folders, links);
 
-  async function addLink(url: string, title: string, tags: string, folderId = "") {
+  async function addLink(url: string, title: string, tags: string, folderId = ""): Promise<SaveProblem | null> {
     if (isDuplicate(links, url)) {
       return "You already saved this link!";
+    }
+    // Saving a link that's in the Trash offers it back instead of a copy.
+    const trashed = trash.links.find((link) => normalizeUrl(link.url) === normalizeUrl(url));
+    if (trashed) {
+      return {
+        message: "This link is in your Trash.",
+        actionLabel: "Restore it",
+        onAction: () => {
+          restoreLinksNow([trashed]);
+          showToast("Link restored");
+        },
+      };
     }
 
     const link = { ...createLink(url, title, parseTags(tags)), folderId: folderId || undefined };
@@ -166,6 +219,18 @@ export default function LinkManager({
     return null;
   }
 
+  // Tapping a tab slides the page across (the View Transitions API), where
+  // the browser has it and animations aren't turned off. flushSync makes
+  // React draw the new page inside the transition.
+  function slideTo(change: () => void) {
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!document.startViewTransition || calm) {
+      change();
+      return;
+    }
+    document.startViewTransition(() => flushSync(change));
+  }
+
   // A smart list and a folder are one choice: picking one leaves the other.
   // Picking something in the phone drawer also closes it, to show the list.
   function selectList(list: SmartList) {
@@ -174,7 +239,7 @@ export default function LinkManager({
   }
 
   function selectFolder(folderId: string | null) {
-    updateAddress({ folder: folderId, list: "all" });
+    updateAddress({ folder: folderId, list: "home" });
     if (menuOpen) closeMenu();
   }
 
@@ -186,6 +251,9 @@ export default function LinkManager({
         text: "No links match your search.",
         drawing: <Magnifier className={drawing} />,
       };
+    // With folders inside, the tiles above are what's there: no drawing.
+    if (activeFolder && insideFolders.length > 0)
+      return { text: `No links in ${selectedFolder?.name} itself.`, drawing: null };
     if (activeFolder)
       return {
         text: "No links in this folder yet.",
@@ -201,6 +269,11 @@ export default function LinkManager({
         text: "No broken links. Every link still works.",
         drawing: <AllWell className={drawing} />,
       };
+    if (activeList === "unsorted")
+      return {
+        text: "Every link is in a folder.",
+        drawing: <AllWell className={drawing} />,
+      };
     return {
       text: "No links match your search.",
       drawing: <Magnifier className={drawing} />,
@@ -212,9 +285,89 @@ export default function LinkManager({
     if (menuOpen) closeMenu();
   }
 
-  async function deleteLink(id: string) {
-    setLinks((current) => current.filter((link) => link.id !== id));
-    await removeLink(id);
+  // Deleting puts links in the Trash, with Undo.
+  async function deleteLinks(ids: string[]) {
+    const chosen = new Set(ids);
+    const deletedAt = new Date().toISOString();
+    const gone = links.filter((link) => chosen.has(link.id)).map((link) => ({ ...link, deletedAt }));
+    if (gone.length === 0) return;
+    setLinks((current) => current.filter((link) => !chosen.has(link.id)));
+    setTrash((current) => ({ ...current, links: [...gone, ...current.links] }));
+    showToast(gone.length === 1 ? "Link moved to the Trash" : `${gone.length} links moved to the Trash`, () => restoreLinksNow(gone));
+    await (gone.length === 1 ? removeLink(gone[0].id) : removeLinks(gone.map((link) => link.id)));
+  }
+
+  // Out of the Trash at once; a link whose folder is gone comes back without one.
+  async function restoreLinksNow(items: Link[]) {
+    const ids = new Set(items.map((link) => link.id));
+    const live = new Set(folders.map((folder) => folder.id));
+    const back = items.map((link) => ({
+      ...link,
+      deletedAt: undefined,
+      folderId: link.folderId && live.has(link.folderId) ? link.folderId : undefined,
+    }));
+    setTrash((current) => ({ ...current, links: current.links.filter((link) => !ids.has(link.id)) }));
+    setLinks((current) => [...back, ...current.filter((link) => !ids.has(link.id))]);
+    const result = await restoreLinks([...ids]);
+    // Refused (the link limit): back into the Trash, and say why.
+    if (typeof result === "string") {
+      setLinks((current) => current.filter((link) => !ids.has(link.id)));
+      setTrash((current) => ({ ...current, links: [...items, ...current.links] }));
+      showToast(result);
+    }
+  }
+
+  // The folder comes back (renamed if its name was taken meanwhile), and so
+  // do the links that left it when it was deleted, unless they moved since.
+  async function restoreFolderNow(folder: Folder) {
+    const result = await restoreFolder(folder.id);
+    if (typeof result === "string") {
+      showToast(result);
+      return;
+    }
+    // What moved up when it was deleted (and is still there) goes back in.
+    const movedTo = folder.parentId;
+    setTrash((current) => ({ ...current, folders: current.folders.filter((f) => f.id !== folder.id) }));
+    setFolders((current) => [
+      ...current.map((f) =>
+        f.cameFromFolderId === folder.id && f.parentId === movedTo ? { ...f, parentId: folder.id, cameFromFolderId: undefined } : f
+      ),
+      { ...folder, name: result.name, parentId: result.parentId, deletedAt: undefined },
+    ]);
+    setLinks((current) =>
+      current.map((link) =>
+        link.cameFromFolderId === folder.id && link.folderId === movedTo
+          ? { ...link, folderId: folder.id, cameFromFolderId: undefined }
+          : link
+      )
+    );
+    if (result.name !== folder.name) showToast(`Restored as "${result.name}"`);
+  }
+
+  function restoreFromTrash(kind: "link" | "folder", id: string) {
+    if (kind === "link") {
+      const link = trash.links.find((l) => l.id === id);
+      if (!link) return;
+      restoreLinksNow([link]);
+      showToast("Link restored");
+    } else {
+      const folder = trash.folders.find((f) => f.id === id);
+      if (folder) restoreFolderNow(folder);
+    }
+  }
+
+  async function deleteFromTrash({ linkId, folderId, name }: { linkId?: string; folderId?: string; name: string }) {
+    if (!window.confirm(`Delete "${name}" forever? This can't be undone.`)) return;
+    setTrash((current) => ({
+      links: current.links.filter((link) => link.id !== linkId),
+      folders: current.folders.filter((folder) => folder.id !== folderId),
+    }));
+    await deleteForever(linkId ? [linkId] : [], folderId ? [folderId] : []);
+  }
+
+  async function emptyTheTrash() {
+    setTrash({ links: [], folders: [] });
+    await emptyTrash();
   }
 
   async function editDetails(id: string, input: LinkDetailsInput) {
@@ -225,30 +378,55 @@ export default function LinkManager({
   }
   async function toggleRead(id: string) {
     const link = links.find((l) => l.id === id);
-    if (!link) {
-      return;
-    }
-    const readAt = link.readAt ? undefined : new Date().toISOString();
-    setLinks((current) => setReadAt(current, id, readAt));
-    await saveReadStatus(id, !link.readAt);
+    if (link) await markManyRead([id], !link.readAt, { one: true });
   }
 
-  // Several links into one folder (or out of folders, with null), at once.
-  async function moveMany(ids: string[], folderId: string | null) {
-    if (ids.length === 0) return;
+  // Marks links read or unread, with Undo, which puts back each link's own
+  // earlier read date. `one`: a card's own button (one link, its own action).
+  async function markManyRead(ids: string[], read: boolean, { one = false } = {}) {
     const chosen = new Set(ids);
-    setLinks((current) =>
-      current.map((link) => (chosen.has(link.id) ? { ...link, folderId: folderId ?? undefined } : link))
-    );
-    await moveLinksToFolder(ids, folderId);
-  }
-
-  async function markManyRead(ids: string[], read: boolean) {
-    if (ids.length === 0) return;
-    const chosen = new Set(ids);
+    const before = links.filter((link) => chosen.has(link.id)).map((link) => ({ id: link.id, readAt: link.readAt ?? null }));
+    if (before.length === 0) return;
     const readAt = read ? new Date().toISOString() : undefined;
     setLinks((current) => current.map((link) => (chosen.has(link.id) ? { ...link, readAt } : link)));
-    await markLinksRead(ids, read);
+    const what = before.length === 1 ? "Marked as" : `${before.length} links marked as`;
+    showToast(`${what} ${read ? "read" : "unread"}`, () => putReadDatesBack(before));
+    await (one ? saveReadStatus(before[0].id, read) : markLinksRead(ids, read));
+  }
+
+  async function putReadDatesBack(before: { id: string; readAt: string | null }[]) {
+    for (const { id, readAt } of before) {
+      setLinks((current) => setReadAt(current, id, readAt ?? undefined));
+    }
+    await setReadDates(before);
+  }
+
+  // Several links into one folder (or out of folders, with null), at once,
+  // with Undo, which puts each link back in its own earlier folder. `one`:
+  // the details panel's Folder menu, for one link.
+  async function moveMany(ids: string[], folderId: string | null, { undoable = true, one = false } = {}) {
+    const chosen = new Set(ids);
+    const before = links.filter((link) => chosen.has(link.id)).map((link) => ({ id: link.id, folderId: link.folderId ?? null }));
+    if (before.length === 0) return;
+    setLinks((current) =>
+      current.map((link) => (chosen.has(link.id) ? { ...link, folderId: folderId ?? undefined, cameFromFolderId: undefined } : link))
+    );
+    if (undoable) {
+      const folderName = folders.find((folder) => folder.id === folderId)?.name;
+      const message = folderName
+        ? `${before.length === 1 ? "Moved" : `${before.length} links moved`} to ${folderName}`
+        : before.length === 1
+          ? "Taken out of its folder"
+          : `${before.length} links taken out of their folders`;
+      showToast(message, () => moveBack(before));
+    }
+    await (one ? moveToFolder(before[0].id, folderId) : moveLinksToFolder(before.map((link) => link.id), folderId));
+  }
+
+  async function moveBack(before: { id: string; folderId: string | null }[]) {
+    const byFolder = new Map<string | null, string[]>();
+    for (const { id, folderId } of before) byFolder.set(folderId, [...(byFolder.get(folderId) ?? []), id]);
+    await Promise.all([...byFolder].map(([folderId, ids]) => moveMany(ids, folderId, { undoable: false })));
   }
 
   function toggleSelected(id: string) {
@@ -266,13 +444,13 @@ export default function LinkManager({
   }
 
   async function moveLink(id: string, folderId: string | undefined) {
-    setLinks((current) => setFolder(current, id, folderId));
-    await moveToFolder(id, folderId ?? null);
+    await moveMany([id], folderId ?? null, { one: true });
   }
 
-  // Makes a folder; returns it (for the save box's folder menu) or an error.
-  async function makeFolder(name: string) {
-    const result = await createFolder(name);
+  // Makes a folder (inside parentId, if given); returns it (for the save
+  // box's folder menu) or an error.
+  async function makeFolder(name: string, parentId: string | null = null) {
+    const result = await createFolder(name, parentId);
     if (typeof result !== "string") {
       setFolders((current) => [...current, result]);
     }
@@ -283,6 +461,28 @@ export default function LinkManager({
     const result = await makeFolder(name);
     return typeof result === "string" ? result : null;
   }
+  // Pinned folders come first on Home. Shown at once, saved in the background.
+  async function pinFolder(id: string, pinned: boolean) {
+    setFolders((current) => current.map((f) => (f.id === id ? { ...f, pinned: pinned || undefined } : f)));
+    await setFolderPinned(id, pinned);
+  }
+
+  // Into another folder (or the top level, with null), with Undo.
+  async function changeFolderParent(id: string, parentId: string | null, { undoable = true } = {}) {
+    const folder = folders.find((f) => f.id === id);
+    if (!folder) return null;
+    const error = await moveFolder(id, parentId);
+    if (error) return error;
+    setFolders((current) =>
+      current.map((f) => (f.id === id ? { ...f, parentId: parentId ?? undefined, cameFromFolderId: undefined } : f))
+    );
+    if (undoable) {
+      const where = folders.find((f) => f.id === parentId)?.name ?? "the top level";
+      showToast(`"${folder.name}" moved to ${where}`, () => changeFolderParent(id, folder.parentId ?? null, { undoable: false }));
+    }
+    return null;
+  }
+
   async function changeFolderName(id: string, name: string) {
     const error = await renameFolder(id, name);
     if (error) {
@@ -315,11 +515,36 @@ export default function LinkManager({
     await setFolderIcon(id, icon);
   }
 
+  // The folder goes to the Trash. What's inside it stays: its links and its
+  // folders move up one level (into its parent, or the top level), and
+  // remember it, so Restore (or Undo) puts them back. With folders inside,
+  // it asks first, since more than one thing moves.
   async function removeFolder(id: string) {
-    setFolders((current) => current.filter((folder) => folder.id !== id));
-    setLinks((current) => clearFolder(current, id));
+    const folder = folders.find((f) => f.id === id);
+    if (!folder) return;
+    const parent = folderPath(folders, id).at(-2);
+    const movingFolders = childFolders(folders, id).length;
+    if (movingFolders > 0) {
+      const ownLinks = links.filter((link) => link.folderId === id).length;
+      const what = [movingFolders === 1 ? "1 folder" : `${movingFolders} folders`, ...(ownLinks ? [ownLinks === 1 ? "1 link" : `${ownLinks} links`] : [])].join(" and ");
+      const where = parent ? `up into ${parent.name}` : "up to the top level";
+      if (!window.confirm(`Delete "${folder.name}"? Its ${what} move ${where}.`)) return;
+    }
+    const upTo = parent?.id;
+    const trashed = { ...folder, parentId: upTo, deletedAt: new Date().toISOString() };
+    const renames = new Map(renamesMovingUp(folders, id).map((rename) => [rename.id, rename.name]));
+    setFolders((current) =>
+      current
+        .filter((f) => f.id !== id)
+        .map((f) => (f.parentId === id ? { ...f, parentId: upTo, cameFromFolderId: id, name: renames.get(f.id) ?? f.name } : f))
+    );
+    setTrash((current) => ({ ...current, folders: [trashed, ...current.folders] }));
+    setLinks((current) =>
+      current.map((link) => (link.folderId === id ? { ...link, folderId: upTo, cameFromFolderId: id } : link))
+    );
     // The folder is gone, so the address shouldn't point at it (nor offer it on Back).
     updateAddress({ folder: null }, { replace: true });
+    showToast(`"${folder.name}" moved to the Trash`, () => restoreFolderNow(trashed));
     await deleteFolder(id);
   }
   return (
@@ -341,7 +566,7 @@ export default function LinkManager({
         }
       />
 
-      {/* The sidebar on the left (on top, on phones), the list on the right. */}
+      {/* The sidebar on the left (on phones, the Folders tab's full screen), the list on the right. */}
       {/* With the details panel open, wide screens get a third column for it. */}
       <div
         className={`mt-6 grid grid-cols-1 gap-6 md:grid-cols-[14rem_minmax(0,1fr)] ${
@@ -359,19 +584,68 @@ export default function LinkManager({
           onSelectTag={toggleTag}
           onCreateFolder={addFolder}
           onChecked={setLinks}
+          trashCount={trash.links.length + trash.folders.length}
           open={menuOpen}
           onClose={closeMenu}
         />
 
         <div className="min-w-0">
-          {showRediscover && (
-            <Rediscover links={rediscover} now={now} className="mb-6" />
-          )}
+          {activeList === "trash" && !activeFolder ? (
+            <TrashView
+              links={trash.links}
+              folders={trash.folders}
+              now={now}
+              onRestoreLink={(id) => restoreFromTrash("link", id)}
+              onRestoreFolder={(id) => restoreFromTrash("folder", id)}
+              onDeleteForever={deleteFromTrash}
+              onEmpty={emptyTheTrash}
+            />
+          ) : showHome ? (
+            <HomeView
+              links={links}
+              folders={folders}
+              now={now}
+              rediscover={rediscover}
+              onSelectList={selectList}
+              onSelectFolder={selectFolder}
+              onShowDetails={setDetailsId}
+              onSortThem={() => {
+                selectList("unsorted");
+                setSelecting(true);
+              }}
+              onShowFolders={() => setMenuOpen(true)}
+            />
+          ) : (
+          <>
 
           {/* What the list is showing: a smart list, or a folder with its own controls. */}
-          {/* On phones, the Lists button next to it opens the sidebar as a drawer. */}
+          {/* On phones, the bottom bar's Folders tab opens the sidebar full screen. */}
           {/* A folder's pencil sits right after its name; its edit panel wraps below. */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Where the open folder is: Work › Clients. On phones a long trail
+              keeps its first and last steps: Work › … › Clients. */}
+            {parentFolders.length > 0 && (
+              <nav aria-label="Folder path" className="basis-full text-sm text-muted">
+                <ol className="flex min-w-0 flex-wrap items-center gap-1">
+                  {parentFolders.map((parent, index) => {
+                    const middle = index > 0 && index < parentFolders.length - 1;
+                    return (
+                      <li key={parent.id} className={`flex min-w-0 items-center gap-1 ${middle ? "max-sm:hidden" : ""}`}>
+                        <button onClick={() => selectFolder(parent.id)} className="truncate hover:text-ink hover:underline">
+                          {parent.name}
+                        </button>
+                        <span aria-hidden="true">›</span>
+                        {index === 0 && parentFolders.length > 2 && (
+                          <span aria-hidden="true" className="sm:hidden">
+                            … ›
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </nav>
+            )}
             <h2 className="flex min-w-0 items-center gap-2 text-xl font-semibold text-ink">
               {selectedFolder &&
                 (selectedFolder.icon ? (
@@ -393,6 +667,13 @@ export default function LinkManager({
               <FolderActions
                 key={selectedFolder.id}
                 folder={selectedFolder}
+                folders={folders}
+                onCreateInside={async (name) => {
+                  const result = await makeFolder(name, selectedFolder.id);
+                  return typeof result === "string" ? result : null;
+                }}
+                onMove={(parentId) => changeFolderParent(selectedFolder.id, parentId)}
+                onPin={(pinned) => pinFolder(selectedFolder.id, pinned)}
                 onRename={changeFolderName}
                 onRecolor={changeFolderColor}
                 onChangeIcon={changeFolderIcon}
@@ -461,6 +742,41 @@ export default function LinkManager({
             )}
           </div>
 
+          {/* The folders inside the open one, as tiles, before its own links. */}
+          {insideFolders.length > 0 && (
+            <>
+              <ul aria-label={`Folders in ${selectedFolder?.name}`} className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                {insideFolders.map((inside) => (
+                  <li key={inside.id}>
+                    <button
+                      onClick={() => selectFolder(inside.id)}
+                      className="glass flex w-full items-center gap-2 rounded-2xl p-3 text-left transition-shadow hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                    >
+                      {inside.icon ? (
+                        <FolderIconDrawing name={inside.icon} className={`size-6 shrink-0 ${FOLDER_TEXT_CLASS[inside.color ?? "gray"]}`} />
+                      ) : (
+                        <span aria-hidden="true" className={`mx-1.5 size-3 shrink-0 rounded-full ${FOLDER_DOT_CLASS[inside.color ?? "gray"]}`} />
+                      )}
+                      <span className="min-w-0 flex-1 truncate font-medium text-ink">{inside.name}</span>
+                      <span aria-hidden="true" className="text-sm text-muted">
+                        {counts[inside.id] ?? 0}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted">
+                <input
+                  type="checkbox"
+                  checked={withInside}
+                  onChange={(e) => setWithInside(e.target.checked)}
+                  className="size-4 accent-[#0071e3]"
+                />
+                Also show the links in these folders
+              </label>
+            </>
+          )}
+
           {activeTag && (
             <div className="glass mt-4 flex items-center justify-between gap-4 rounded-full py-1.5 pl-5 pr-1.5 text-sm text-muted">
               <span>Showing links tagged #{activeTag}</span>
@@ -509,7 +825,7 @@ export default function LinkManager({
                   link={link}
                   activeTag={activeTag}
                   now={now}
-                  onDelete={deleteLink}
+                  onDelete={(id) => deleteLinks([id])}
                   onEditDetails={editDetails}
                   onToggleRead={toggleRead}
                   folders={folders}
@@ -522,6 +838,8 @@ export default function LinkManager({
                 />
               ))}
             </ul>
+          )}
+          </>
           )}
         </div>
 
@@ -542,47 +860,61 @@ export default function LinkManager({
           <div
             role="toolbar"
             aria-label="Selected links"
-            className="glass-bar fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto grid max-w-xl grid-cols-[1fr_auto] items-center gap-2 rounded-3xl px-4 py-3 motion-safe:animate-rise-in md:bottom-6 md:flex"
+            className="glass-bar fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-2xl flex-wrap items-center gap-2 rounded-3xl px-4 py-3 motion-safe:animate-rise-in md:bottom-6 md:flex-nowrap"
           >
-            <span className="text-sm font-medium text-ink md:mr-auto" aria-live="polite">
+            <span className="mr-auto whitespace-nowrap text-sm font-medium text-ink" aria-live="polite">
               {selected.size === 0 ? "Tick links to select them" : `${selected.size} selected`}
             </span>
-            <button onClick={stopSelecting} className="btn-primary md:order-last">
+            {/* Nothing ticked yet: no greyed-out buttons, just a quick way to tick them all. */}
+            {selected.size === 0 ? (
+              <button onClick={() => setSelected(new Set(visibleLinks.map((link) => link.id)))} className="btn-secondary whitespace-nowrap">
+                Select all
+              </button>
+            ) : (
+              // On phones the actions get a row of their own, under the count.
+              <div className="order-last flex w-full gap-2 md:order-none md:w-auto">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const target = e.target.value;
+                    if (!target) return;
+                    moveMany([...selected], target === "none" ? null : target);
+                    stopSelecting();
+                  }}
+                  aria-label="Move selected links to folder"
+                  className="field min-w-0 flex-1 py-1.5 md:w-36 md:flex-none"
+                >
+                  <option value="">Move to…</option>
+                  <option value="none">No folder</option>
+                  {flattenTree(folders).map(({ folder, depth }) => (
+                    <option key={folder.id} value={folder.id}>
+                      {indentedName(folder.name, depth)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    markManyRead([...selected], true);
+                    stopSelecting();
+                  }}
+                  className="btn-secondary whitespace-nowrap"
+                >
+                  Mark read
+                </button>
+                <button
+                  onClick={() => {
+                    deleteLinks([...selected]);
+                    stopSelecting();
+                  }}
+                  className="btn-secondary text-danger"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+            <button onClick={stopSelecting} className="btn-primary">
               Done
             </button>
-            {/* On phones the actions get a row of their own, under the count. */}
-            <div className="col-span-2 flex gap-2">
-              <select
-                value=""
-                onChange={(e) => {
-                  const target = e.target.value;
-                  if (!target) return;
-                  moveMany([...selected], target === "none" ? null : target);
-                  stopSelecting();
-                }}
-                disabled={selected.size === 0}
-                aria-label="Move selected links to folder"
-                className="field min-w-0 flex-1 py-1.5 disabled:opacity-50 md:flex-none"
-              >
-                <option value="">Move to…</option>
-                <option value="none">No folder</option>
-                {folders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>
-                    {folder.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  markManyRead([...selected], true);
-                  stopSelecting();
-                }}
-                disabled={selected.size === 0}
-                className="btn-secondary"
-              >
-                Mark read
-              </button>
-            </div>
           </div>
         )}
 
@@ -614,7 +946,7 @@ export default function LinkManager({
             onMove={moveLink}
             onDelete={(id) => {
               closeDetails();
-              deleteLink(id);
+              deleteLinks([id]);
             }}
             onTagClick={toggleTag}
           />
@@ -623,13 +955,16 @@ export default function LinkManager({
 
       <BottomBar
         activeList={activeList}
-        inFolder={Boolean(activeFolder)}
-        onSelectList={selectList}
+        inFolder={Boolean(activeFolder) || activeList === "trash"}
+        onSelectList={(list) => slideTo(() => selectList(list))}
         onSave={() => setSavingOnPhone(true)}
-        onOpenLists={() => setMenuOpen(true)}
-        listsOpen={menuOpen}
-        listsButton={menuButton}
+        onOpenFolders={() => setMenuOpen(true)}
+        foldersOpen={menuOpen}
+        foldersButton={menuButton}
+        accountHref={user ? "/account" : "/"}
+        accountLabel={user ? "You" : "Sign in"}
       />
+      <UndoToast toast={toast} onClose={closeToast} />
       {/* Room under the last link, so the bottom bar never covers it. */}
       <div aria-hidden="true" className="h-24 md:hidden" />
     </>

@@ -16,7 +16,8 @@ type HeaderProps = {
 
 // The floating glass bar at the top of every signed-in page. The links scroll
 // underneath it. Your picture and name lead to your account page.
-// On phones, the middle part (the save box) gets a row of its own.
+// On phones, the middle part (the save box) gets a row of its own, and the
+// right side is just your picture (Sign out is on the account page there).
 export default function Header({ user, children, end, hideMiddleOnPhones = false }: HeaderProps) {
   return (
     <header
@@ -47,14 +48,15 @@ export default function Header({ user, children, end, hideMiddleOnPhones = false
           <div className="ml-auto flex min-w-0 items-center gap-1">
             <Link
               href="/account"
-              className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-medium text-ink hover:bg-hover focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="flex min-w-0 items-center gap-2 rounded-full p-1 text-sm font-medium text-ink hover:bg-hover focus:outline-none focus:ring-2 focus:ring-blue-400 md:pr-3"
             >
               <Avatar name={user.name} image={user.image} />
-              <span className="truncate">
+              {/* Phones show just the picture; screen readers still hear the name. */}
+              <span className="truncate max-md:sr-only">
                 {user.username ? `@${user.username}` : user.name}
               </span>
             </Link>
-            <SignOutButton />
+            <SignOutButton className="btn-quiet max-md:hidden" />
           </div>
         )
       )}

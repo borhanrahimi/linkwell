@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import FolderBar from "@/components/FolderBar";
+import { countWithInside } from "@/lib/folders";
 import { countLinks, countTags, type SmartList } from "@/lib/links";
+import ListIcon from "@/components/ListIcon";
 import type { Folder, Link } from "@/types/link";
+
 
 type SidebarProps = {
   links: Link[];
@@ -17,6 +20,8 @@ type SidebarProps = {
   onSelectTag: (tag: string) => void;
   onCreateFolder: (name: string) => Promise<string | null>;
   onChecked: (links: Link[]) => void;
+  // How many links and folders are in the Trash.
+  trashCount?: number;
   // Phones only: whether the sidebar is open as a drawer, and how to close it.
   open?: boolean;
   onClose?: () => void;
@@ -24,8 +29,8 @@ type SidebarProps = {
 
 // The column on the left: smart lists (with the counts that used to be the
 // Overview tile), folders and tags. Each one is a filter for the list.
-// On phones it's a drawer instead, sliding in from the left over a dimmed page
-// when the Lists button opens it; Close, Esc or a tap on the page close it.
+// On phones it's a full screen instead, opened by the bottom bar's Folders
+// tab; Close or Esc closes it.
 export default function Sidebar(props: SidebarProps) {
   const {
     links,
@@ -33,6 +38,7 @@ export default function Sidebar(props: SidebarProps) {
     activeList,
     activeFolder,
     activeTag,
+    trashCount = 0,
     open = false,
     onClose,
   } = props;
@@ -50,11 +56,8 @@ export default function Sidebar(props: SidebarProps) {
   }, [open, onClose]);
 
   const { total, unread, broken } = countLinks(links);
-  const folderCounts: Record<string, number> = {};
-  for (const link of links) {
-    if (link.folderId)
-      folderCounts[link.folderId] = (folderCounts[link.folderId] ?? 0) + 1;
-  }
+  // A folder's count includes the links in the folders inside it.
+  const folderCounts = countWithInside(folders, links);
   const tags = countTags(links);
   // The 5 most used tags, plus the chosen one; "Show all" lists the rest.
   const [allTags, setAllTags] = useState(false);
@@ -66,13 +69,37 @@ export default function Sidebar(props: SidebarProps) {
   const lists: {
     id: SmartList;
     label: string;
-    count: number;
+    count?: number;
     alert?: boolean;
   }[] = [
+    { id: "home", label: "Home" },
     { id: "all", label: "All links", count: total },
     { id: "unread", label: "Unread", count: unread },
     { id: "broken", label: "Broken", count: broken, alert: broken > 0 },
   ];
+
+  // One row of the sidebar's lists. Counts of 0 are left out: less to read.
+  function listRow(list: (typeof lists)[number] | { id: SmartList; label: string; count?: number; alert?: boolean }) {
+    // A smart list only counts as chosen while no folder is.
+    const active = activeList === list.id && !activeFolder;
+    return (
+      <li key={list.id}>
+        <button
+          onClick={() => props.onSelectList(list.id)}
+          aria-pressed={active}
+          className={`sidebar-item ${active ? "sidebar-item-active" : ""}`}
+        >
+          <ListIcon list={list.id} />
+          <span className="min-w-0 flex-1 truncate">{list.label}</span>
+          {list.count ? (
+            <span aria-hidden="true" className={`text-xs ${list.alert ? "font-semibold text-danger" : "text-muted"}`}>
+              {list.count}
+            </span>
+          ) : null}
+        </button>
+      </li>
+    );
+  }
 
   return (
     <>
@@ -86,7 +113,7 @@ export default function Sidebar(props: SidebarProps) {
       <nav
         id="sidebar"
         aria-label="Your lists"
-        className={`glass space-y-5 p-3 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-72 max-md:max-w-[85vw] max-md:overflow-y-auto max-md:rounded-r-2xl max-md:bg-surface md:sticky md:top-24 md:self-start md:rounded-2xl ${
+        className={`glass space-y-5 p-3 max-md:fixed max-md:inset-0 max-md:z-40 max-md:overflow-y-auto max-md:rounded-none max-md:bg-surface max-md:motion-safe:animate-fade-in md:sticky md:top-24 md:self-start md:rounded-2xl ${
           open ? "" : "max-md:hidden"
         }`}
       >
@@ -98,35 +125,9 @@ export default function Sidebar(props: SidebarProps) {
         </div>
         <div>
           <ul aria-label="Lists" className="space-y-0.5">
-            {lists.map((list) => {
-              // A smart list only counts as chosen while no folder is.
-              const active = activeList === list.id && !activeFolder;
-              return (
-                <li key={list.id}>
-                  <button
-                    onClick={() => props.onSelectList(list.id)}
-                    aria-pressed={active}
-                    className={`sidebar-item ${active ? "sidebar-item-active" : ""}`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {list.label}
-                    </span>
-                    <span
-                      aria-hidden="true"
-                      className={`text-xs ${list.alert ? "font-semibold text-danger" : "text-muted"}`}
-                    >
-                      {list.count}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
+            {lists.map(listRow)}
           </ul>
-          {total > 0 && (
-            <div className="px-2">
-              <CheckLinksButton onChecked={props.onChecked} />
-            </div>
-          )}
+          {total > 0 && <CheckLinksButton onChecked={props.onChecked} />}
         </div>
 
         <section aria-labelledby="folders-heading">
@@ -184,6 +185,11 @@ export default function Sidebar(props: SidebarProps) {
             )}
           </section>
         )}
+
+        {/* The Trash, apart at the bottom, like in a mail app. */}
+        <ul aria-label="Trash" className="border-t border-line pt-3">
+          {listRow({ id: "trash", label: "Trash", count: trashCount })}
+        </ul>
       </nav>
     </>
   );

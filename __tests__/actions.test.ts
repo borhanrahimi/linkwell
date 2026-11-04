@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { checkAllLinks, createFolder, deleteFolder, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, markLinksRead, moveLinksToFolder, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { countAction, deleteFolderById, deleteLinkById, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { checkAllLinks, createFolder, deleteFolder, deleteForever, moveFolder, emptyTrash, removeLinks, restoreFolder, restoreLinkByUrl, restoreLinks, setReadDates, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, markLinksRead, moveLinksToFolder, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
+import { countAction, getFolderAncestors, updateFolderParent, deleteForever as deleteForeverFromTrash, emptyTrash as emptyTrashNow, findTrashedLink, getTrash, restoreFolder as restoreFolderFromTrash, restoreLinks as restoreLinksFromTrash, trashFolder, trashLinks, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchPageInfo } from "@/lib/fetchTitle";
 import { after } from "next/server";
 import { getUserId } from "@/lib/session";
 import { MAX_FOLDERS, MAX_LINKS, TOO_FAST, TOO_MANY_FOLDERS, TOO_MANY_LINKS } from "@/lib/limits";
+import { IN_TRASH } from "@/lib/links";
 
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
@@ -13,7 +14,16 @@ vi.mock("@/lib/data", () => ({
   insertLinks: vi.fn(async () => {}),
   // Rate limits: the first use in every window, unless a test says otherwise.
   countAction: vi.fn(async () => 1),
-  deleteLinkById: vi.fn(async () => {}),
+  trashLinks: vi.fn(async () => {}),
+  trashFolder: vi.fn(async () => {}),
+  getTrash: vi.fn(async () => ({ links: [], folders: [] })),
+  findTrashedLink: vi.fn(async () => undefined),
+  restoreLinks: vi.fn(async () => []),
+  restoreFolder: vi.fn(async (_userId: string, id: string, name: string) => ({ id, name })),
+  deleteForever: vi.fn(async () => {}),
+  emptyTrash: vi.fn(async () => {}),
+  getFolderAncestors: vi.fn(async () => []),
+  updateFolderParent: vi.fn(async () => {}),
   updateLinkDetails: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
@@ -24,7 +34,6 @@ vi.mock("@/lib/data", () => ({
   updateFolderName: vi.fn(async () => {}),
   updateFolderColor: vi.fn(async () => {}),
   updateFolderIcon: vi.fn(async () => {}),
-  deleteFolderById: vi.fn(async () => {}),
   getFolders: vi.fn(async () => []),
   insertFolder: vi.fn(async (_userId: string, name: string) => ({ id: "f1", name })),
   isUsernameTaken: vi.fn(async () => false),
@@ -73,14 +82,21 @@ describe("signed out", () => {
     await expect(setFolderColor("f1", "green")).rejects.toThrow("Not signed in");
     await expect(setFolderIcon("f1", "book")).rejects.toThrow("Not signed in");
     await expect(saveUsername("ada")).rejects.toThrow("Not signed in");
+    await expect(removeLinks([link.id])).rejects.toThrow("Not signed in");
+    await expect(restoreLinks([link.id])).rejects.toThrow("Not signed in");
+    await expect(restoreLinkByUrl(link.url)).rejects.toThrow("Not signed in");
+    await expect(restoreFolder("f1")).rejects.toThrow("Not signed in");
+    await expect(deleteForever([link.id], [])).rejects.toThrow("Not signed in");
+    await expect(emptyTrash()).rejects.toThrow("Not signed in");
+    await expect(setReadDates([{ id: link.id, readAt: null }])).rejects.toThrow("Not signed in");
 
     expect(getLinks).not.toHaveBeenCalled();
     expect(getFolders).not.toHaveBeenCalled();
     expect(insertLink).not.toHaveBeenCalled();
     expect(insertLinks).not.toHaveBeenCalled();
-    expect(deleteLinkById).not.toHaveBeenCalled();
+    expect(trashLinks).not.toHaveBeenCalled();
     expect(insertFolder).not.toHaveBeenCalled();
-    expect(deleteFolderById).not.toHaveBeenCalled();
+    expect(trashFolder).not.toHaveBeenCalled();
     expect(updateUsername).not.toHaveBeenCalled();
     expect(updateLinkDetails).not.toHaveBeenCalled();
     expect(updateLinksFolder).not.toHaveBeenCalled();
@@ -232,10 +248,114 @@ describe("saveLink", () => {
 });
 
 describe("removeLink", () => {
-  test("deletes the link with that id", async () => {
+  test("puts the link with that id in the Trash", async () => {
+    await removeLink(link.id);
+
+    expect(trashLinks).toHaveBeenCalledWith("u1", [link.id]);
+  });
+
+  test("ignores an id that isn't a real id", async () => {
     await removeLink("1");
 
-    expect(deleteLinkById).toHaveBeenCalledWith("u1", "1");
+    expect(trashLinks).toHaveBeenCalledWith("u1", []);
+  });
+});
+
+describe("the Trash", () => {
+  const a = "5f0c6c1e-1b1a-4c3e-9a7e-2d3b4c5d6e7a";
+  const b = "5f0c6c1e-1b1a-4c3e-9a7e-2d3b4c5d6e7b";
+  const trashedFolder = { id: "f1", name: "Reading", deletedAt: "2026-10-01T12:00:00.000Z" };
+
+  test("removeLinks puts many links in the Trash, real ids only", async () => {
+    await removeLinks([a, "nope", b, a]);
+
+    expect(trashLinks).toHaveBeenCalledWith("u1", [a, b]);
+  });
+
+  test("restoreLinks brings links back and returns them", async () => {
+    vi.mocked(restoreLinksFromTrash).mockResolvedValueOnce([{ ...link, id: a }]);
+
+    expect(await restoreLinks([a])).toEqual([{ ...link, id: a }]);
+    expect(restoreLinksFromTrash).toHaveBeenCalledWith("u1", [a]);
+  });
+
+  test("restoreLinks refuses to go over the link limit", async () => {
+    vi.mocked(getLinks).mockResolvedValueOnce(Array.from({ length: MAX_LINKS }, (_, i) => ({ ...link, id: String(i) })));
+
+    expect(await restoreLinks([a])).toBe(TOO_MANY_LINKS);
+    expect(restoreLinksFromTrash).not.toHaveBeenCalled();
+  });
+
+  test("saving a link that's in the Trash doesn't make a copy", async () => {
+    vi.mocked(findTrashedLink).mockResolvedValueOnce({ ...link, deletedAt: "2026-10-01T12:00:00.000Z" });
+
+    expect(await saveLink(link)).toBe(IN_TRASH);
+    expect(insertLink).not.toHaveBeenCalled();
+  });
+
+  test("restoreLinkByUrl restores the trashed link with that address", async () => {
+    vi.mocked(findTrashedLink).mockResolvedValueOnce({ ...link, id: a });
+    vi.mocked(restoreLinksFromTrash).mockResolvedValueOnce([{ ...link, id: a }]);
+
+    expect(await restoreLinkByUrl(` ${link.url} `)).toEqual({ ...link, id: a });
+    expect(restoreLinksFromTrash).toHaveBeenCalledWith("u1", [a]);
+  });
+
+  test("restoreLinkByUrl says so when the link isn't in the Trash", async () => {
+    expect(await restoreLinkByUrl(link.url)).toBe("That link isn't in your Trash any more.");
+    expect(restoreLinksFromTrash).not.toHaveBeenCalled();
+  });
+
+  test("restoreFolder brings a folder back under its own name", async () => {
+    vi.mocked(getTrash).mockResolvedValueOnce({ links: [], folders: [trashedFolder] });
+
+    expect(await restoreFolder("f1")).toEqual({ id: "f1", name: "Reading" });
+    expect(restoreFolderFromTrash).toHaveBeenCalledWith("u1", "f1", "Reading", null, null);
+  });
+
+  test("restoreFolder renames it when another folder took its name", async () => {
+    vi.mocked(getTrash).mockResolvedValueOnce({ links: [], folders: [trashedFolder] });
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f2", name: "reading" }]);
+
+    await restoreFolder("f1");
+
+    expect(restoreFolderFromTrash).toHaveBeenCalledWith("u1", "f1", "Reading (2)", null, null);
+  });
+
+  test("restoreFolder refuses a folder that isn't in the Trash, or one over the limit", async () => {
+    expect(await restoreFolder("f1")).toBe("That folder isn't in your Trash any more.");
+
+    vi.mocked(getTrash).mockResolvedValueOnce({ links: [], folders: [trashedFolder] });
+    vi.mocked(getFolders).mockResolvedValueOnce(Array.from({ length: MAX_FOLDERS }, (_, i) => ({ id: `x${i}`, name: `F${i}` })));
+    expect(await restoreFolder("f1")).toBe(TOO_MANY_FOLDERS);
+
+    expect(restoreFolderFromTrash).not.toHaveBeenCalled();
+  });
+
+  test("deleteForever and emptyTrash only reach the user's own Trash, with real ids", async () => {
+    await deleteForever([a, "x"], ["nope"]);
+    await emptyTrash();
+
+    expect(deleteForeverFromTrash).toHaveBeenCalledWith("u1", [a], []);
+    expect(emptyTrashNow).toHaveBeenCalledWith("u1");
+  });
+
+  test("setReadDates puts back each link's own read date, never a future one", async () => {
+    await setReadDates([
+      { id: a, readAt: "2026-10-01T12:00:00.000Z" },
+      { id: b, readAt: null },
+      { id: "nope", readAt: null },
+      { id: link.id, readAt: "2999-01-01T00:00:00.000Z" },
+    ]);
+
+    expect(updateLinksReadAt).toHaveBeenCalledWith("u1", [a], new Date("2026-10-01T12:00:00.000Z"));
+    expect(updateLinksReadAt).toHaveBeenCalledWith("u1", [b, link.id], null);
+  });
+
+  test("importing skips links that are in the Trash", async () => {
+    vi.mocked(getTrash).mockResolvedValueOnce({ links: [link], folders: [] });
+
+    expect(await importBookmarks([{ url: link.url, tags: [] }])).toEqual({ added: 0, skipped: 1 });
   });
 });
 
@@ -333,7 +453,7 @@ describe("createFolder", () => {
   test("creates a folder with a trimmed name", async () => {
     expect(await createFolder("  Work  ")).toEqual({ id: "f1", name: "Work" });
     // The first folder gets the first palette colour.
-    expect(insertFolder).toHaveBeenCalledWith("u1", "Work", "blue");
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Work", "blue", null);
   });
 
   test("refuses an empty name", async () => {
@@ -416,10 +536,117 @@ describe("renameFolder", () => {
 });
 
 describe("deleteFolder", () => {
-  test("deletes the folder", async () => {
+  test("puts the folder in the Trash; what's inside moves up one level", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([{ id: "f0", name: "Home" }, { id: "f1", name: "Work", parentId: "f0" }]);
+
     await deleteFolder("f1");
 
-    expect(deleteFolderById).toHaveBeenCalledWith("u1", "f1");
+    expect(trashFolder).toHaveBeenCalledWith("u1", "f1", "f0", []);
+  });
+
+  test("renames a folder moving up next to one with the same name", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([
+      { id: "f0", name: "Ideas" },
+      { id: "f1", name: "Work" },
+      { id: "f2", name: "Ideas", parentId: "f1" },
+      { id: "f3", name: "Clients", parentId: "f1" },
+    ]);
+
+    await deleteFolder("f1");
+
+    expect(trashFolder).toHaveBeenCalledWith("u1", "f1", null, [{ id: "f2", name: "Ideas (2)" }]);
+  });
+
+  test("does nothing for a folder that isn't the user's", async () => {
+    await deleteFolder("f1");
+
+    expect(trashFolder).not.toHaveBeenCalled();
+  });
+});
+
+describe("folders inside folders", () => {
+  const work = { id: "f1", name: "Work" };
+  const clients = { id: "f2", name: "Clients", parentId: "f1" };
+  const home = { id: "f3", name: "Home" };
+
+  test("creates a folder inside one of the user's folders", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([work]);
+
+    await createFolder("Clients", "f1");
+
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Clients", "green", "f1");
+  });
+
+  test("refuses a parent that isn't the user's", async () => {
+    expect(await createFolder("Clients", "someone-elses")).toBe("That folder doesn't exist any more.");
+    expect(insertFolder).not.toHaveBeenCalled();
+  });
+
+  test("names only have to be unique among neighbours", async () => {
+    vi.mocked(getFolders).mockResolvedValue([work, clients, home]);
+
+    expect(await createFolder("clients", "f1")).toBe('There\'s already a folder called "clients" in Work.');
+    expect(await createFolder("Clients", "f3")).toMatchObject({ name: "Clients" });
+    expect(await createFolder("Clients")).toMatchObject({ name: "Clients" });
+    expect(await renameFolder("f3", "work")).toBe('You already have a folder called "work".');
+    vi.mocked(getFolders).mockReset();
+    vi.mocked(getFolders).mockResolvedValue([]);
+  });
+
+  test("moves a folder into another, or to the top level", async () => {
+    vi.mocked(getFolders).mockResolvedValue([work, clients, home]);
+    vi.mocked(getFolderAncestors).mockResolvedValueOnce([]);
+
+    expect(await moveFolder("f1", "f3")).toBeNull();
+    expect(updateFolderParent).toHaveBeenCalledWith("u1", "f1", "f3");
+    expect(await moveFolder("f2", null)).toBeNull();
+    expect(updateFolderParent).toHaveBeenCalledWith("u1", "f2", null);
+    vi.mocked(getFolders).mockReset();
+    vi.mocked(getFolders).mockResolvedValue([]);
+  });
+
+  test("never puts a folder inside itself or a folder inside it (a loop)", async () => {
+    vi.mocked(getFolders).mockResolvedValue([work, clients, home]);
+    vi.mocked(getFolderAncestors).mockResolvedValueOnce(["f1"]);
+
+    expect(await moveFolder("f1", "f1")).toBe("A folder can't go inside itself.");
+    expect(await moveFolder("f1", "f2")).toBe("A folder can't go inside itself.");
+    expect(getFolderAncestors).toHaveBeenCalledWith("u1", "f2");
+    expect(updateFolderParent).not.toHaveBeenCalled();
+    vi.mocked(getFolders).mockReset();
+    vi.mocked(getFolders).mockResolvedValue([]);
+  });
+
+  test("refuses a move next to a folder with the same name, or into someone else's folder", async () => {
+    vi.mocked(getFolders).mockResolvedValue([work, clients, { id: "f4", name: "Clients" }]);
+
+    expect(await moveFolder("f4", "f1")).toBe('There\'s already a folder called "Clients" in Work.');
+    expect(await moveFolder("f4", "nope")).toBe("That folder doesn't exist any more.");
+    expect(updateFolderParent).not.toHaveBeenCalled();
+    vi.mocked(getFolders).mockReset();
+    vi.mocked(getFolders).mockResolvedValue([]);
+  });
+
+  test("restores a folder into its old parent, or the top level when that's gone", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([work]);
+    vi.mocked(getTrash).mockResolvedValueOnce({ links: [], folders: [{ ...clients, deletedAt: "2026-10-01T00:00:00.000Z" }] });
+    await restoreFolder("f2");
+    expect(restoreFolderFromTrash).toHaveBeenCalledWith("u1", "f2", "Clients", "f1", "f1");
+
+    vi.mocked(getTrash).mockResolvedValueOnce({ links: [], folders: [{ ...clients, deletedAt: "2026-10-01T00:00:00.000Z" }] });
+    await restoreFolder("f2");
+    expect(restoreFolderFromTrash).toHaveBeenCalledWith("u1", "f2", "Clients", null, "f1");
+  });
+
+  test("importing keeps nested folders: each level found or made inside the one above", async () => {
+    vi.mocked(getFolders).mockResolvedValueOnce([work]);
+    vi.mocked(insertFolder).mockImplementationOnce(async (_u, name, _c, parentId) => ({ id: "new", name, parentId: parentId ?? undefined }));
+
+    await importBookmarks([{ url: "https://example.com/brief", tags: [], folderPath: ["work", "Clients"] }]);
+
+    expect(insertFolder).toHaveBeenCalledTimes(1);
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Clients", "green", "f1");
+    expect(insertLinks).toHaveBeenCalledWith("u1", [expect.objectContaining({ folderId: "new" })]);
   });
 });
 
@@ -466,7 +693,7 @@ describe("importBookmarks", () => {
 
     expect(insertFolder).toHaveBeenCalledTimes(1);
     // The user already has one folder (Work), so Recipes gets the second colour.
-    expect(insertFolder).toHaveBeenCalledWith("u1", "Recipes", "green");
+    expect(insertFolder).toHaveBeenCalledWith("u1", "Recipes", "green", null);
     const saved = vi.mocked(insertLinks).mock.calls[0][1];
     expect(saved.map((l) => l.folderId)).toEqual(["f1", "f1", "w1"]);
   });

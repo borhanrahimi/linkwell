@@ -61,6 +61,32 @@ describe("toBookmarksHtml", () => {
     );
   });
 
+  test("nests folders inside folders, so a browser gets the same tree", () => {
+    const html = toBookmarksHtml(
+      [{ ...link, folderId: "f2" }],
+      [
+        { id: "f1", name: "Work" },
+        { id: "f2", name: "Clients", parentId: "f1" },
+      ]
+    );
+
+    expect(html).toMatch(/<DT><H3>Work<\/H3>\s*<DL><p>\s*<DT><H3>Clients<\/H3>\s*<DL><p>\s*<DT><A HREF="https:\/\/example.com\/a"/);
+    // Clients is written once, inside Work, not again at the top.
+    expect(html.match(/Clients/g)).toHaveLength(1);
+  });
+
+  test("an export reads back as the same tree", () => {
+    const html = toBookmarksHtml(
+      [{ ...link, folderId: "f2" }],
+      [
+        { id: "f1", name: "Work" },
+        { id: "f2", name: "Clients", parentId: "f1" },
+      ]
+    );
+
+    expect(parseBookmarksHtml(html)[0]).toMatchObject({ folder: "Clients", folderPath: ["Work", "Clients"] });
+  });
+
   test("keeps empty folders", () => {
     expect(toBookmarksHtml([], [{ id: "f1", name: "Empty" }])).toContain(
       "<DT><H3>Empty</H3>"
@@ -109,8 +135,35 @@ describe("parseBookmarksHtml", () => {
       title: "Soup & bread",
       tags: ["food", "soup"],
       folder: "Recipes",
+      folderPath: ["Recipes"],
       addDate: "2020-01-01T00:00:00.000Z",
     });
+  });
+
+  test("keeps the whole path of nested folders, skipping the browser's own", () => {
+    const html = `<DL><p>
+    <DT><H3 PERSONAL_TOOLBAR_FOLDER="true">Bookmarks bar</H3>
+    <DL><p>
+        <DT><H3>Work</H3>
+        <DL><p>
+            <DT><H3>Clients</H3>
+            <DL><p>
+                <DT><A HREF="https://example.com/brief">Brief</A>
+            </DL><p>
+        </DL><p>
+    </DL><p>
+</DL><p>`;
+
+    expect(parseBookmarksHtml(html)[0]).toMatchObject({ folder: "Clients", folderPath: ["Work", "Clients"] });
+  });
+
+  test("cleans a sent path: names trimmed and cut, at most 10 deep; older pages send one folder", () => {
+    const deep = Array.from({ length: 15 }, (_, i) => ` F${i} `);
+    expect(cleanBookmark({ url: "https://example.com", tags: [], folderPath: deep })?.folderPath).toEqual(
+      Array.from({ length: 10 }, (_, i) => `F${i}`)
+    );
+    expect(cleanBookmark({ url: "https://example.com", tags: [], folder: "Work" })?.folderPath).toEqual(["Work"]);
+    expect(cleanBookmark({ url: "https://example.com", tags: [], folderPath: [42, ""] as never })?.folderPath).toEqual([]);
   });
 
   test("links on the bookmarks bar or at the top get no folder", () => {
@@ -151,6 +204,7 @@ describe("parseBookmarksHtml", () => {
         title: "Example",
         tags: ["react"],
         folder: "Work",
+        folderPath: ["Work"],
         addDate: "2020-01-01T00:00:00.000Z",
       },
       {
@@ -158,6 +212,7 @@ describe("parseBookmarksHtml", () => {
         title: "B",
         tags: [],
         folder: undefined,
+        folderPath: [],
         addDate: "2020-01-01T00:00:00.000Z",
       },
     ]);
@@ -174,6 +229,7 @@ describe("cleanBookmark", () => {
       title: "A",
       tags: ["react", "docs"],
       folder: "Work",
+      folderPath: ["Work"],
       addDate: "2020-01-01T00:00:00.000Z",
     });
   });

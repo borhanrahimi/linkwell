@@ -27,6 +27,7 @@ Especially welcome: seeing or changing another person's links, folders or accoun
 - Every Server Action checks who is signed in, and only reads or changes that person's own rows.
 - Everything sent to the server is checked again there: only `http`/`https` links, and length limits on every field.
 - Expensive actions are rate limited, and each account has a maximum number of links and folders.
+- Deleted links and folders stay in the person's own Trash for 30 days, then they're deleted for good by the daily job. Deleting the account deletes everything at once, Trash included.
 - The link checker refuses private and internal addresses (SSRF protection).
 - A Content-Security-Policy with a fresh nonce for every page, and security headers on every response.
 - Secrets live only in Vercel and in a local `.env.local` that's never committed.

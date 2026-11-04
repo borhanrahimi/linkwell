@@ -1,4 +1,5 @@
 import { cleanDate, cleanTags, cleanText, FOLDER_NAME_MAX_LENGTH, getDomain, isWebAddress, TITLE_MAX_LENGTH, URL_MAX_LENGTH } from "@/lib/links";
+import { childFolders } from "@/lib/folders";
 import type { Folder, ImportedBookmark, Link } from "@/types/link";
 
 // Replaces the characters that mean something in HTML. Titles come from other
@@ -27,7 +28,8 @@ function bookmarkLine(link: Link, indent: string): string {
 
 // Builds a "Netscape bookmarks file": the old HTML format that Chrome, Safari,
 // Firefox and Raindrop all import and export. Folders become bookmark folders
-// (<H3> followed by their own <DL> list); links without a folder come last.
+// (<H3> followed by their own <DL> list), with the folders inside them nested
+// in that list, before their links; links without a folder come last.
 export function toBookmarksHtml(links: Link[], folders: Folder[]): string {
   const lines = [
     "<!DOCTYPE NETSCAPE-Bookmark-file-1>",
@@ -37,13 +39,22 @@ export function toBookmarksHtml(links: Link[], folders: Folder[]): string {
     "<DL><p>",
   ];
 
-  for (const folder of folders) {
-    lines.push(`    <DT><H3>${escapeHtml(folder.name)}</H3>`);
-    lines.push("    <DL><p>");
-    for (const link of links.filter((l) => l.folderId === folder.id)) {
-      lines.push(bookmarkLine(link, "        "));
+  const written = new Set<string>();
+  function writeFolder(folder: Folder, indent: string) {
+    if (written.has(folder.id)) return;
+    written.add(folder.id);
+    lines.push(`${indent}<DT><H3>${escapeHtml(folder.name)}</H3>`);
+    lines.push(`${indent}<DL><p>`);
+    for (const inside of childFolders(folders, folder.id)) {
+      writeFolder(inside, indent + "    ");
     }
-    lines.push("    </DL><p>");
+    for (const link of links.filter((l) => l.folderId === folder.id)) {
+      lines.push(bookmarkLine(link, indent + "    "));
+    }
+    lines.push(`${indent}</DL><p>`);
+  }
+  for (const folder of childFolders(folders, null)) {
+    writeFolder(folder, "    ");
   }
 
   const folderIds = new Set(folders.map((folder) => folder.id));
@@ -66,12 +77,23 @@ function isBuiltInFolder(heading: Element): boolean {
   );
 }
 
-// The folder a link is in: the <H3> right before the <DL> list around it.
-function folderOf(link: Element): string | undefined {
-  const list = link.closest("dl");
-  const heading = list?.previousElementSibling;
-  if (heading?.tagName !== "H3" || isBuiltInFolder(heading)) return undefined;
-  return heading.textContent?.trim() || undefined;
+// The most folders deep an imported link can be.
+export const FOLDER_DEPTH_MAX = 10;
+
+// The folders a link is in, outermost first: each <DL> list around it has
+// its folder's <H3> right before it. The browser's own folders are skipped.
+function folderPathOf(link: Element): string[] {
+  const path: string[] = [];
+  let list = link.closest("dl");
+  while (list) {
+    const heading = list.previousElementSibling;
+    if (heading?.tagName === "H3" && !isBuiltInFolder(heading)) {
+      const name = heading.textContent?.trim();
+      if (name) path.unshift(name);
+    }
+    list = list.parentElement?.closest("dl") ?? null;
+  }
+  return path;
 }
 
 // Reads a bookmarks file from Chrome, Safari, Firefox, Raindrop or Linkwell.
@@ -86,6 +108,7 @@ export function parseBookmarksHtml(html: string): ImportedBookmark[] {
     if (!isWebAddress(url)) continue;
 
     const seconds = Number(a.getAttribute("add_date"));
+    const path = folderPathOf(a);
     bookmarks.push({
       url,
       title: a.textContent?.trim() || undefined,
@@ -93,7 +116,8 @@ export function parseBookmarksHtml(html: string): ImportedBookmark[] {
         .split(",")
         .map((tag) => tag.trim())
         .filter(Boolean),
-      folder: folderOf(a),
+      folder: path.at(-1),
+      folderPath: path,
       addDate: seconds > 0 ? new Date(seconds * 1000).toISOString() : undefined,
     });
   }
@@ -104,6 +128,16 @@ export function parseBookmarksHtml(html: string): ImportedBookmark[] {
 // How many bookmarks the browser sends in one request. A big file goes in
 // several batches, so each request stays well under the 1 MB a Server Action accepts.
 export const IMPORT_BATCH_SIZE = 200;
+
+// The folder path, each name cleaned like any folder name, at most
+// FOLDER_DEPTH_MAX deep. Older pages only send `folder`: one level.
+function cleanFolderPath(input: ImportedBookmark): string[] {
+  const names = Array.isArray(input.folderPath) ? input.folderPath : [input.folder];
+  return names
+    .map((name) => cleanText(name, FOLDER_NAME_MAX_LENGTH))
+    .filter((name): name is string => Boolean(name))
+    .slice(0, FOLDER_DEPTH_MAX);
+}
 
 // Checks one bookmark the browser sent. Server Actions are public, so nothing
 // here is trusted: wrong types, huge texts, odd links and future dates are
@@ -120,6 +154,7 @@ export function cleanBookmark(
     title: cleanText(input.title, TITLE_MAX_LENGTH),
     tags: cleanTags(input.tags),
     folder: cleanText(input.folder, FOLDER_NAME_MAX_LENGTH),
+    folderPath: cleanFolderPath(input),
     addDate: cleanDate(input.addDate, now),
   };
 }

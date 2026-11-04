@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import NextLink from "next/link";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
+// Imported, not linked by address: Next.js puts a fingerprint of each file in
+// its address, so new screenshots show at once instead of an old cached copy.
+import appDark from "@/public/screenshots/app-dark.png";
+import appLight from "@/public/screenshots/app-light.png";
+import phoneDark from "@/public/screenshots/phone-dark.png";
+import phoneLight from "@/public/screenshots/phone-light.png";
 import Footer from "@/components/Footer";
 import LogoMark from "@/components/LogoMark";
 import SignInButton from "@/components/SignInButton";
@@ -10,13 +16,13 @@ import Stargazer from "@/components/illustrations/Stargazer";
 import Wave from "@/components/illustrations/Wave";
 
 // What a visitor who isn't signed in sees: what Linkwell is, its three
-// promises, how saving works, and a few honest answers. A Server Component:
+// promises, what makes it calm, how saving works, and a few honest answers. A Server Component:
 // only the sign-in buttons need JavaScript.
 
 const PROMISES: { title: string; text: string; drawing: ReactNode }[] = [
   {
     title: "Save links",
-    text: "Paste a link, or send it from your browser or phone. Add tags, a folder and a note about why you saved it.",
+    text: "Paste a link, or send it from your browser or phone. Add tags, a note about why you saved it, and a folder (folders can hold folders, too).",
     drawing: <EmptyBox className="mx-auto w-48" />,
   },
   {
@@ -26,8 +32,24 @@ const PROMISES: { title: string; text: string; drawing: ReactNode }[] = [
   },
   {
     title: "Actually come back to them",
-    text: "Mark links as read, and Rediscover brings back the ones you saved weeks ago and forgot.",
+    text: "Home shows what's unread and what you saved lately, and Rediscover brings back the ones you saved weeks ago and forgot.",
     drawing: <Stargazer className="mx-auto w-48" />,
+  },
+];
+
+// What makes it calm to use, day to day.
+const CALM: { title: string; text: string }[] = [
+  {
+    title: "A Home that shows a little of everything",
+    text: "Open Linkwell to a greeting, what's waiting to be read, what you saved lately and your folders, instead of one endless list.",
+  },
+  {
+    title: "Folders inside folders",
+    text: "Work can hold Clients and Ideas, as deep as you like. Your browser's bookmark folders come in just as they were.",
+  },
+  {
+    title: "Nothing lost by one wrong tap",
+    text: "Deleted links and folders wait in the Trash for 30 days, and every delete, move or change can be undone right away.",
   },
 ];
 
@@ -46,6 +68,11 @@ const QUESTIONS: { question: string; answer: string }[] = [
   {
     question: "Who can see my links?",
     answer: "Only you. Your links and folders belong to your account, and every request is checked so nobody else can read or change them.",
+  },
+  {
+    question: "What if I delete something by mistake?",
+    answer:
+      "Tap Undo in the message that appears, or find it in the Trash, where deleted links and folders stay for 30 days. Deleting a folder never deletes the links in it.",
   },
   {
     question: "Can I take my links with me?",
@@ -123,19 +150,21 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
           <div className="relative mx-auto max-w-4xl md:pr-16">
             <figure className="hidden overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/10 md:block">
               <ThemeScreenshot
-                name="app"
+                light={appLight}
+                dark={appDark}
                 width={2560}
                 height={1600}
-                alt="Linkwell on a computer: a sidebar with lists, folders and tags, a Rediscover banner bringing back an old link, and the saved links as cards."
+                alt="Linkwell on a computer: Home, with a greeting, a Rediscover banner bringing back an old link, unread links as cards, and recently saved links next to your folders."
                 sizes="(min-width: 896px) 832px, 100vw"
               />
             </figure>
             <figure className="mx-auto w-60 overflow-hidden rounded-[1.75rem] border-4 border-ink/80 shadow-2xl shadow-black/20 md:absolute md:-bottom-10 md:right-0 md:w-44">
               <ThemeScreenshot
-                name="phone"
+                light={phoneLight}
+                dark={phoneDark}
                 width={780}
                 height={1688}
-                alt="Linkwell on a phone: the links come first, with the lists behind a menu button."
+                alt="Linkwell on a phone: Home, with a floating tab bar for Home, Folders, saving a link, Unread and your account."
                 sizes="(min-width: 768px) 176px, 240px"
               />
             </figure>
@@ -153,6 +182,20 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
                 {promise.drawing}
                 <h3 className="mt-4 text-lg font-semibold text-ink">{promise.title}</h3>
                 <p className="mt-1 text-muted">{promise.text}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section aria-labelledby="calm-heading" className="mt-20">
+          <h2 id="calm-heading" className="text-center text-2xl font-semibold text-ink">
+            Calm by design
+          </h2>
+          <ul className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {CALM.map((item) => (
+              <li key={item.title} className="glass rounded-2xl p-5">
+                <h3 className="font-semibold text-ink">{item.title}</h3>
+                <p className="mt-1 text-sm text-muted">{item.text}</p>
               </li>
             ))}
           </ul>
@@ -205,11 +248,11 @@ export default function Landing({ deleted = false }: { deleted?: boolean }) {
 
 // A screenshot of the app in light and dark mode: both are in the page, and
 // CSS shows the one matching the visitor's mode (the hidden one isn't loaded).
-function ThemeScreenshot({ name, alt, ...props }: { name: string; width: number; height: number; alt: string; sizes: string }) {
+function ThemeScreenshot({ light, dark, alt, ...props }: { light: StaticImageData; dark: StaticImageData; width: number; height: number; alt: string; sizes: string }) {
   return (
     <>
-      <Image {...props} alt={alt} src={`/screenshots/${name}-light.png`} className="block h-auto w-full dark:hidden" />
-      <Image {...props} alt={alt} src={`/screenshots/${name}-dark.png`} className="hidden h-auto w-full dark:block" />
+      <Image {...props} alt={alt} src={light} className="block h-auto w-full dark:hidden" />
+      <Image {...props} alt={alt} src={dark} className="hidden h-auto w-full dark:block" />
     </>
   );
 }

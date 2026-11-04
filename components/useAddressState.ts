@@ -2,7 +2,8 @@ import { useSyncExternalStore } from "react";
 import type { SmartList } from "@/lib/links";
 import type { LinkView } from "@/components/useLinkView";
 
-// What the list shows lives in the page's address: /?list=unread,
+// What the list shows lives in the page's address: / is Home, /?list=all,
+// /?list=unread,
 // /?folder=<id>&tag=react, /?view=list. So the back button steps back through
 // what you looked at, a refresh keeps your place, and a list can be bookmarked.
 // Search isn't in it: it changes with every key you type.
@@ -14,7 +15,7 @@ export type AddressState = {
   view: LinkView | null;
 };
 
-const LISTS: SmartList[] = ["all", "unread", "broken"];
+const LISTS: SmartList[] = ["home", "all", "unread", "broken", "unsorted", "trash"];
 const listeners = new Set<() => void>();
 
 // Anything odd in the address (a typo, an old link) falls back to the default.
@@ -23,7 +24,7 @@ export function readAddress(search: string): AddressState {
   const list = params.get("list") as SmartList | null;
   const view = params.get("view");
   return {
-    list: list && LISTS.includes(list) ? list : "all",
+    list: list && LISTS.includes(list) ? list : "home",
     folder: params.get("folder") || null,
     tag: params.get("tag") || null,
     view: view === "list" || view === "cards" ? view : null,
@@ -51,7 +52,7 @@ export function useAddressState(serverSearch = ""): [AddressState, (changes: Par
   function update(changes: Partial<AddressState>, { replace = false } = {}) {
     const next = { ...readAddress(window.location.search), ...changes };
     const params = new URLSearchParams();
-    if (next.list !== "all") params.set("list", next.list);
+    if (next.list !== "home") params.set("list", next.list);
     if (next.folder) params.set("folder", next.folder);
     if (next.tag) params.set("tag", next.tag);
     if (next.view) params.set("view", next.view);

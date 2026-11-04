@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { GET } from "@/app/api/cron/check-links/route";
-import { getLinksToCheck, getLinksWithoutImage, updateLinkImage, updateLinkStatus } from "@/lib/data";
+import { deleteOldTrash, getLinksToCheck, getLinksWithoutImage, updateLinkImage, updateLinkStatus } from "@/lib/data";
 import { fetchPageInfo } from "@/lib/fetchTitle";
 import { checkLink } from "@/lib/checkLink";
 
@@ -10,6 +10,7 @@ vi.mock("@/lib/data", () => ({
   deleteOldRateLimits: vi.fn(async () => {}),
   getLinksWithoutImage: vi.fn(async () => []),
   updateLinkImage: vi.fn(async () => {}),
+  deleteOldTrash: vi.fn(async () => 0),
 }));
 
 vi.mock("@/lib/fetchTitle", () => ({
@@ -62,7 +63,7 @@ describe("GET /api/cron/check-links", () => {
     const response = await callWith("Bearer s3cret");
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ checked: 2, broken: 1, imagesLookedFor: 0 });
+    expect(await response.json()).toEqual({ checked: 2, broken: 1, imagesLookedFor: 0, trashEmptied: 0 });
     expect(updateLinkStatus).toHaveBeenCalledWith("u1", "1", "ok");
     expect(updateLinkStatus).toHaveBeenCalledWith("u2", "2", "broken");
   });
@@ -82,5 +83,16 @@ describe("GET /api/cron/check-links", () => {
     expect(updateLinkImage).toHaveBeenCalledWith("u1", "1", "https://pictured.example/card.png");
     expect(updateLinkImage).toHaveBeenCalledWith("u2", "2", "");
     expect(await response.json()).toMatchObject({ imagesLookedFor: 2 });
+  });
+
+  test("deletes what has been in the Trash for more than 30 days, for good", async () => {
+    vi.useFakeTimers({ now: new Date("2026-11-03T06:00:00.000Z"), toFake: ["Date"] });
+    vi.mocked(deleteOldTrash).mockResolvedValueOnce(3);
+
+    const response = await callWith("Bearer s3cret");
+
+    expect(deleteOldTrash).toHaveBeenCalledWith(new Date("2026-10-04T06:00:00.000Z"));
+    expect(await response.json()).toMatchObject({ trashEmptied: 3 });
+    vi.useRealTimers();
   });
 });

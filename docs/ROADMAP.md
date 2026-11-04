@@ -10,9 +10,19 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ---
 
-## 📌 Next time (written 2026-10-21)
+## 📌 Next time (updated 2026-11-03)
 
-Where we stopped: v2.0 "Runs on its own" is mostly done (checks, Dependabot, `main` protected, health check, uptime monitor, backups). Pick up here:
+**Where we are:** v2.1 Trash and Undo, v2.2 Folders inside folders and v2.3 A real Home screen are built and committed on the branch **`trash-and-folder-tree`** (not on `main` yet, so the live site hasn't changed). Next on the roadmap: v2.4 Drag and drop.
+
+**To ship them (when everything on the branch is done):**
+- [x] Migrations `0014` and `0015` on dev and test
+- [x] Migration `0016` (pinned folders) on dev and test; `npm run e2e` passes (40 tests)
+- [x] `npm run screenshots`: the landing page and README show the new Home
+- [ ] Push the branch and open a pull request (a draft is fine, to show the work in progress)
+- [ ] Right before merging: `npm run backup`, then migrations `0014`, `0015` and `0016` on production (`MAINTENANCE.md` → Database changes)
+- [ ] Merge with a normal merge (not "Squash and merge", so every commit keeps its own day on the contribution graph)
+
+**Still open from 2026-10-21:** v2.0 "Runs on its own" is mostly done (checks, Dependabot, `main` protected, health check, uptime monitor, backups). Pick up here:
 
 **You (with Claude walking you through it):**
 - [ ] Neon's restore window: Neon → production project → **Settings** → "Instant restore" / "History retention". Tell Claude the number, for `MAINTENANCE.md`
@@ -375,8 +385,9 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 | v2.3 A real Home screen 🏡 | Its folder tiles and tabs build on the folder tree |
 | v2.4 Drag and drop ✋ | Moving links and folders by hand, once there's a tree to drag into |
 | v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
+| v2.6 A private vault 🔐 | Links only you can read, not even the developer. Last, because it changes what the server can do for you (see its trade-offs), and it's easiest once everything else is settled |
 
-## 🔜 v2.1: Trash and Undo 🗑️ (planned)
+## 🔜 v2.1: Trash and Undo 🗑️ (built 2026-11-03; production migration left)
 
 Today a deleted link or folder is gone for good, and a wrong tap in Select mode can move 50 links at once. Make every change easy to take back.
 
@@ -384,35 +395,51 @@ Today a deleted link or folder is gone for good, and a wrong tap in Select mode 
 ┌─────────────────────────────────────────────┐
 │ 3 links moved to Reading            [Undo] │  ← a small message for a few seconds
 └─────────────────────────────────────────────┘
-SIDEBAR: … Broken 2 · 🗑️ Trash 4
+SIDEBAR: … Broken 2 · Trash 4
 TRASH:   "Deleted things stay here for 30 days"   [Empty trash]
-         ┌ link ┐ Deleted 3 days ago   [Restore] [Delete forever]
+         ┌ link ┐ Deleted 3 days ago · 27 days left   [Restore] [Delete forever]
 ```
 
+Choices made while finishing the plan (2026-11-03):
+- **What goes in the Trash:** links and folders. Deleting a folder does **not** put its links in the Trash: they move to "not in a folder", and Restore puts them back. Deleting a link inside a folder leaves the folder alone
+- **How Restore knows where things were:** a link that leaves a deleted folder remembers it in `came_from_folder_id`. Restore moves back only the links that still have it, so a link you moved somewhere else in the meantime stays where you put it. Moving a link by hand clears it
+- **Restoring when something has changed:** a link whose folder is in the Trash, or gone, comes back with no folder. A folder whose name is now taken comes back as "Reading (2)". Restore is refused at the 10,000-link or 200-folder limit, with the usual message
+- **How long Undo stays:** 6 seconds, one message at a time; a new action replaces the old message, and its Undo goes with it
+- **What Undo puts back:** exactly what was there before, per link (each link's old folder, each link's old read date), not a guess
+
 **Step 1: the database**
-- [ ] A `deleted_at` column on `links` and `folders` (`null` = not deleted). Migration `0014`
-- [ ] Every list, count, search, Rediscover and the daily link check skip deleted things; the 10,000-link and 200-folder limits don't count them
-- [ ] Deleting a folder remembers which links were in it, so Restore can put them back
+- [x] A `deleted_at` column on `links` and `folders` (`null` = not deleted), and `came_from_folder_id` on `links` (points to `folders`, `on delete set null`). Migration `0014`
+- [x] Migration `0014` run on dev and test (2026-11-03)
+- [ ] **You:** run it on production right before merging (`npm run backup` first; the command is in `MAINTENANCE.md` → Database changes)
+- [x] `getLinks` and `getFolders` (`lib/data.ts`) return only things that aren't deleted, so every list, count, search and Rediscover in the browser skips the Trash without more changes; a new `getTrash` returns the rest
+- [x] The daily job (`app/api/cron/check-links/route.ts`) doesn't check deleted links or look for their pictures
+- [x] The 10,000-link and 200-folder limits (`lib/limits.ts`) don't count the Trash
+- [x] Every update in `lib/data.ts` only touches things that aren't deleted; saving or moving into a deleted folder saves with no folder, like any folder that isn't yours
 
 **Step 2: the Trash**
-- [ ] **Trash** in the sidebar (and under You on phones), with how many days each item has left
-- [ ] **Restore**, **Delete forever**, and **Empty trash** (asks first)
-- [ ] The daily job deletes anything that has been in the Trash for more than 30 days
-- [ ] Saving a link that's in the Trash offers to restore it instead of making a copy
+- [x] **Trash** in the sidebar (and so in the phone's Lists drawer) with its count, at `/?list=trash`; each item says when it was deleted and how many days it has left (`components/TrashView.tsx`)
+- [x] **Restore** and **Delete forever** on each item; **Empty trash** asks first. (Select mode in the Trash was left out: Empty trash covers clearing many at once)
+- [x] An empty Trash shows a small drawing (`EmptyTrash`: the character lifting the lid of an empty bin): "Nothing in the Trash"
+- [x] The daily job deletes anything that has been in the Trash for more than 30 days, and says how many in its answer (`trashEmptied`)
+- [x] Saving a link that's in the Trash (from the app, or the save page that the bookmarklet, phones and the extension open) says "This link is in your Trash" with **Restore it** instead of making a copy; importing skips it like any other duplicate
 
 **Step 3: Undo**
-- [ ] A small message with **Undo** after deleting, moving, marking read or unread, and Select mode's actions on many links (gone after a few seconds, or when you do the next thing)
-- [ ] Screen readers hear the message (`role="status"`); it waits while a mouse is over it or it has focus
+- [x] A small message with **Undo** (`components/UndoToast.tsx`) after deleting (a link, a folder, or many links in Select mode, which now has **Delete**), moving, and marking read or unread. Gone after 6 seconds, or when you do the next thing
+- [x] Undo after a delete is the same as Restore; after a move or read change it sends back each link's old value (`setReadDates` for read dates). The server only accepts your own links and folders, and read dates that aren't in the future
+- [x] Delete no longer asks "Are you sure?" for links or folders: Undo and the Trash make that safe. Empty trash, Delete forever and deleting your account still ask
+- [x] Screen readers hear the message (`role="status"`); it waits while a mouse is over it or it has focus; on phones it sits above the bottom bar
 
 **Step 4: the rest**
-- [ ] The export leaves the Trash out; backup and restore keep it
-- [ ] Deleting your account still deletes everything at once, Trash included
-- [ ] The demo (`lib/demo.ts`) gets the Trash and Undo too
-- [ ] Tests: deleted things are hidden everywhere, restore brings links back into their folder, the 30-day clean-up, Undo for each action
+- [x] The export (`/api/export`) leaves the Trash out; backup and restore (`scripts/backup-lib.mjs`) keep it, with the new columns in the column list
+- [x] Deleting your account still deletes everything at once, Trash included (the database's `on delete cascade` does it, as before)
+- [x] The demo (`lib/demo.ts`) gets the Trash and Undo too, in memory
+- [x] The privacy page says deleted links stay in the Trash for 30 days before they're gone for good
+- [x] Unit tests: deleted things are hidden (the daily check, imports, saving), restore and its name clashes and limits, the 30-day clean-up, Undo for each action, the message's timer
+- [x] A browser test for delete → Undo → Trash → Restore (`e2e/linkwell.spec.ts`)
 
 **You'll learn:** soft deletes (`deleted_at` instead of `DELETE`), undo patterns, toast messages that work for everyone, and scheduled clean-up jobs.
 
-## 🔜 v2.2: Folders inside folders 📁 (planned)
+## 🔜 v2.2: Folders inside folders 📁 (built 2026-11-03; production migration left)
 
 One level of folders isn't enough once you have many links: "Work" wants "Clients" and "Ideas" inside it. Folders can now hold other folders, as deep as you like.
 
@@ -429,34 +456,51 @@ FOLDERS                      Folders › Work                  ✏️  [+ Add li
 
 Decided (2026-10-26): **no depth limit**, and deleting a folder **moves its subfolders and links up one level**, so nothing is lost.
 
+Choices made while finishing the plan (2026-11-03):
+- **Where a link lives:** in one folder only. Opening Work shows Work's own links; **Also show the links in these folders** (a tick box under the tiles) adds the ones in its subfolders. The sidebar count always includes subfolders
+- **Order:** folders keep the order they were made in, within each level (your own order comes with dragging in v2.4)
+- **Restore after a delete:** the same idea as v2.1. Subfolders that moved up remember the deleted folder in `came_from_folder_id` on `folders`, and Restore moves back only the ones still where the delete left them. If the deleted folder's own parent is gone, it comes back at the top level
+- **Name clashes when moving up:** a subfolder moving up next to a folder with the same name becomes "Ideas (2)"
+- **The loop check:** done by the database: `WITH RECURSIVE` follows `parent_id` up from the new parent in one query (`getFolderAncestors`). The browser only hides the impossible choices from the menu
+
 **Step 1: the database**
-- [ ] A `parent_id` column on `folders` that points to another folder (a foreign key to its own table); `null` = a top-level folder. Migration `0015`
-- [ ] Folder names are unique (ignoring case) **within the same parent**, so "Ideas" can live under both Work and Home
-- [ ] The server checks that the parent is one of your own folders, and that a folder never goes inside itself or one of its own subfolders (a loop). The 200-folder limit still counts every folder
+- [x] A `parent_id` column on `folders` that points to another folder (a foreign key to its own table, `on delete set null`); `null` = a top-level folder. Also `came_from_folder_id` (see above). Migration `0015`; every folder today becomes top level, so nothing changes for anyone at first
+- [x] Migration `0015` run on dev and test (2026-11-03)
+- [ ] **You:** run it on production together with `0014`
+- [x] Folder names are unique (ignoring case) **within the same parent**, so "Ideas" can live under both Work and Home. `createFolder`, `renameFolder` and `moveFolder` all check it
+- [x] The server checks that the parent is one of your own folders (and not in the Trash), and that a folder never goes inside itself or one of its own subfolders (a loop). The 200-folder limit still counts every folder
+- [x] The `Folder` type (`types/link.ts`) gets `parentId`; small tree helpers in `lib/folders.ts` (`childFolders`, `folderPath`, `folderAndInside`, `flattenTree`, `countWithInside`), with tests
 
 **Step 2: seeing the tree**
-- [ ] The sidebar's folders become a tree with ▸/▾ arrows; which folders are open is remembered per device. Deep levels stop indenting after a few steps so the sidebar fits on phones
-- [ ] A breadcrumb trail in the heading (Folders › Work › Clients), each part clickable; on phones the middle collapses (Folders › … › Clients)
-- [ ] An open folder shows its subfolders as tiles first, then its own links
-- [ ] A folder's count includes the links in its subfolders
+- [x] The sidebar's folders become a tree with ▸/▾ arrows; which folders are open is remembered per device (`useOpenFolders`, `localStorage`). Opening a folder also opens its parents. Deep levels stop indenting after 4 steps so the sidebar fits on phones
+- [x] The keyboard works the tree: ↑/↓ move, → opens (or goes in), ← closes (or goes to the parent). Folder buttons stay buttons, with `aria-expanded` so screen readers hear whether a folder is open (see `docs/DECISIONS.md`)
+- [x] A folder path above the heading (Work › Clients), each part clickable; on phones the middle collapses (Work › … › Clients)
+- [x] An open folder shows its subfolders as tiles first, then its own links; the address stays `/?folder=<id>`
+- [x] A folder's count includes the links in its subfolders
+- [x] The phone's Lists drawer shows the same tree
 
 **Step 3: making and moving**
-- [ ] **New folder inside** in the Edit folder panel and in the empty folder's drawing
-- [ ] **Move folder to…** (another folder, or Top level), with the same loop check
-- [ ] Deleting a folder with subfolders asks first ("Its 3 folders and 11 links move up into Work"), then moves everything up one level in one database update. The folder goes to the Trash, and Restore (or Undo) moves its subfolders and links back into it
+- [x] **New folder inside** in the Edit folder panel
+- [x] **Move folder to** (another folder, or Top level) in the Edit folder panel: the folder itself and everything under it aren't offered, and the server does the loop check. Shows the **Undo** message from v2.1
+- [x] Deleting a folder with subfolders asks first ("Its 3 folders and 11 links move up into Work"), then moves everything up one level in one database batch. The folder goes to the Trash, and Restore (or Undo) moves its subfolders and links back into it
+- [x] Deleting a folder with no subfolders works as in v2.1: no question, just Undo
 
 **Step 4: every folder menu shows the tree**
-- [ ] Indented folders in the save page's and top bar's Folder menu, Details, **Move to…** and the Add links picker; **New folder…** there can create inside the chosen folder
+- [x] Indented folders in the save page's and top bar's Folder menu (`FolderPicker`), Details and Select mode's **Move to…**. (**New folder…** in those menus still makes a top-level folder; folders inside are made from the Edit folder panel)
+- [x] The browser extension opens the save page, so it gets the indented menu too
+- [x] The last folder you saved into is still remembered, even if it's deep in the tree
 
 **Step 5: import, export, backup and demo**
-- [ ] Importing bookmarks keeps the browser's nested folders (today `folderOf` in `lib/bookmarks.ts` only takes the nearest one, so they come in flat)
-- [ ] The export writes nested folders; backup and restore carry `parent_id` (parents restored before their children)
-- [ ] The demo (`lib/demo.ts`) does all of the above in memory
-- [ ] Tests: loops refused, delete moves things up and Restore moves them back, nested import and export round-trip, the tree in the browser tests
+- [x] Importing bookmarks keeps the browser's nested folders: each bookmark carries its folder path (`folderPath: ["Work", "Clients"]`), and the import finds or creates each level. Older pages that send one `folder` still work. A path is at most 10 levels and each name is cleaned like any folder name
+- [x] The export writes nested folders (`<DL>` inside `<DL>`), so importing it into a browser, or back into Linkwell, gives the same tree
+- [x] Backup and restore carry `parent_id` and `came_from_folder_id`; a restore puts every folder in first, then links them up, so the order in the file doesn't matter
+- [x] The demo (`lib/demo.ts`) does all of the above in memory, with "Design" inside "Reading" so the tree shows
+- [x] Unit tests: loops refused, names unique per parent, delete moves things up (and renames clashes) and Restore moves them back, nested import and export round-trip, the tree with the keyboard
+- [x] A browser test for making a folder inside another and deleting it (`e2e/linkwell.spec.ts`). The contrast test doesn't cover the tiles and the Trash yet
 
 **You'll learn:** a foreign key to its own table, trees and recursion (building the tree in the browser from the flat list we already load), preventing loops, and `WITH RECURSIVE` in SQL.
 
-## 🔜 v2.3: A real Home screen 🏡 (planned)
+## 🔜 v2.3: A real Home screen 🏡 (built 2026-11-03; production migration left)
 
 The first screen is one long list today, so nothing feels organised. A **Home** view becomes the first screen, with short sections that each show a few things and a **See all**. On phones, a new floating tab bar to move around.
 
@@ -476,12 +520,12 @@ RECENTLY SAVED                                See all →
 ⚠️ 2 broken links · 📥 9 links not in a folder → Sort them
 ```
 
-- [ ] Home as the first screen (`/`), at the top of the sidebar; All links one click away (`/?list=all`)
-- [ ] Rediscover, Unread and Recently saved as short sections; empty ones hide themselves
-- [ ] **Your folders**: top-level folders as tiles with a collage of their links' preview pictures, colour, icon and count
-- [ ] **Pin** a folder to show it first on Home
-- [ ] **Not in a folder**: a gentle nudge that opens a "Sort them" flow (Select mode and Move to…)
-- [ ] A greeting by time of day, and a drawing when Home is completely empty
+- [x] Home as the first screen (`/`, `components/HomeView.tsx`), at the top of the sidebar; All links one click away (`/?list=all`). Choosing a tag from Home shows every link with that tag
+- [x] Rediscover (now only on Home), Unread (8, sideways on phones) and Recently saved (5) as short sections, each with **See all**; empty ones hide themselves
+- [x] **Your folders**: top-level folders as tiles with a collage of up to 4 preview pictures (from the folders inside too), or their icon on their colour, and the count
+- [x] **Pin to Home** in the Edit folder panel (top-level folders) shows it first: a `pinned_at` column, migration `0016`
+- [x] **Not in a folder**: a gentle nudge whose **Sort them** opens those links (`/?list=unsorted`) in Select mode, ready for Move to…; and a nudge for broken links
+- [x] A greeting by the time of day on your own clock (the server says "Welcome back"), and the empty-box drawing when there's nothing yet
 
 **Step 2: the phone tab bar**
 
@@ -492,13 +536,24 @@ RECENTLY SAVED                                See all →
            ╰─ the pill glides to the tab you tap
 ```
 
-- [ ] New tabs: **Home · Folders · + · Unread · You** (Folders opens the folder tree as a full screen; You opens the account page)
-- [ ] A **floating, frosted-glass bar**: rounded, lifted off the bottom edge with a soft shadow, the page blurred behind it (`backdrop-filter`), and a solid fallback where blur isn't supported. Readable in light and dark mode, and it keeps clear of the iPhone's home line (`env(safe-area-inset-bottom)`)
-- [ ] A **sliding highlight**: a soft pill behind the active tab glides to the next one when you tap it
-- [ ] Icons react: a small bounce on tap, and the outline drawing turns filled while the tab is active
-- [ ] The bar slides away while you scroll down to read and comes back when you scroll up a little
-- [ ] The screen slides sideways when you tap a tab (the View Transitions API). No swiping between tabs: it fights the iPhone's own swipe-back gesture and is easy to trigger while scrolling
-- [ ] All the motion is off for people who turn animations off (`prefers-reduced-motion`); the contrast and browser tests cover Home and the new bar
+- [x] New tabs: **Home · Folders · + · Unread · You** (Folders opens the sidebar, folder tree, lists and tags, as a full screen; You opens the account page, or signing in on the demo)
+- [x] A **floating, frosted-glass bar**: rounded, lifted off the bottom edge with a soft shadow, the page blurred behind it (`backdrop-filter`), and a solid fallback where blur isn't supported. Readable in light and dark mode, and it keeps clear of the iPhone's home line (`env(safe-area-inset-bottom)`)
+- [x] A **sliding highlight**: a soft pill behind the active tab glides to the next one when you tap it
+- [x] Icons react: a small bounce on tap, and the outline drawing turns filled while the tab is active
+- [x] The bar slides away while you scroll down to read and comes back when you scroll up a little
+- [x] The screen slides sideways when you tap a tab (the View Transitions API). No swiping between tabs: it fights the iPhone's own swipe-back gesture and is easy to trigger while scrolling
+- [x] All the motion is off for people who turn animations off (`prefers-reduced-motion`)
+- [x] Unit tests for Home, pinning, Sort them and the bar (hiding on scroll, You)
+
+**Polish after a first look (2026-11-03)**
+- [x] Home: the date, the greeting and a one-line summary ("7 unread · 4 saved this week") with the broken and unsorted nudges right under it; Unread is one row on wide screens; Recently saved and Your folders side by side; sites without a picture get their icon on a colour of their own instead of a grey box
+- [x] Sidebar: every list has an icon like the folders; counts of 0 are hidden; Check links is a quiet row; the Trash sits apart at the bottom; a folder's ▸ arrow hangs in the margin, so all icons line up
+- [x] Select mode: with nothing ticked, only the hint, **Select all** and Done (no greyed-out buttons squeezed together); the actions appear once something is ticked
+- [x] Phones: the top bar is just the logo and your picture (Sign out moved to the account page); a smaller greeting; smaller Unread cards so the next one peeks in; folders as a compact row before Recently saved
+- [x] The landing page imports its screenshots, so Next.js gives each version its own address and new pictures show at once (same-named files were served from an old cached copy); `npm run screenshots` gives the sample links the demo's pictures and the folders their icons, so the pictures look like real use
+- [x] Dark mode: the active tab's label is ink, not blue (blue on the blue pill measured 4.43:1, under the 4.5:1 needed)
+- [x] Migration `0016` on dev and test; the contrast and browser tests cover Home, the bar and the Folders screen
+- [ ] **You:** migration `0016` on production before merging
 
 **You'll learn:** designing from what the user needs first, sideways scrolling sections, combining several views of the same data on one screen, frosted glass with `backdrop-filter`, animating with CSS transforms, and page transitions.
 
@@ -513,7 +568,7 @@ With a folder tree, people want to pick things up and put them where they belong
 
 **Step 2: dragging folders**
 - [ ] Drag a folder onto another folder to put it inside, or between folders to change the order; the loop check from v2.2 still applies
-- [ ] A `position` column on `folders` keeps your own order (migration `0016`), with "My order" or "A to Z" for the sidebar
+- [ ] A `position` column on `folders` keeps your own order (migration `0017`; `0016` is v2.3's pinned folders), with "My order" or "A to Z" for the sidebar
 
 **Step 3: phones, keyboards and screen readers**
 - [ ] On phones: press and hold to pick something up, with a small buzz where phones support it (`navigator.vibrate`); the page scrolls when you drag near the edge
@@ -549,6 +604,48 @@ Today the page loads **every** link and folder into the browser and counts and s
 - [ ] The demo keeps working in memory
 
 **You'll learn:** measuring before optimising, database indexes, `EXPLAIN` in SQL, pagination, infinite scrolling, and full-text search.
+
+## 🔜 v2.6: A private vault 🔐 (planned 2026-11-03)
+
+Today your links are private from other users (every query checks who you are), but they're stored as plain text: whoever can open the database (the developer, Neon, or someone who steals a backup) could read them. A vault changes that. Links are locked in your browser before they're sent, and only your **vault password** unlocks them. The server only ever stores scrambled data, like Bitwarden or 1Password. This is called **end-to-end encryption**, or a **zero-knowledge** design.
+
+```
+YOUR BROWSER                                   LINKWELL'S SERVER
+vault password ──► key (never leaves) ──┐
+link "https://…", title, note, tags ────┴► 🔒 locked text ──► stored as it is
+                                                              (can't read it)
+```
+
+**How it works**
+- Sign-in stays with Google (who you are), plus a **vault password** (what unlocks your links). Linkwell has no password of its own today, so the vault needs one. It never leaves the browser
+- The browser turns the vault password into a key (a slow key-derivation function such as PBKDF2 or Argon2id, with a salt per user), and locks each link with AES-GCM through the browser's own Web Crypto API. No home-made crypto
+- What's locked: the address, title, note, tags, the picture's address and folder names. What stays readable, because the app needs it: ids, dates, read/unread, which folder a link is in, and the counts
+- Unlocking once per visit; the key stays in memory only, so closing the tab locks it again. An optional "remember on this device" can come later
+
+**The honest trade-offs (decide before building)**
+- **Forget the vault password = links gone.** Nobody can reset it, not even the developer; that's the whole point. So: a **recovery key** to print or save when the vault is set up, and a clear warning
+- **The server can't read your links any more**, so everything it does with them has to move to the browser or become optional:
+  - fetching titles and preview pictures when you save
+  - the daily broken-link check and the archived copy
+  - server search (v2.5 Step 4), and server-side counts by folder name
+  - the export, Rediscover and the weekly email idea
+  - Probably: the browser fetches titles itself where it can, the daily check becomes a "Check my links" button while the vault is unlocked, and search stays in the browser
+- **Social features (the long-term vision) need sharing keys**: a shared folder would get its own key, given to the people who may read it. That's much harder, so sharing stays out of the vault at first (public folders would be unlocked on purpose)
+- **"Hack-proof" isn't a real promise.** It protects against a stolen database or backup, and against anyone reading the database, the developer included. It can't protect against a hacked computer, a weak vault password, or a changed version of the app's own code (the browser runs whatever code the site sends). Bitwarden's web vault has the same limit. Write this plainly on the privacy page
+
+**Steps (a first sketch)**
+- [ ] Decide: everyone gets a vault, or it's an opt-in "Private vault" switch (easier to ship and to test, and the server features keep working for people who don't turn it on)
+- [ ] A design note in `docs/DECISIONS.md`: which fields are locked, the key derivation and its settings, the recovery key, and what moves to the browser
+- [ ] Set up the vault: choose a vault password, show the recovery key once, lock every existing link in the browser and send them back locked (a one-time move, in batches)
+- [ ] Unlock screen after signing in; lock again on sign-out or after a while doing nothing
+- [ ] Saving, editing, importing and exporting work on locked data (the browser locks and unlocks)
+- [ ] Change the vault password (re-lock the key, not every link), and recover with the recovery key
+- [ ] Backups stay locked too, so a stolen backup file is useless
+- [ ] The privacy page and `SECURITY.md` explain exactly what the server can and can't see
+- [ ] Tests: the server never receives a readable address, a wrong password fails safely, the recovery key works, and a changed password still opens old links
+- [ ] Ask someone who knows security to look it over before calling it done
+
+**You'll learn:** encryption in the browser (Web Crypto, AES-GCM), deriving keys from passwords, the "zero-knowledge" idea, threat models (what you protect against, and what you can't), and how to say it honestly to the people who trust you with their data.
 
 ---
 

@@ -1,5 +1,5 @@
 import type { LinkActions } from "@/components/LinkActions";
-import { nextFolderColor } from "@/lib/folders";
+import { childFolders, folderAndInside, freeFolderName, nameTakenIn, nextFolderColor, renamesMovingUp } from "@/lib/folders";
 import { cleanDetails, cleanFolderName, cleanNewLink, getDomain } from "@/lib/links";
 import { MAX_FOLDERS, TOO_MANY_FOLDERS } from "@/lib/limits";
 import type { Folder, Link } from "@/types/link";
@@ -15,6 +15,8 @@ export const DEMO_FOLDERS: Folder[] = [
   { id: "demo-reading", name: "Reading", color: "blue", icon: "book" },
   { id: "demo-recipes", name: "Recipes", color: "green", icon: "coffee" },
   { id: "demo-work", name: "Work", color: "yellow", icon: "briefcase" },
+  // A folder inside a folder, so the tree shows.
+  { id: "demo-design", name: "Design", color: "purple", icon: "star", parentId: "demo-reading" },
 ];
 
 // Saved some days before `now`, so dates and Rediscover look lived-in.
@@ -32,7 +34,7 @@ export function demoLinks(now: Date): Link[] {
       url: "https://example.com/calm-interfaces",
       title: "How to write calm interfaces",
       tags: ["design", "ux"],
-      folderId: "demo-reading",
+      folderId: "demo-design",
       readAt: ago(1),
       image: "/demo/calm-interfaces.svg",
     }),
@@ -67,9 +69,23 @@ export const DEMO_CHECK_MESSAGE = "Checking links works once you sign in. In the
 
 // Stand-ins for the Server Actions: they answer like the server would (same
 // cleaning, same messages) but nothing leaves the browser, and a refresh
-// starts over. Folder names are remembered here, to refuse duplicates.
+// starts over. The folders' names and places are remembered here, to refuse
+// duplicates and loops, and so are the folders in the Trash, to restore them.
 export function makeDemoActions(folders: Folder[] = DEMO_FOLDERS): LinkActions {
-  const folderNames = new Map(folders.map((folder) => [folder.id, folder.name.toLowerCase()]));
+  type Place = { id: string; name: string; parentId?: string };
+  const live = new Map<string, Place>(folders.map(({ id, name, parentId }) => [id, { id, name, parentId }]));
+  const trashed = new Map<string, Place>();
+  // Folders that moved up a level when the folder they were in was deleted.
+  const movedOut = new Map<string, string>();
+  const list = () => [...live.values()];
+  const taken = (name: string, parentId: string | null, exceptId?: string) => {
+    const parent = parentId ? live.get(parentId) : undefined;
+    return nameTakenIn(list(), name, parentId, exceptId)
+      ? parent
+        ? `There's already a folder called "${name}" in ${parent.name}.`
+        : `You already have a folder called "${name}".`
+      : null;
+  };
 
   return {
     async saveLink(input) {
@@ -79,6 +95,35 @@ export function makeDemoActions(folders: Folder[] = DEMO_FOLDERS): LinkActions {
       return { ...link, folderId: input.folderId, title: link.title ?? getDomain(link.url) };
     },
     async removeLink() {},
+    async removeLinks() {},
+    // The page puts the links back itself; the server would send them too.
+    async restoreLinks() {
+      return [];
+    },
+    async restoreFolder(id) {
+      const folder = trashed.get(id);
+      if (!folder) return "That folder isn't in your Trash any more.";
+      if (live.size >= MAX_FOLDERS) return TOO_MANY_FOLDERS;
+      const parentId = folder.parentId && live.has(folder.parentId) ? folder.parentId : undefined;
+      const name = freeFolderName(folder.name, childFolders(list(), parentId ?? null).map((f) => f.name));
+      trashed.delete(id);
+      // What was inside it moves back, as on the server.
+      for (const other of live.values()) {
+        if (other.parentId === folder.parentId && movedOut.get(other.id) === id) {
+          other.parentId = id;
+          movedOut.delete(other.id);
+        }
+      }
+      live.set(id, { id, name, parentId });
+      return { id, name, parentId };
+    },
+    async deleteForever(_linkIds, folderIds) {
+      for (const id of folderIds) trashed.delete(id);
+    },
+    async emptyTrash() {
+      trashed.clear();
+    },
+    async setReadDates() {},
     async saveLinkDetails(_id, input) {
       return cleanDetails(input);
     },
@@ -92,31 +137,49 @@ export function makeDemoActions(folders: Folder[] = DEMO_FOLDERS): LinkActions {
     async checkAllLinks() {
       return DEMO_CHECK_MESSAGE;
     },
-    async createFolder(name) {
+    async createFolder(name, parentId = null) {
       const cleaned = cleanFolderName(name);
       if ("error" in cleaned) return cleaned.error;
-      if (folderNames.size >= MAX_FOLDERS) return TOO_MANY_FOLDERS;
-      if ([...folderNames.values()].includes(cleaned.name.toLowerCase())) {
-        return `You already have a folder called "${cleaned.name}".`;
-      }
-      const folder = { id: crypto.randomUUID(), name: cleaned.name, color: nextFolderColor(folderNames.size) };
-      folderNames.set(folder.id, cleaned.name.toLowerCase());
+      if (live.size >= MAX_FOLDERS) return TOO_MANY_FOLDERS;
+      if (parentId !== null && !live.has(parentId)) return "That folder doesn't exist any more.";
+      const problem = taken(cleaned.name, parentId);
+      if (problem) return problem;
+      const folder: Folder = { id: crypto.randomUUID(), name: cleaned.name, color: nextFolderColor(live.size), parentId: parentId ?? undefined };
+      live.set(folder.id, { id: folder.id, name: folder.name, parentId: folder.parentId });
       return folder;
     },
     async renameFolder(id, name) {
       const cleaned = cleanFolderName(name);
       if ("error" in cleaned) return cleaned.error;
-      const others = [...folderNames].filter(([folderId]) => folderId !== id).map(([, other]) => other);
-      if (others.includes(cleaned.name.toLowerCase())) {
-        return `You already have a folder called "${cleaned.name}".`;
-      }
-      folderNames.set(id, cleaned.name.toLowerCase());
+      const folder = live.get(id);
+      const problem = taken(cleaned.name, folder?.parentId ?? null, id);
+      if (problem) return problem;
+      if (folder) folder.name = cleaned.name;
+      return null;
+    },
+    async moveFolder(id, parentId) {
+      const folder = live.get(id);
+      if (!folder || (parentId !== null && !live.has(parentId))) return "That folder doesn't exist any more.";
+      if (parentId !== null && folderAndInside(list(), id).has(parentId)) return "A folder can't go inside itself.";
+      const problem = taken(folder.name, parentId, id);
+      if (problem) return problem;
+      folder.parentId = parentId ?? undefined;
+      movedOut.delete(id);
       return null;
     },
     async setFolderColor() {},
+    async setFolderPinned() {},
     async setFolderIcon() {},
     async deleteFolder(id) {
-      folderNames.delete(id);
+      const folder = live.get(id);
+      if (!folder) return;
+      for (const { id: childId, name } of renamesMovingUp(list(), id)) live.get(childId)!.name = name;
+      for (const child of childFolders(list(), id)) {
+        child.parentId = folder.parentId;
+        movedOut.set(child.id, id);
+      }
+      live.delete(id);
+      trashed.set(id, folder);
     },
   };
 }

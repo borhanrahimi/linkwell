@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badges, EditForm, Favicon, PreviewImage, StickyNote } from "@/components/LinkParts";
 import { useSwipeToClose } from "@/components/useSwipeToClose";
+import { flattenTree, indentedName } from "@/lib/folders";
 import { getArchiveUrl, getDomain, timeAgo } from "@/lib/links";
 import type { Folder, Link, LinkDetailsInput } from "@/types/link";
 
@@ -165,9 +166,9 @@ export default function LinkDetails({
                   className="field max-w-[60%] py-1 text-sm"
                 >
                   <option value="">No folder</option>
-                  {folders.map((folder) => (
+                  {flattenTree(folders).map(({ folder, depth }) => (
                     <option key={folder.id} value={folder.id}>
-                      {folder.name}
+                      {indentedName(folder.name, depth)}
                     </option>
                   ))}
                 </select>
