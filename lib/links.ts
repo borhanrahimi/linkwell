@@ -323,6 +323,7 @@ export function toFolder(row: FolderRow): Folder {
     icon: isFolderIcon(row.icon) ? row.icon : undefined,
     parentId: row.parentId ?? undefined,
     pinned: row.pinnedAt ? true : undefined,
+    position: row.position,
     cameFromFolderId: row.cameFromFolderId ?? undefined,
     deletedAt: row.deletedAt?.toISOString(),
   };

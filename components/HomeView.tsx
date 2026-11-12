@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
+import { DRAG_SOURCE_CLASS, useDrag, type DragItem } from "@/components/DragAndDrop";
 import FolderIconDrawing from "@/components/FolderIcon";
 import { Favicon, PreviewImage } from "@/components/LinkParts";
 import ListIcon from "@/components/ListIcon";
@@ -36,6 +37,12 @@ const FOLDERS_SHOWN = 6;
 const RECENT_SHOWN = 6;
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 
+// Home's links can be picked up too, and dropped on a folder (in the
+// sidebar, on Home's folder tiles, or on phones the folders that come up).
+function linkItem(link: Link): DragItem {
+  return { kind: "links", ids: [link.id], name: link.title || getDomain(link.url) };
+}
+
 // The greeting and the date follow the clock of the person reading, not the
 // server's (which may be in another time zone), so the server says something
 // neutral and the browser fills in the rest.
@@ -58,6 +65,7 @@ function today() {
 export default function HomeView({ links, folders, now, rediscover, onSelectList, onSelectFolder, onShowDetails, onSortThem, onShowFolders, trashCount, onSelectTag }: HomeViewProps) {
   const hello = useSyncExternalStore(noSubscription, greeting, () => "Welcome back");
   const date = useSyncExternalStore(noSubscription, today, () => "");
+  const drag = useDrag();
 
   if (links.length === 0 && folders.length === 0) {
     return (
@@ -129,10 +137,13 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
               {newest.slice(0, RECENT_SHOWN).map((link) => (
                 <li
                   key={link.id}
+                  {...drag.dragSource(() => linkItem(link))}
                   onClick={(event) => {
                     if (!(event.target as Element).closest("a")) onShowDetails(link.id);
                   }}
-                  className="flex cursor-pointer items-center gap-3 px-4 py-2.5 first:rounded-t-2xl last:rounded-b-2xl hover:bg-hover/50"
+                  className={`flex cursor-pointer items-center gap-3 px-4 py-2.5 first:rounded-t-2xl last:rounded-b-2xl hover:bg-hover/50 ${DRAG_SOURCE_CLASS} ${
+                    drag.item?.kind === "links" && drag.item.ids.includes(link.id) ? "opacity-40" : ""
+                  }`}
                 >
                   <Favicon url={link.url} size="small" />
                   <div className="min-w-0 flex-1">
@@ -276,12 +287,15 @@ function colorFor(text: string) {
 
 function LinkTile({ link, onShowDetails, hideWhenWide }: { link: Link; onShowDetails: (id: string) => void; hideWhenWide: boolean }) {
   const domain = getDomain(link.url);
+  const drag = useDrag();
+  const pickedUp = drag.item?.kind === "links" && drag.item.ids.includes(link.id);
   return (
     <li
+      {...drag.dragSource(() => linkItem(link))}
       onClick={(event) => {
         if (!(event.target as Element).closest("a")) onShowDetails(link.id);
       }}
-      className={`glass flex w-44 shrink-0 cursor-pointer snap-start flex-col overflow-hidden rounded-2xl transition-shadow hover:shadow-lg sm:w-auto ${hideWhenWide ? "sm:hidden" : ""}`}
+      className={`glass flex w-44 shrink-0 cursor-pointer snap-start flex-col overflow-hidden rounded-2xl transition-[box-shadow,opacity] hover:shadow-lg sm:w-auto ${DRAG_SOURCE_CLASS} ${hideWhenWide ? "sm:hidden" : ""} ${pickedUp ? "opacity-40" : ""}`}
     >
       {link.image ? (
         <PreviewImage src={link.image} className="w-full" />
@@ -306,10 +320,23 @@ function LinkTile({ link, onShowDetails, hideWhenWide }: { link: Link; onShowDet
 // icon on its colour when it has none; then its name and count.
 function FolderTile({ folder, count, images, onOpen }: { folder: Folder; count: number; images: string[]; onOpen: () => void }) {
   const color = folder.color ?? "gray";
+  const drag = useDrag();
+  // Links and folders can be dropped on it, and it can be picked up itself.
+  const over = drag.over?.folderId === folder.id;
+  const pickedUp = drag.item?.kind === "folder" && drag.item.id === folder.id;
   return (
     <li className="w-28 shrink-0 snap-start sm:w-auto">
-      <button onClick={onOpen} className="group w-full text-left focus:outline-none">
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl ring-1 ring-line transition-shadow group-hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-blue-400">
+      <button
+        onClick={onOpen}
+        data-drop-folder={folder.id}
+        {...drag.dragSource(() => ({ kind: "folder", id: folder.id, name: folder.name }))}
+        className={`group w-full text-left focus:outline-none ${DRAG_SOURCE_CLASS} ${pickedUp ? "opacity-50" : ""}`}
+      >
+        <div
+          className={`relative aspect-[4/3] overflow-hidden rounded-2xl ring-1 ring-line transition-shadow group-hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-blue-400 ${
+            over ? "drop-into" : ""
+          }`}
+        >
           {images.length > 0 ? (
             <div className={`grid size-full gap-0.5 ${images.length > 1 ? "grid-cols-2" : ""}`}>
               {images.map((src, index) => (

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { checkAllLinks, createFolder, deleteFolder, deleteForever, moveFolder, emptyTrash, removeLinks, restoreFolder, restoreLinkByUrl, restoreLinks, setReadDates, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, markLinksRead, moveLinksToFolder, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { countAction, getFolderAncestors, updateFolderParent, deleteForever as deleteForeverFromTrash, emptyTrash as emptyTrashNow, findTrashedLink, getTrash, restoreFolder as restoreFolderFromTrash, restoreLinks as restoreLinksFromTrash, trashFolder, trashLinks, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { countAction, getFolderAncestors, updateFolderPlace, deleteForever as deleteForeverFromTrash, emptyTrash as emptyTrashNow, findTrashedLink, getTrash, restoreFolder as restoreFolderFromTrash, restoreLinks as restoreLinksFromTrash, trashFolder, trashLinks, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchPageInfo } from "@/lib/fetchTitle";
 import { after } from "next/server";
@@ -23,7 +23,7 @@ vi.mock("@/lib/data", () => ({
   deleteForever: vi.fn(async () => {}),
   emptyTrash: vi.fn(async () => {}),
   getFolderAncestors: vi.fn(async () => []),
-  updateFolderParent: vi.fn(async () => {}),
+  updateFolderPlace: vi.fn(async () => {}),
   updateLinkDetails: vi.fn(async () => {}),
   updateLinkStatus: vi.fn(async () => {}),
   updateLinkReadAt: vi.fn(async () => {}),
@@ -597,10 +597,29 @@ describe("folders inside folders", () => {
     vi.mocked(getFolders).mockResolvedValue([work, clients, home]);
     vi.mocked(getFolderAncestors).mockResolvedValueOnce([]);
 
+    // Last in its new place, and that level numbered again.
     expect(await moveFolder("f1", "f3")).toBeNull();
-    expect(updateFolderParent).toHaveBeenCalledWith("u1", "f1", "f3");
+    expect(updateFolderPlace).toHaveBeenCalledWith("u1", "f1", "f3", ["f1"]);
     expect(await moveFolder("f2", null)).toBeNull();
-    expect(updateFolderParent).toHaveBeenCalledWith("u1", "f2", null);
+    expect(updateFolderPlace).toHaveBeenCalledWith("u1", "f2", null, ["f1", "f3", "f2"]);
+    vi.mocked(getFolders).mockReset();
+    vi.mocked(getFolders).mockResolvedValue([]);
+  });
+
+  test("puts a folder at a place among the others (dragging, Move up and Move down)", async () => {
+    vi.mocked(getFolders).mockResolvedValue([work, clients, home]);
+
+    // Home before Work, at the top level.
+    expect(await moveFolder("f3", null, 0)).toBeNull();
+    expect(updateFolderPlace).toHaveBeenCalledWith("u1", "f3", null, ["f3", "f1"]);
+    // Staying where it is without a place keeps it there.
+    expect(await moveFolder("f1", null)).toBeNull();
+    expect(updateFolderPlace).toHaveBeenLastCalledWith("u1", "f1", null, ["f1", "f3"]);
+    // A place past the end means last; something that isn't a whole number, no place.
+    expect(await moveFolder("f1", null, 99)).toBeNull();
+    expect(updateFolderPlace).toHaveBeenLastCalledWith("u1", "f1", null, ["f3", "f1"]);
+    expect(await moveFolder("f1", null, "0" as unknown as number)).toBeNull();
+    expect(updateFolderPlace).toHaveBeenLastCalledWith("u1", "f1", null, ["f1", "f3"]);
     vi.mocked(getFolders).mockReset();
     vi.mocked(getFolders).mockResolvedValue([]);
   });
@@ -612,7 +631,7 @@ describe("folders inside folders", () => {
     expect(await moveFolder("f1", "f1")).toBe("A folder can't go inside itself.");
     expect(await moveFolder("f1", "f2")).toBe("A folder can't go inside itself.");
     expect(getFolderAncestors).toHaveBeenCalledWith("u1", "f2");
-    expect(updateFolderParent).not.toHaveBeenCalled();
+    expect(updateFolderPlace).not.toHaveBeenCalled();
     vi.mocked(getFolders).mockReset();
     vi.mocked(getFolders).mockResolvedValue([]);
   });
@@ -622,7 +641,7 @@ describe("folders inside folders", () => {
 
     expect(await moveFolder("f4", "f1")).toBe('There\'s already a folder called "Clients" in Work.');
     expect(await moveFolder("f4", "nope")).toBe("That folder doesn't exist any more.");
-    expect(updateFolderParent).not.toHaveBeenCalled();
+    expect(updateFolderPlace).not.toHaveBeenCalled();
     vi.mocked(getFolders).mockReset();
     vi.mocked(getFolders).mockResolvedValue([]);
   });

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Folder, Link, LinkDetailsInput } from "@/types/link";
+import { DRAG_SOURCE_CLASS, useDrag, type DragItem } from "@/components/DragAndDrop";
 import { Badges, EditForm, Favicon, PreviewImage, StickyNote } from "@/components/LinkParts";
 import { getArchiveUrl, getDomain, timeAgo } from "@/lib/links";
 import { FOLDER_DOT_CLASS } from "@/lib/folders";
@@ -24,6 +25,9 @@ type LinkCardProps = {
   selecting?: boolean;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
+  // What picking it up drags: this link, or all the ticked ones. Left out,
+  // it can't be dragged.
+  dragItem?: () => DragItem;
 };
 
 // Clicks on the card's own controls (title, buttons, tags) do their own thing;
@@ -32,8 +36,9 @@ function onCardBackground(event: React.MouseEvent) {
   return !(event.target as Element).closest("a, button, input, select, textarea, label");
 }
 
-export default function LinkCard({ link, activeTag, now, folders, compact = false, onDelete, onEditDetails, onTagClick, onToggleRead, onShowDetails, selecting = false, selected = false, onToggleSelect }: LinkCardProps) {
+export default function LinkCard({ link, activeTag, now, folders, compact = false, onDelete, onEditDetails, onTagClick, onToggleRead, onShowDetails, selecting = false, selected = false, onToggleSelect, dragItem }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const drag = useDrag();
   // Broken links get a red outline, so they stand out in the grid.
   const tileSize = link.status === "broken" ? "ring-1 ring-danger/50" : "";
 
@@ -138,6 +143,9 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
     else onShowDetails(link.id);
   }
   const selectedRing = selected ? "ring-2 ring-[#0071e3]" : "";
+  // Picked up: it fades where it was, while its ghost follows the pointer.
+  const draggable = dragItem ? drag.dragSource(dragItem) : {};
+  const pickedUp = drag.item?.kind === "links" && drag.item.ids.includes(link.id) ? "opacity-40" : "";
 
   // List view: one row. The note, the folder menu and the archive link stay
   // in Cards view (and the details panel).
@@ -145,8 +153,9 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
     return (
       // On phones the actions wrap onto their own line under the title.
       <li
+        {...draggable}
         onClick={handleCardClick}
-        className={`group flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-hover/50 ${selected ? "bg-hover" : ""}`}
+        className={`group flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 hover:bg-hover/50 ${DRAG_SOURCE_CLASS} ${selected ? "bg-hover" : ""} ${pickedUp}`}
       >
         {checkbox}
         <div className={link.readAt ? "opacity-50 grayscale" : ""}>
@@ -172,8 +181,9 @@ export default function LinkCard({ link, activeTag, now, folders, compact = fals
 
   return (
     <li
+      {...draggable}
       onClick={handleCardClick}
-      className={`group glass flex cursor-pointer flex-col justify-between gap-3 overflow-hidden rounded-2xl p-4 transition-[transform,box-shadow] duration-200 motion-safe:animate-rise-in motion-safe:hover:-translate-y-0.5 hover:shadow-lg ${tileSize} ${selectedRing}`}
+      className={`group glass flex cursor-pointer flex-col justify-between gap-3 overflow-hidden rounded-2xl p-4 transition-[transform,box-shadow,opacity] duration-200 motion-safe:animate-rise-in motion-safe:hover:-translate-y-0.5 hover:shadow-lg ${DRAG_SOURCE_CLASS} ${tileSize} ${selectedRing} ${pickedUp}`}
     >
       {/* The page's picture across the top of the card, edge to edge. */}
       {link.image && <PreviewImage src={link.image} className="-mx-4 -mt-4 mb-1 w-[calc(100%+2rem)] max-w-none self-start" />}

@@ -17,6 +17,7 @@ import Sidebar from "@/components/Sidebar";
 import { useLinkView, type LinkView } from "@/components/useLinkView";
 import { useAddressState } from "@/components/useAddressState";
 import FolderIconDrawing from "@/components/FolderIcon";
+import { DRAG_SOURCE_CLASS, DragProvider, useDrag, type DragItem, type DropSpot } from "@/components/DragAndDrop";
 import {
   childFolders,
   countWithInside,
@@ -26,6 +27,9 @@ import {
   FOLDER_DOT_CLASS,
   FOLDER_TEXT_CLASS,
   indentedName,
+  nextPosition,
+  placeFolder,
+  placeOf,
   renamesMovingUp,
 } from "@/lib/folders";
 import FolderActions from "@/components/FolderActions";
@@ -50,6 +54,7 @@ import {
   updateDetails,
   parseTags,
   filterByTag,
+  getDomain,
   searchLinks,
   type SortOrder,
   sortLinks,
@@ -127,6 +132,11 @@ export default function LinkManager({
   } = useLinkActions();
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
+  // The folders as they are now, for Undo: its callback was made a render ago.
+  const latestFolders = useRef(folders);
+  useEffect(() => {
+    latestFolders.current = folders;
+  });
   const [trash, setTrash] = useState(initialTrash);
   // The small message after a change, with Undo (see UndoToast).
   const [toast, setToast] = useState<Toast | null>(null);
@@ -333,7 +343,8 @@ export default function LinkManager({
       ...current.map((f) =>
         f.cameFromFolderId === folder.id && f.parentId === movedTo ? { ...f, parentId: folder.id, cameFromFolderId: undefined } : f
       ),
-      { ...folder, name: result.name, parentId: result.parentId, deletedAt: undefined },
+      // Last among the folders it goes back next to, as on the server.
+      { ...folder, name: result.name, parentId: result.parentId, position: result.position ?? nextPosition(current, result.parentId ?? null), deletedAt: undefined },
     ]);
     setLinks((current) =>
       current.map((link) =>
@@ -453,7 +464,8 @@ export default function LinkManager({
   async function makeFolder(name: string, parentId: string | null = null) {
     const result = await createFolder(name, parentId);
     if (typeof result !== "string") {
-      setFolders((current) => [...current, result]);
+      // Last among its neighbours (the server says where; the demo doesn't).
+      setFolders((current) => [...current, { ...result, position: result.position ?? nextPosition(current, parentId) }]);
     }
     return result;
   }
@@ -468,20 +480,83 @@ export default function LinkManager({
     await setFolderPinned(id, pinned);
   }
 
-  // Into another folder (or the top level, with null), with Undo.
-  async function changeFolderParent(id: string, parentId: string | null, { undoable = true } = {}) {
+  // Into another folder (or the top level, with null), at `index` among the
+  // folders there (left out: last, or where it is if it stays), with Undo,
+  // which puts it back in its old place. Shown at once; if the server says
+  // no (a name that's taken there), it goes back and the message is returned.
+  async function changeFolderPlace(id: string, parentId: string | null, index?: number, { undoable = true } = {}) {
+    const folders = latestFolders.current;
     const folder = folders.find((f) => f.id === id);
     if (!folder) return null;
-    const error = await moveFolder(id, parentId);
-    if (error) return error;
+    const from = placeOf(folders, id);
+    const to = placeOf(placeFolder(folders, id, parentId, index), id);
+    if (to.parentId === from.parentId && to.index === from.index) return null;
     setFolders((current) =>
-      current.map((f) => (f.id === id ? { ...f, parentId: parentId ?? undefined, cameFromFolderId: undefined } : f))
+      placeFolder(current, id, parentId, index).map((f) =>
+        f.id === id && parentId !== from.parentId ? { ...f, cameFromFolderId: undefined } : f
+      )
     );
+    const error = await moveFolder(id, parentId, index);
+    if (error) {
+      setFolders((current) => placeFolder(current, id, from.parentId, from.index));
+      return error;
+    }
     if (undoable) {
       const where = folders.find((f) => f.id === parentId)?.name ?? "the top level";
-      showToast(`"${folder.name}" moved to ${where}`, () => changeFolderParent(id, folder.parentId ?? null, { undoable: false }));
+      const message =
+        parentId === from.parentId ? `"${folder.name}" moved ${to.index < from.index ? "up" : "down"}` : `"${folder.name}" moved to ${where}`;
+      showToast(message, () => changeFolderPlace(id, from.parentId, from.index, { undoable: false }));
     }
     return null;
+  }
+
+  // Dragging and the keyboard: a move that's refused says why in the message.
+  async function moveFolderNow(id: string, parentId: string | null, index?: number) {
+    const error = await changeFolderPlace(id, parentId, index);
+    if (error) showToast(error);
+  }
+
+  // Where a folder dropped there would go: its new parent and its place
+  // among the folders there. null: it can't go there (inside itself), or it
+  // wouldn't move at all.
+  function folderDropPlace(id: string, spot: DropSpot): { parentId: string | null; index?: number } | null {
+    const target = folders.find((f) => f.id === spot.folderId);
+    if (!target || folderAndInside(folders, id).has(target.id)) return null;
+    const from = placeOf(folders, id);
+    if (spot.where === "into") return target.id === from.parentId ? null : { parentId: target.id };
+    const { parentId } = placeOf(folders, target.id);
+    const others = childFolders(folders, parentId).filter((f) => f.id !== id);
+    const index = others.indexOf(target) + (spot.where === "after" ? 1 : 0);
+    return parentId === from.parentId && index === from.index ? null : { parentId, index };
+  }
+
+  // Links can be dropped on any folder that isn't already home to all of them.
+  function canDrop(item: DragItem, spot: DropSpot) {
+    if (item.kind === "folder") return folderDropPlace(item.id, spot) !== null;
+    const chosen = new Set(item.ids);
+    return links.some((link) => chosen.has(link.id) && link.folderId !== spot.folderId);
+  }
+
+  // Every drop shows the Undo message, like Move to… does.
+  function drop(item: DragItem, spot: DropSpot) {
+    if (item.kind === "folder") {
+      const place = folderDropPlace(item.id, spot);
+      if (place) moveFolderNow(item.id, place.parentId, place.index);
+      return;
+    }
+    const chosen = new Set(item.ids);
+    moveMany(
+      links.filter((link) => chosen.has(link.id) && link.folderId !== spot.folderId).map((link) => link.id),
+      spot.folderId
+    );
+    if (selecting) stopSelecting();
+  }
+
+  // What picking up a link drags: in Select mode with it ticked, every
+  // ticked link ("Moving 4 links"); otherwise just this one.
+  function linkDragItem(link: Link): DragItem {
+    const ids = selecting && selected.has(link.id) ? [...selected] : [link.id];
+    return { kind: "links", ids, name: ids.length > 1 ? `${ids.length} links` : link.title || getDomain(link.url) };
   }
 
   async function changeFolderName(id: string, name: string) {
@@ -549,7 +624,7 @@ export default function LinkManager({
     await deleteFolder(id);
   }
   return (
-    <>
+    <DragProvider canDrop={canDrop} onDrop={drop} folderName={(id) => folders.find((f) => f.id === id)?.name ?? ""}>
       {/* The save box lives in the top bar, so it's always at hand. */}
       {user || topBarEnd ? (
         <Header user={user} end={topBarEnd} hideMiddleOnPhones>
@@ -584,6 +659,7 @@ export default function LinkManager({
           onSelectFolder={selectFolder}
           onSelectTag={toggleTag}
           onCreateFolder={addFolder}
+          onMoveFolder={moveFolderNow}
           onChecked={setLinks}
           trashCount={trash.links.length + trash.folders.length}
         />
@@ -608,6 +684,7 @@ export default function LinkManager({
                   activeFolder={null}
                   onSelect={(folderId) => folderId && selectFolder(folderId)}
                   onCreate={addFolder}
+                  onMove={moveFolderNow}
                 />
               </div>
             </section>
@@ -702,7 +779,7 @@ export default function LinkManager({
                   const result = await makeFolder(name, selectedFolder.id);
                   return typeof result === "string" ? result : null;
                 }}
-                onMove={(parentId) => changeFolderParent(selectedFolder.id, parentId)}
+                onMove={(parentId, index) => changeFolderPlace(selectedFolder.id, parentId, index)}
                 onPin={(pinned) => pinFolder(selectedFolder.id, pinned)}
                 onRename={changeFolderName}
                 onRecolor={changeFolderColor}
@@ -778,20 +855,7 @@ export default function LinkManager({
               <ul aria-label={`Folders in ${selectedFolder?.name}`} className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 {insideFolders.map((inside) => (
                   <li key={inside.id}>
-                    <button
-                      onClick={() => selectFolder(inside.id)}
-                      className="glass flex w-full items-center gap-2 rounded-2xl p-3 text-left transition-shadow hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
-                    >
-                      {inside.icon ? (
-                        <FolderIconDrawing name={inside.icon} className={`size-6 shrink-0 ${FOLDER_TEXT_CLASS[inside.color ?? "gray"]}`} />
-                      ) : (
-                        <span aria-hidden="true" className={`mx-1.5 size-3 shrink-0 rounded-full ${FOLDER_DOT_CLASS[inside.color ?? "gray"]}`} />
-                      )}
-                      <span className="min-w-0 flex-1 truncate font-medium text-ink">{inside.name}</span>
-                      <span aria-hidden="true" className="text-sm text-muted">
-                        {counts[inside.id] ?? 0}
-                      </span>
-                    </button>
+                    <InsideFolderTile folder={inside} count={counts[inside.id] ?? 0} onOpen={() => selectFolder(inside.id)} />
                   </li>
                 ))}
               </ul>
@@ -865,6 +929,7 @@ export default function LinkManager({
                   selecting={selecting}
                   selected={selected.has(link.id)}
                   onToggleSelect={toggleSelected}
+                  dragItem={() => linkDragItem(link)}
                 />
               ))}
             </ul>
@@ -990,9 +1055,68 @@ export default function LinkManager({
         accountHref={user ? "/account" : "/"}
         accountLabel={user ? "You" : "Sign in"}
       />
+      <PhoneDropPanel folders={folders} />
       <UndoToast toast={toast} onClose={closeToast} />
       {/* Room under the last link, so the bottom bar never covers it. */}
       <div aria-hidden="true" className="h-24 md:hidden" />
-    </>
+    </DragProvider>
+  );
+}
+
+// A folder inside the open one, as a tile: opens it, takes links and folders
+// dropped on it, and can be picked up itself (onto the sidebar, say).
+function InsideFolderTile({ folder, count, onOpen }: { folder: Folder; count: number; onOpen: () => void }) {
+  const drag = useDrag();
+  const over = drag.over?.folderId === folder.id;
+  const pickedUp = drag.item?.kind === "folder" && drag.item.id === folder.id;
+  return (
+    <button
+      onClick={onOpen}
+      data-drop-folder={folder.id}
+      {...drag.dragSource(() => ({ kind: "folder", id: folder.id, name: folder.name }))}
+      className={`glass flex w-full items-center gap-2 rounded-2xl p-3 text-left transition-shadow hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${DRAG_SOURCE_CLASS} ${over ? "drop-into" : ""} ${pickedUp ? "opacity-50" : ""}`}
+    >
+      {folder.icon ? (
+        <FolderIconDrawing name={folder.icon} className={`size-6 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`} />
+      ) : (
+        <span aria-hidden="true" className={`mx-1.5 size-3 shrink-0 rounded-full ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`} />
+      )}
+      <span className="min-w-0 flex-1 truncate font-medium text-ink">{folder.name}</span>
+      <span aria-hidden="true" className="text-sm text-muted">
+        {count}
+      </span>
+    </button>
+  );
+}
+
+// Phones have no sidebar to drop on, so while links are picked up, every
+// folder shows at the bottom of the screen, within reach of the thumb. Screen
+// readers hear where the links are over instead (see DragProvider).
+function PhoneDropPanel({ folders }: { folders: Folder[] }) {
+  const { item, over } = useDrag();
+  if (item?.kind !== "links" || folders.length === 0) return null;
+  return (
+    <div
+      aria-hidden="true"
+      className="glass-bar fixed inset-x-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-h-[40vh] max-w-2xl overflow-y-auto rounded-3xl p-3 motion-safe:animate-rise-in md:hidden"
+    >
+      <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted">Drop on a folder</p>
+      <ul className="flex flex-wrap gap-2">
+        {flattenTree(folders).map(({ folder }) => (
+          <li
+            key={folder.id}
+            data-drop-folder={folder.id}
+            className={`flex items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-medium text-ink ring-1 ring-line ${over?.folderId === folder.id ? "drop-into" : ""}`}
+          >
+            {folder.icon ? (
+              <FolderIconDrawing name={folder.icon} className={`size-4 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`} />
+            ) : (
+              <span className={`size-2.5 shrink-0 rounded-full ${FOLDER_DOT_CLASS[folder.color ?? "gray"]}`} />
+            )}
+            {folder.name}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

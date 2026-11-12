@@ -61,6 +61,15 @@ describe("restoring a backup", () => {
     expect(inserts[3].params).toContain("https://example.com");
   });
 
+  test("a backup from before folders had a position puts them in at 0 (the order they were made in)", async () => {
+    const db = fakeDatabase(0);
+
+    expect(await restoreBackup(db, backup)).toBeNull();
+
+    const folderInsert = db.queries.find((q) => q.text.startsWith('insert into "folders"'))!;
+    expect(folderInsert.params[TABLES.folders.indexOf("position")]).toBe(0);
+  });
+
   test("puts nested folders back even when a folder comes before the one it's inside", async () => {
     const db = fakeDatabase(0);
     const nested = {

@@ -6,7 +6,7 @@ import {
   emptyTrash as emptyTrashNow,
   findTrashedLink,
   getFolderAncestors,
-  updateFolderParent,
+  updateFolderPlace,
   updateFolderPinned,
   getLinks,
   getTrash,
@@ -37,7 +37,7 @@ import { fetchPageInfo } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
 import { cleanDate, cleanDetails, cleanFolderName, cleanIds, cleanNewLink, IN_TRASH, isDuplicate, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
-import { childFolders, freeFolderName, isFolderColor, isFolderIcon, nameTakenIn, nextFolderColor, renamesMovingUp } from "@/lib/folders";
+import { childFolders, freeFolderName, isFolderColor, isFolderIcon, nameTakenIn, nextFolderColor, placeFolder, renamesMovingUp } from "@/lib/folders";
 import {
   MAX_FOLDERS,
   MAX_LINKS,
@@ -388,9 +388,11 @@ export async function renameFolder(
 }
 
 // Moves a folder, with everything inside it, into another folder (or to the
-// top level with null). Never into itself or a folder inside it: that would
-// make a loop, a folder inside itself. Returns a message, or null when moved.
-export async function moveFolder(id: string, parentId: string | null): Promise<string | null> {
+// top level with null), at `index` among the folders there (dragging, Move up
+// and Move down); without one it goes last, or keeps its place if it stays.
+// Never into itself or a folder inside it: that would make a loop, a folder
+// inside itself. Returns a message, or null when moved.
+export async function moveFolder(id: string, parentId: string | null, index?: number): Promise<string | null> {
   const userId = await getUserId();
   const folders = await getFolders(userId);
   const folder = folders.find((f) => f.id === id);
@@ -405,7 +407,9 @@ export async function moveFolder(id: string, parentId: string | null): Promise<s
   if (nameTakenIn(folders, folder.name, parent?.id ?? null, id)) {
     return nameTaken(folder.name, parent);
   }
-  await updateFolderParent(userId, id, parent?.id ?? null);
+  const place = Number.isInteger(index) ? index : undefined;
+  const order = childFolders(placeFolder(folders, id, parent?.id ?? null, place), parent?.id ?? null).map((f) => f.id);
+  await updateFolderPlace(userId, id, parent?.id ?? null, order);
   return null;
 }
 

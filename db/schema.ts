@@ -22,6 +22,9 @@ export const folders = pgTable("folders", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   // Pinned to Home since then (shown first there); null = not pinned.
   pinnedAt: timestamp("pinned_at", { withTimezone: true }),
+  // Its place among the folders next to it (same parent), from 0: the order
+  // you drag them into. Ties (folders that moved up a level) go by created_at.
+  position: integer("position").notNull().default(0),
 });
 
 export const links = pgTable("links", {

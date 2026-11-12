@@ -150,6 +150,29 @@ the database: `getFolderAncestors` follows `parent_id` up with `WITH
 RECURSIVE`. The sidebar's open folders are remembered per device
 (`useOpenFolders`).
 
+### Your own order and dragging
+
+`folders.position` is a folder's place among its neighbours (0, 1, 2…). One
+helper, `placeFolder` in `lib/folders.ts`, puts a folder at a place and
+numbers that level again; the browser uses it to show a move at once,
+`moveFolder` uses it to work out the order it saves (`updateFolderPlace`, one
+batch), and Undo uses it to put the folder back. New and restored folders go
+last (the database works out the number in the same query).
+
+Dragging lives in `components/DragAndDrop.tsx`: a `DragProvider` in
+`LinkManager`, and `useDrag()` in what can be picked up (`LinkCard`, the
+`FolderBar` rows, folder tiles) or dropped on (anything with
+`data-drop-folder`). It uses pointer events, so a mouse, a finger and a pen
+share one code path: a mouse picks up after a small move, a finger after a
+press and hold. While dragging, the drop spot is found with
+`document.elementFromPoint`, the ghost moves without React drawing the page
+again, and an `aria-live` line says what's happening. `LinkManager` decides
+what may land where (`canDrop`) and does the move (`drop`), through the same
+functions as Move to…, so every drop gets the Undo message. Without dragging:
+Move to…, Move up / Move down in the Edit folder panel, and Alt+arrows on a
+folder in the sidebar. The sidebar can show My order or A to Z
+(`useFolderOrder`, per device).
+
 ### What the list shows
 
 `LinkManager` stores only facts: `links`, `folders`, the `trash`, the search
@@ -190,9 +213,9 @@ possible: pages load data on the server and hand it to one client component.
 | Area | Main files |
 |---|---|
 | Pages | `app/page.tsx` (landing or the app), `account/`, `share/`, `demo/`, `privacy/`, `terms/` |
-| The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, the folder tree, tags, Trash; wide screens only; phones use the Folders screen and Home's More part), `HomeView` (the first screen), `TrashView`, `UndoToast`, `BottomBar` (phones, on every signed-in page: Home, Folders, +, Unread, You; tap, or press and slide along it), `Rediscover` (banner on Home), `LinkCard` (card or list row; Select mode ticks), `LinkDetails` (panel; a bottom sheet below `lg`), `FolderActions` (the pencil next to a folder's name and its Edit folder panel: name, colour, icon, Pin to Home, New folder inside, Move folder to, Delete), `AddLinksSheet` (fill a folder like a playlist), `FolderPicker` |
+| The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, the folder tree, tags, Trash; wide screens only; phones use the Folders screen and Home's More part), `HomeView` (the first screen), `TrashView`, `UndoToast`, `BottomBar` (phones, on every signed-in page: Home, Folders, +, Unread, You; tap, or press and slide along it), `Rediscover` (banner on Home), `LinkCard` (card or list row; Select mode ticks), `LinkDetails` (panel; a bottom sheet below `lg`), `FolderActions` (the pencil next to a folder's name and its Edit folder panel: name, colour, icon, Pin to Home, New folder inside, Move folder to, Move up / Move down, Delete), `DragAndDrop` (picking links and folders up, with a mouse, a finger or the keyboard), `AddLinksSheet` (fill a folder like a playlist), `FolderPicker` |
 | Shared pieces | `LinkParts` (`Favicon`, `PreviewImage`, `Badges`, `StickyNote`, `EditForm`), `Sheet` (bottom sheet on phones, dialog on wider screens), `LogoMark`, `FolderIcon`, `ListIcon` |
-| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useOpenFolders` (open folders in the tree, per device), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
+| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useOpenFolders` (open folders in the tree, per device), `useFolderOrder` (My order or A to Z, per device), `useDrag` (what's picked up, and where it would land), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
 | Around it | `Landing`, `ShareForm`, `ImportBookmarks`, `Bookmarklet`, `UsernameForm`, `DeleteAccount`, `LegalPage`, `Footer` |
 
 Props from server to client must be serializable (plain data and `Date`s; no
@@ -209,7 +232,7 @@ signed-in user's id, and every read, update and delete matches it
 | Table | Holds | Notes |
 |---|---|---|
 | `links` | url, title, tags (`text[]`), note, `created_at`, `status` + `checked_at` (link check), `read_at`, `folder_id`, `came_from_folder_id`, `image`, `deleted_at`, `user_id` | `folder_id` → `folders`, `ON DELETE SET NULL`. `image`: the page's sharing picture (https), `""` when it has none, `null` when not looked for yet. `deleted_at`: in the Trash since then. `came_from_folder_id`: the deleted folder it moved out of |
-| `folders` | name, colour, icon, `parent_id`, `came_from_folder_id`, `pinned_at`, `deleted_at`, `user_id` | `parent_id` → `folders` (its own table), `null` = top level. Names unique among folders with the same parent, ignoring case (checked by the actions). `pinned_at`: shown first on Home |
+| `folders` | name, colour, icon, `parent_id`, `came_from_folder_id`, `pinned_at`, `position`, `deleted_at`, `user_id` | `parent_id` → `folders` (its own table), `null` = top level. Names unique among folders with the same parent, ignoring case (checked by the actions). `pinned_at`: shown first on Home. `position`: your own order among neighbours, from 0 |
 | `rate_limits` | `user_id`, action, window start, count | One row per window; `INSERT … ON CONFLICT DO UPDATE` counts atomically |
 | `user`, `session`, `account`, `verification` | Better Auth's tables (`db/auth-schema.ts`) | Deleting a user deletes everything of theirs (`ON DELETE CASCADE`) |
 

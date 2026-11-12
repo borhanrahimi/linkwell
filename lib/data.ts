@@ -124,25 +124,54 @@ export async function getFolders(userId: string): Promise<Folder[]> {
     .select()
     .from(folders)
     .where(and(eq(folders.userId, userId), isNull(folders.deletedAt)))
-    .orderBy(asc(folders.createdAt));
+    .orderBy(asc(folders.position), asc(folders.createdAt));
   return rows.map(toFolder);
 }
 
-// parentId: the folder to make it inside (already checked to be the user's own).
+// The next free position at the end of a level (null: the top level), worked
+// out by the database in the same query that uses it.
+function lastPosition(userId: string, parentId: string | null) {
+  return sql`(select coalesce(max(f.position) + 1, 0) from ${folders} as f
+    where f.user_id = ${userId} and f.parent_id is not distinct from ${parentId}::uuid and f.deleted_at is null)`;
+}
+
+// parentId: the folder to make it inside (already checked to be the user's
+// own). A new folder goes last among the folders next to it.
 export async function insertFolder(
   userId: string,
   name: string,
   color: FolderColor,
   parentId: string | null = null
 ): Promise<Folder> {
-  const [row] = await db.insert(folders).values({ userId, name, color, parentId }).returning();
+  const [row] = await db
+    .insert(folders)
+    .values({ userId, name, color, parentId, position: lastPosition(userId, parentId) })
+    .returning();
   return toFolder(row);
 }
 
 // Moves a folder (with everything inside it) into another one, or to the top
-// level with null. Moved by hand: restoring its old parent no longer takes it back.
-export async function updateFolderParent(userId: string, id: string, parentId: string | null) {
-  await db.update(folders).set({ parentId, cameFromFolderId: null }).where(ownFolder(userId, id));
+// level with null, and saves the order of that level: `order` is every folder
+// there, the moved one included, first to last. Moved to another folder by
+// hand: restoring its old parent no longer takes it back. One batch.
+export async function updateFolderPlace(userId: string, id: string, parentId: string | null, order: string[]) {
+  const positions = sql.join(
+    order.map((folderId, i) => sql`when ${folderId}::uuid then ${i}::integer`),
+    sql` `
+  );
+  await db.batch([
+    db
+      .update(folders)
+      .set({
+        parentId,
+        cameFromFolderId: sql`case when ${folders.parentId} is not distinct from ${parentId}::uuid then ${folders.cameFromFolderId} end`,
+      })
+      .where(ownFolder(userId, id)),
+    db
+      .update(folders)
+      .set({ position: sql`case ${folders.id} ${positions} else ${folders.position} end` })
+      .where(and(eq(folders.userId, userId), inArray(folders.id, order), isNull(folders.deletedAt))),
+  ]);
 }
 
 // The ids of the folders this one is inside, nearest first, found by the
@@ -230,9 +259,10 @@ export async function trashFolder(
       .update(links)
       .set({ folderId: parentId, cameFromFolderId: id })
       .where(and(eq(links.userId, userId), eq(links.folderId, id), isNull(links.deletedAt))),
+    // They take its place in the order too (ties go by when they were made).
     db
       .update(folders)
-      .set({ parentId, cameFromFolderId: id })
+      .set({ parentId, cameFromFolderId: id, position: sql`(select f.position from ${folders} as f where f.id = ${id})` })
       .where(and(eq(folders.userId, userId), eq(folders.parentId, id), isNull(folders.deletedAt))),
     ...renames.map((rename) => db.update(folders).set({ name: rename.name }).where(ownFolder(userId, rename.id))),
     db.update(folders).set({ deletedAt: new Date() }).where(ownFolder(userId, id)),
@@ -255,7 +285,7 @@ export async function restoreLinks(userId: string, ids: string[]): Promise<Link[
 }
 
 // A folder out of the Trash, into `parentId` (its old parent, or the top
-// level if that's gone), under a new name if its own is taken there now. Its
+// level if that's gone), last there, under a new name if its own is taken. Its
 // links and folders come back only if they're still where deleting it put
 // them: in `movedTo`, the parent it had when it was deleted.
 export async function restoreFolder(
@@ -268,7 +298,7 @@ export async function restoreFolder(
   const [folderRows] = await db.batch([
     db
       .update(folders)
-      .set({ deletedAt: null, name, parentId })
+      .set({ deletedAt: null, name, parentId, position: lastPosition(userId, parentId) })
       .where(and(eq(folders.id, id), eq(folders.userId, userId), isNotNull(folders.deletedAt)))
       .returning(),
     db

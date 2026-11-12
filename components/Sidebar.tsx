@@ -19,6 +19,8 @@ type SidebarProps = {
   onSelectFolder: (folderId: string | null) => void;
   onSelectTag: (tag: string) => void;
   onCreateFolder: (name: string) => Promise<string | null>;
+  // Alt+arrows on a folder (see FolderBar).
+  onMoveFolder?: (id: string, parentId: string | null, index?: number) => void;
   onChecked: (links: Link[]) => void;
   // How many links and folders are in the Trash.
   trashCount?: number;
@@ -111,6 +113,7 @@ export default function Sidebar(props: SidebarProps) {
             activeFolder={activeFolder}
             onSelect={props.onSelectFolder}
             onCreate={props.onCreateFolder}
+            onMove={props.onMoveFolder}
           />
         </section>
 

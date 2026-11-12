@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { DRAG_SOURCE_CLASS, useDrag } from "@/components/DragAndDrop";
 import FolderIcon from "@/components/FolderIcon";
+import { useFolderOrder } from "@/components/useFolderOrder";
 import { useOpenFolders } from "@/components/useOpenFolders";
-import { childFolders, flattenTree, folderPath, FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
+import { childFolders, flattenTree, folderPath, FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS, placeOf, sortedByName } from "@/lib/folders";
 import { FOLDER_NAME_MAX_LENGTH } from "@/lib/links";
 import type { Folder } from "@/types/link";
 
@@ -18,6 +20,9 @@ type FolderBarProps = {
   label?: string;
   // Bigger rows, for fingers (the phone's Folders screen).
   roomy?: boolean;
+  // Moves a folder with the keyboard: into `parentId` at `index` among the
+  // folders there (left out: last). Dragging goes through DragProvider.
+  onMove?: (id: string, parentId: string | null, index?: number) => void;
 };
 
 // Deep folders stop indenting after 4 levels, so the sidebar fits on phones.
@@ -29,7 +34,15 @@ const INDENT = ["", "pl-4", "pl-8", "pl-12", "pl-16"];
 // open); which are open is remembered per device. The keyboard works it like
 // a tree: ↑/↓ move between folders, → opens (or goes in), ← closes (or goes
 // to the folder it's in).
-export default function FolderBar({ folders, counts, activeFolder, onSelect, onCreate, label = "Folders", roomy = false }: FolderBarProps) {
+//
+// Folders can be picked up and dropped onto another folder (to go inside it)
+// or, in My order, between two (to change the order). The keyboard does the
+// same with Alt (Option on a Mac): Alt+↑/↓ move a folder up or down, Alt+→
+// puts it inside the folder above it, Alt+← takes it out one level.
+export default function FolderBar({ folders: ownOrder, counts, activeFolder, onSelect, onCreate, label = "Folders", roomy = false, onMove }: FolderBarProps) {
+  const [order, setOrder] = useFolderOrder();
+  const folders = order === "name" ? sortedByName(ownOrder) : ownOrder;
+  const drag = useDrag();
   const [stored, setOpen] = useOpenFolders();
   // The open folder's own parents are always open, so it can be seen.
   const open = new Set(stored);
@@ -48,9 +61,53 @@ export default function FolderBar({ folders, counts, activeFolder, onSelect, onC
     if (id) list.current?.querySelector<HTMLButtonElement>(`[data-folder="${id}"]`)?.focus();
   }
 
+  // Alt+arrows: the keyboard's way of dragging. Places are worked out in your
+  // own order, which is what gets saved.
+  function moveWithKeys(id: string, key: string) {
+    if (!onMove) return;
+    const { parentId, index } = placeOf(ownOrder, id);
+    const name = ownOrder.find((f) => f.id === id)?.name;
+    if (key === "ArrowUp" || key === "ArrowDown") {
+      if (order === "name") {
+        drag.announce("Folders are sorted A to Z. Choose My order to move them up or down.");
+        return;
+      }
+      const next = index + (key === "ArrowUp" ? -1 : 1);
+      if (next < 0 || next >= childFolders(ownOrder, parentId).length) {
+        drag.announce(`${name} is already ${next < 0 ? "first" : "last"}`);
+        return;
+      }
+      onMove(id, parentId, next);
+    } else if (key === "ArrowLeft") {
+      if (!parentId) {
+        drag.announce(`${name} is already at the top level`);
+        return;
+      }
+      // Out of its folder, just after it.
+      const parent = placeOf(ownOrder, parentId);
+      onMove(id, parent.parentId, parent.index + 1);
+    } else {
+      // Into the folder above it, as you see them, at the end.
+      const above = childFolders(folders, parentId)[childFolders(folders, parentId).findIndex((f) => f.id === id) - 1];
+      if (!above) {
+        drag.announce(`There's no folder above ${name} to put it in`);
+        return;
+      }
+      setOpen(above.id, true);
+      onMove(id, above.id);
+    }
+    // The row moved: keep the keyboard on it.
+    requestAnimationFrame(() => focusFolder(id));
+  }
+
   function onKeyDown(event: React.KeyboardEvent) {
     const id = (event.target as HTMLElement).dataset.folder;
     if (!id) return;
+    if (event.altKey && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault();
+      moveWithKeys(id, event.key);
+      return;
+    }
     const at = rows.findIndex((row) => row.folder.id === id);
     const hasInside = childFolders(folders, id).length > 0;
     let handled = true;
@@ -94,9 +151,15 @@ export default function FolderBar({ folders, counts, activeFolder, onSelect, onC
         {rows.map(({ folder, depth }) => {
           const hasInside = childFolders(folders, folder.id).length > 0;
           const isOpen = open.has(folder.id);
+          const over = drag.over?.folderId === folder.id ? drag.over.where : null;
+          const pickedUp = drag.item?.kind === "folder" && drag.item.id === folder.id;
           return (
           <li key={folder.id} className={INDENT[Math.min(depth, INDENT.length - 1)]}>
             <div className="relative">
+            {/* Where a folder being dragged would land: a line before or after this one. */}
+            {(over === "before" || over === "after") && (
+              <span aria-hidden="true" className={`absolute inset-x-1 z-20 h-0.5 rounded-full bg-[#0071e3] ${over === "before" ? "-top-px" : "-bottom-px"}`} />
+            )}
             {/* The arrow hangs in the margin left of the row, so every folder's
               icon lines up with the others and with the lists above. */}
             {hasInside && (
@@ -114,12 +177,16 @@ export default function FolderBar({ folders, counts, activeFolder, onSelect, onC
             )}
             <button
               data-folder={folder.id}
+              data-drop-folder={folder.id}
+              data-drop-reorder={order === "mine" ? "" : undefined}
+              {...drag.dragSource(() => ({ kind: "folder", id: folder.id, name: folder.name }))}
               onClick={() => onSelect(folder.id === activeFolder ? null : folder.id)}
               aria-pressed={folder.id === activeFolder}
               // Screen readers hear whether its folders are showing, and how deep it is.
               aria-expanded={hasInside ? isOpen : undefined}
               aria-description={depth > 0 ? `Inside ${folderPath(folders, folder.id).at(-2)?.name}` : undefined}
-              className={`sidebar-item ${roomy ? "py-3 text-base" : ""} ${folder.id === activeFolder ? "sidebar-item-active" : ""}`}
+              aria-keyshortcuts={onMove ? "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight" : undefined}
+              className={`sidebar-item ${DRAG_SOURCE_CLASS} ${roomy ? "py-3 text-base" : ""} ${folder.id === activeFolder ? "sidebar-item-active" : ""} ${over === "into" ? "drop-into" : ""} ${pickedUp ? "opacity-50" : ""}`}
             >
               {folder.icon ? (
                 <FolderIcon name={folder.icon} className={`size-4 shrink-0 ${FOLDER_TEXT_CLASS[folder.color ?? "gray"]}`} />
@@ -163,9 +230,23 @@ export default function FolderBar({ folders, counts, activeFolder, onSelect, onC
           </div>
         </form>
       ) : (
-        <button onClick={() => setIsCreating(true)} className="sidebar-item text-muted">
-          + New folder
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setIsCreating(true)} className="sidebar-item min-w-0 flex-1 text-muted">
+            + New folder
+          </button>
+          {/* Your own order (drag folders to change it) or A to Z. */}
+          {ownOrder.length > 1 && (
+            <select
+              value={order}
+              onChange={(e) => setOrder(e.target.value as "mine" | "name")}
+              aria-label="Folder order"
+              className="shrink-0 rounded-md bg-transparent py-1 text-xs text-muted hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            >
+              <option value="mine">My order</option>
+              <option value="name">A to Z</option>
+            </select>
+          )}
+        </div>
       )}
       {error && (
         <p role="alert" className="mt-2 px-2 text-sm text-danger">

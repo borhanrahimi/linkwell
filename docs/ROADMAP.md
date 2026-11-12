@@ -10,14 +10,18 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ---
 
-## 📌 Next time (updated 2026-11-03)
+## 📌 Next time (updated 2026-11-11)
 
-**Where we are:** v2.1 Trash and Undo, v2.2 Folders inside folders and v2.3 A real Home screen are **live** (pull request #16, merged 2026-11-03). The phone navigation round (the Folders screen, the tab bar everywhere, sliding between tabs) is on the branch **`phone-navigation`**. Next on the roadmap: v2.4 Drag and drop.
+**Where we are:** v2.1–v2.3 and the phone navigation round are **live** (pull requests #16 and #17). **v2.4 Drag and drop** is done on the branch **`drag-and-drop`**, not merged yet. Next on the roadmap: v2.5 Ready for 10,000 links.
 
-**Shipping `phone-navigation`:**
-- [x] `npm run check` (496 tests) and `npm run e2e` (40 tests) pass
+**Shipping `drag-and-drop`** (it needs migration `0017`, a new `position` column):
+- [x] `npm run check` (512 tests) and `npm run e2e` (44 tests) pass
+- [x] Migration `0017` on the test database (2026-11-11)
+- [ ] Migration `0017` on your dev database: `npx drizzle-kit migrate` (until then, the signed-in page on `localhost` can't load folders; the demo works)
+- [ ] Try it in the demo (`localhost:3000/demo`): drag a card onto a folder, a folder between two others, and on a phone press and hold a card
 - [ ] Commit, push the branch and open a pull request
-- [ ] Merge once the checks pass, with a normal merge (not "Squash and merge", so every commit keeps its own day on the contribution graph). No database changes this time, so no migration first
+- [ ] **Before merging:** `npm run backup`, then migration `0017` on production (see `MAINTENANCE.md`)
+- [ ] Merge with a normal merge (not "Squash and merge")
 
 **Lesson from v2.1–v2.3:** pull request #16 was merged before production had migrations `0014`–`0016`, so the signed-in page broke until they were run. Always back up and migrate production **before** merging code that needs new columns.
 
@@ -382,7 +386,7 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 | v2.1 Trash and Undo 🗑️ | Small, and makes every later change safe to try: nothing is lost by one wrong tap |
 | v2.2 Folders inside folders 📁 | The big folder change, with Undo already there |
 | v2.3 A real Home screen 🏡 | Its folder tiles and tabs build on the folder tree |
-| v2.4 Drag and drop ✋ | Moving links and folders by hand, once there's a tree to drag into |
+| ✅ v2.4 Drag and drop ✋ | Moving links and folders by hand, once there's a tree to drag into |
 | v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
 | v2.6 A private vault 🔐 | Links only you can read, not even the developer. Last, because it changes what the server can do for you (see its trade-offs), and it's easiest once everything else is settled |
 
@@ -457,7 +461,7 @@ Decided (2026-10-26): **no depth limit**, and deleting a folder **moves its subf
 
 Choices made while finishing the plan (2026-11-03):
 - **Where a link lives:** in one folder only. Opening Work shows Work's own links; **Also show the links in these folders** (a tick box under the tiles) adds the ones in its subfolders. The sidebar count always includes subfolders
-- **Order:** folders keep the order they were made in, within each level (your own order comes with dragging in v2.4)
+- **Order:** folders keep the order they were made in, within each level (your own order came with dragging in v2.4)
 - **Restore after a delete:** the same idea as v2.1. Subfolders that moved up remember the deleted folder in `came_from_folder_id` on `folders`, and Restore moves back only the ones still where the delete left them. If the deleted folder's own parent is gone, it comes back at the top level
 - **Name clashes when moving up:** a subfolder moving up next to a folder with the same name becomes "Ideas (2)"
 - **The loop check:** done by the database: `WITH RECURSIVE` follows `parent_id` up from the new parent in one query (`getFolderAncestors`). The browser only hides the impossible choices from the menu
@@ -563,24 +567,47 @@ RECENTLY SAVED                                See all →
 
 **You'll learn:** designing from what the user needs first, sideways scrolling sections, combining several views of the same data on one screen, frosted glass with `backdrop-filter`, animating with CSS transforms, and page transitions.
 
-## 🔜 v2.4: Drag and drop ✋ (planned)
+## ✅ v2.4: Drag and drop ✋ (done 2026-11-11, branch `drag-and-drop`)
 
 With a folder tree, people want to pick things up and put them where they belong, and to choose the order of their folders instead of A to Z.
 
+```
+SIDEBAR                     ┌ card fades ┐
+FOLDERS                     │ ▒▒▒▒▒▒▒▒▒▒ │
+──────────────── ← before   └────────────┘
+  📖 Reading     2      ┌───────────────────────┐
+  ☕ Recipes     2      │ Moving 4 links        │  ← the ghost follows the pointer
+┃ 💼 Work        3 ┃ ←  └───────────────────────┘     (above the finger on phones)
++ New folder   My order ▾
+```
+
+Choices made while building it (2026-11-11):
+- **Our own dragging, on pointer events** (`components/DragAndDrop.tsx`), not the browser's drag and drop (it doesn't work with fingers) and not a library
+- **A mouse** picks up after moving 6 pixels with the button down; **a finger** after a 0.4 s press and hold (a finger that moves sooner is scrolling). A card can be picked up anywhere, its title too (a click on the title still opens the page); only its buttons and tags keep their own job
+- **Where a folder lands:** in the middle of a folder's row, inside it; near its top or bottom edge, before or after it (a blue line shows which). Folder tiles take drops too, and can be picked up
+- **Phones have no sidebar**, so picking up links brings up **Drop on a folder** at the bottom of the screen, within thumb's reach
+- **Nothing that isn't allowed lights up:** a folder inside itself, or a drop that wouldn't change anything
+
 **Step 1: dragging links**
-- [ ] Drag a card or row onto a folder in the sidebar or a folder tile; the folder lights up while you're over it
-- [ ] Links ticked in Select mode move together ("Moving 4 links")
-- [ ] Every drop shows the **Undo** message from v2.1
+- [x] Drag a card or row onto a folder in the sidebar or a folder tile; the folder lights up while you're over it. Home's Unread cards and Recently saved rows can be dragged too, and Home's folder tiles take drops
+- [x] Links ticked in Select mode move together ("Moving 4 links"), and Select mode ends, as with Move to…
+- [x] Every drop shows the **Undo** message from v2.1 (the same `moveMany` as Move to…)
+- [x] The click a drag ends with is ignored, so letting go doesn't open the link's details
 
 **Step 2: dragging folders**
-- [ ] Drag a folder onto another folder to put it inside, or between folders to change the order; the loop check from v2.2 still applies
-- [ ] A `position` column on `folders` keeps your own order (migration `0017`; `0016` is v2.3's pinned folders), with "My order" or "A to Z" for the sidebar
+- [x] Drag a folder onto another folder to put it inside, or between folders to change the order; the loop check from v2.2 still applies (in the browser, and in `moveFolder` on the server)
+- [x] A `position` column on `folders` keeps your own order (migration `0017`, which numbers everyone's folders in the order they were made, so nothing moves). One helper, `placeFolder` (`lib/folders.ts`), works out a move for the browser, the server and Undo
+- [x] "My order" or "A to Z" under the sidebar's folders (and on the phone's Folders screen), remembered per device (`useFolderOrder`). In A to Z, folders can still be dropped inside each other, but not between
+- [x] New and restored folders go last; a deleted folder's folders take its place in the order
+- [x] Backups carry `position`; restoring an older backup gives its folders 0, so they keep the order they were made in
 
 **Step 3: phones, keyboards and screen readers**
-- [ ] On phones: press and hold to pick something up, with a small buzz where phones support it (`navigator.vibrate`); the page scrolls when you drag near the edge
-- [ ] Nothing needs dragging: **Move to…** stays for links and folders, and the Edit folder panel gets **Move up** and **Move down**
-- [ ] Screen readers hear what's happening ("Picked up Reading. Over Work. Dropped into Work")
-- [ ] Browser tests for dragging with a mouse, a finger and the keyboard
+- [x] On phones: press and hold to pick something up, with a small buzz where phones support it (`navigator.vibrate`); the page scrolls when you drag near the top or bottom edge (on computers too)
+- [x] Nothing needs dragging: **Move to…** stays for links and folders, and the Edit folder panel gets **Move up** and **Move down**
+- [x] The keyboard drags too: on a folder in the sidebar, **Alt+↑/↓** moves it up or down, **Alt+→** puts it inside the folder above, **Alt+←** takes it out one level (Option on a Mac). **Esc** puts back whatever's picked up
+- [x] Screen readers hear what's happening ("Picked up Reading", "Over Work", "Dropped into Work", "Reading put back"), and the Undo message after it
+- [x] Unit tests: `placeFolder` and friends, `moveFolder` with a place, dragging with a mouse and a finger, Select mode, loops refused, Esc, the keyboard, A to Z, Move up / Move down, restoring an old backup
+- [x] Browser tests for dragging with a mouse, a finger (real touch events) and the keyboard (`e2e/drag.spec.ts`)
 
 **You'll learn:** pointer events (one code path for mouse, finger and pen), drag and drop that works for everyone, and saving a hand-made order in the database.
 

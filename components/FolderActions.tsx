@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import FolderIcon from "@/components/FolderIcon";
-import { flattenTree, folderAndInside, FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_ICONS, FOLDER_TEXT_CLASS, indentedName } from "@/lib/folders";
+import { childFolders, flattenTree, folderAndInside, FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_ICONS, FOLDER_TEXT_CLASS, indentedName, placeOf } from "@/lib/folders";
 import { FOLDER_NAME_MAX_LENGTH } from "@/lib/links";
 import type { Folder, FolderColor, FolderIcon as FolderIconName } from "@/types/link";
 
@@ -12,7 +12,8 @@ type FolderActionsProps = {
   folders: Folder[];
   // Each returns an error message, or null when it worked.
   onCreateInside: (name: string) => Promise<string | null>;
-  onMove: (parentId: string | null) => Promise<string | null>;
+  // Into `parentId` (null: the top level), at `index` among the folders there.
+  onMove: (parentId: string | null, index?: number) => Promise<string | null>;
   onPin: (pinned: boolean) => void;
   onRename: (id: string, name: string) => Promise<string | null>;
   onRecolor: (id: string, color: FolderColor) => void;
@@ -35,6 +36,9 @@ export default function FolderActions({ folder, folders, onCreateInside, onMove,
   const [moveError, setMoveError] = useState<string | null>(null);
   // Where it can move: anywhere but into itself or a folder inside it.
   const cantGoInto = folderAndInside(folders, folder.id);
+  // Its place among the folders next to it, for Move up and Move down.
+  const place = placeOf(folders, folder.id);
+  const neighbours = childFolders(folders, place.parentId).length;
   const pencil = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -78,6 +82,10 @@ export default function FolderActions({ folder, folders, onCreateInside, onMove,
 
   async function handleMove(parentId: string) {
     setMoveError(await onMove(parentId || null));
+  }
+
+  async function handleStep(step: -1 | 1) {
+    setMoveError(await onMove(place.parentId, place.index + step));
   }
 
   // The folder goes to the Trash, with Undo (it asks first only when folders
@@ -246,6 +254,26 @@ export default function FolderActions({ folder, folders, onCreateInside, onMove,
                   </option>
                 ))}
             </select>
+            {/* The order without dragging: one place up or down among its neighbours. */}
+            {neighbours > 1 && (
+              <div className="flex gap-2 pt-1">
+                {/* aria-disabled, not disabled: the keyboard stays on the button at the ends. */}
+                <button
+                  onClick={() => place.index > 0 && handleStep(-1)}
+                  aria-disabled={place.index <= 0}
+                  className="btn-secondary aria-disabled:opacity-50"
+                >
+                  Move up
+                </button>
+                <button
+                  onClick={() => place.index < neighbours - 1 && handleStep(1)}
+                  aria-disabled={place.index >= neighbours - 1}
+                  className="btn-secondary aria-disabled:opacity-50"
+                >
+                  Move down
+                </button>
+              </div>
+            )}
             {moveError && (
               <p role="alert" className="text-sm text-danger">
                 {moveError}
