@@ -38,6 +38,8 @@ export type Folder = {
   cameFromFolderId?: string;
   // Pinned to Home: shown first in Home's "Your folders".
   pinned?: boolean;
+  // Its place among the folders next to it, from 0 (your own order).
+  position?: number;
   // When it went to the Trash (only folders in the Trash have one).
   deletedAt?: string;
 };

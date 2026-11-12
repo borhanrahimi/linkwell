@@ -171,3 +171,51 @@ export function renamesMovingUp<F extends TreeFolder>(folders: F[], id: string):
   }
   return renames;
 }
+
+// ---- Your own order (dragging, Move up / Move down) ----
+
+// Puts a folder into `parentId` (null: the top level) at `index` among the
+// folders already there, and numbers that level 0, 1, 2… again. Without an
+// index it keeps its place when it stays where it is, and goes last when it
+// moves. Returns the whole list in its new order. Doesn't check for loops:
+// moveFolder does that first.
+export function placeFolder<F extends TreeFolder & { position?: number }>(
+  folders: F[],
+  id: string,
+  parentId: string | null,
+  index?: number
+): F[] {
+  const folder = folders.find((f) => f.id === id);
+  if (!folder) return folders;
+  const before = childFolders(folders, parentId);
+  const others = before.filter((f) => f.id !== id);
+  const stays = before.includes(folder);
+  const at = index === undefined ? (stays ? before.indexOf(folder) : others.length) : Math.min(Math.max(index, 0), others.length);
+  const order = [...others.slice(0, at).map((f) => f.id), id, ...others.slice(at).map((f) => f.id)];
+  const positions = new Map(order.map((other, i) => [other, i]));
+  const moved = folders.map((f) => {
+    const position = positions.get(f.id);
+    if (f.id === id) return { ...f, parentId: parentId ?? undefined, position };
+    return position === undefined || f.position === position ? f : { ...f, position };
+  });
+  // Folders are shown in list order, so the list follows the new numbers. The
+  // sort keeps equal ones as they were, so other levels don't change.
+  return moved.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+}
+
+// Where a folder is: its parent (null: the top level) and its index there.
+export function placeOf<F extends TreeFolder>(folders: F[], id: string): { parentId: string | null; index: number } {
+  const folder = folders.find((f) => f.id === id);
+  const parentId = folder ? (parentOf(folders, folder) ?? null) : null;
+  return { parentId, index: childFolders(folders, parentId).findIndex((f) => f.id === id) };
+}
+
+// The next free place at the end of a level, for a new or restored folder.
+export function nextPosition<F extends TreeFolder & { position?: number }>(folders: F[], parentId: string | null): number {
+  return Math.max(-1, ...childFolders(folders, parentId).map((f) => f.position ?? 0)) + 1;
+}
+
+// The same folders, A to Z within each level (the sidebar's "A to Z" choice).
+export function sortedByName<F extends TreeFolder>(folders: F[]): F[] {
+  return [...folders].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
+}

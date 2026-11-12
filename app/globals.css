@@ -247,3 +247,17 @@
 @utility sidebar-item-active {
   @apply bg-surface font-semibold shadow-sm ring-1 ring-line hover:bg-surface;
 }
+
+/* While a link or folder is picked up (components/DragAndDrop.tsx): no text
+   gets selected on the way, and the pointer shows a closed hand everywhere. */
+.dragging,
+.dragging * {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grabbing !important;
+}
+
+/* A folder that would take the drop: a blue wash and ring. */
+@utility drop-into {
+  @apply bg-[#0071e3]/10 ring-2 ring-[#0071e3];
+}

@@ -15,6 +15,10 @@ import {
   nameTakenIn,
   nextFolderColor,
   renamesMovingUp,
+  nextPosition,
+  placeFolder,
+  placeOf,
+  sortedByName,
 } from "@/lib/folders";
 
 test("new folders go through the palette in order, then start again", () => {
@@ -104,5 +108,52 @@ describe("folders inside folders", () => {
     // Deleting Work moves Clients and Ideas to the top level, next to "ideas".
     expect(renamesMovingUp(clash, "w")).toEqual([{ id: "i", name: "Ideas (2)" }]);
     expect(renamesMovingUp(folders, "c")).toEqual([]);
+  });
+});
+
+describe("your own order", () => {
+  const work = { id: "w", name: "Work", position: 0 };
+  const home = { id: "h", name: "home", position: 1 };
+  const ideas = { id: "i", name: "Ideas", position: 2 };
+  const clients = { id: "c", name: "Clients", parentId: "w", position: 0 };
+  const all = [work, home, ideas, clients];
+  const names = (folders: { name: string }[]) => folders.map((f) => f.name);
+
+  test("puts a folder at a place among its neighbours, and numbers them again", () => {
+    const moved = placeFolder(all, "i", null, 0);
+    expect(names(childFolders(moved, null))).toEqual(["Ideas", "Work", "home"]);
+    expect(childFolders(moved, null).map((f) => f.position)).toEqual([0, 1, 2]);
+    // The other levels don't change.
+    expect(childFolders(moved, "w")).toEqual([clients]);
+  });
+
+  test("into another folder: last without a place, or at the place given", () => {
+    expect(names(childFolders(placeFolder(all, "h", "w"), "w"))).toEqual(["Clients", "home"]);
+    expect(names(childFolders(placeFolder(all, "h", "w", 0), "w"))).toEqual(["home", "Clients"]);
+    // What it left closes up.
+    expect(childFolders(placeFolder(all, "h", "w"), null).map((f) => f.position)).toEqual([0, 2]);
+  });
+
+  test("staying put without a place keeps it there; a place past the end means last", () => {
+    expect(names(childFolders(placeFolder(all, "h", null), null))).toEqual(["Work", "home", "Ideas"]);
+    expect(names(childFolders(placeFolder(all, "w", null, 99), null))).toEqual(["home", "Ideas", "Work"]);
+    expect(placeFolder(all, "nope", null, 0)).toBe(all);
+  });
+
+  test("says where a folder is, and the next free place at the end of a level", () => {
+    expect(placeOf(all, "c")).toEqual({ parentId: "w", index: 0 });
+    expect(placeOf(all, "i")).toEqual({ parentId: null, index: 2 });
+    expect(nextPosition(all, null)).toBe(3);
+    expect(nextPosition(all, "c")).toBe(0);
+  });
+
+  test("A to Z ignores case and reads numbers as numbers", () => {
+    expect(names(sortedByName([work, home, ideas, { id: "x", name: "Week 10" }, { id: "y", name: "Week 9" }]))).toEqual([
+      "home",
+      "Ideas",
+      "Week 9",
+      "Week 10",
+      "Work",
+    ]);
   });
 });

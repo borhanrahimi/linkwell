@@ -596,11 +596,12 @@ describe("toFolder", () => {
     parentId: null,
     cameFromFolderId: null,
     pinnedAt: null,
+    position: 2,
     userId: "u1",
   };
 
-  test("keeps the id and name", () => {
-    expect(toFolder(row)).toEqual({ id: "f1", name: "Work" });
+  test("keeps the id, name and place in the order", () => {
+    expect(toFolder(row)).toEqual({ id: "f1", name: "Work", position: 2 });
   });
 
   test("keeps a colour from the palette", () => {

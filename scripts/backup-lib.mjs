@@ -15,7 +15,7 @@ export const TABLES = {
   user: ["id", "name", "email", "email_verified", "image", "username", "created_at", "updated_at"],
   account: ["id", "account_id", "provider_id", "user_id", "scope", "created_at", "updated_at"],
   // deleted_at: the Trash is backed up too, so a restore keeps it.
-  folders: ["id", "name", "color", "icon", "parent_id", "came_from_folder_id", "user_id", "created_at", "deleted_at", "pinned_at"],
+  folders: ["id", "name", "color", "icon", "parent_id", "came_from_folder_id", "user_id", "created_at", "deleted_at", "pinned_at", "position"],
   links: ["id", "url", "title", "tags", "note", "created_at", "status", "checked_at", "read_at", "folder_id", "came_from_folder_id", "image", "user_id", "deleted_at"],
 };
 
@@ -23,6 +23,11 @@ const quoted = (name) => `"${name}"`;
 
 // The folders' columns that point at other folders.
 const FOLDER_LINKS = ["parent_id", "came_from_folder_id"];
+
+// Columns that are newer than some backups, and what they hold when a file
+// doesn't have them (position: v2.4, before that folders kept the order they
+// were made in, which their created_at still gives).
+const MISSING = { folders: { position: 0 } };
 
 // sql.query(text, params) runs one query and returns its rows.
 export async function takeBackup(sql, source) {
@@ -65,7 +70,9 @@ export async function restoreBackup(sql, backup) {
       // Folders point at other folders, which may come later in the file
       // (a folder moved into a newer one). They go in pointing nowhere first;
       // the updates below link them up once every folder is in.
-      const values = columns.map((column) => (FOLDER_LINKS.includes(column) && table === "folders" ? null : (row[column] ?? null)));
+      const values = columns.map((column) =>
+        FOLDER_LINKS.includes(column) && table === "folders" ? null : (row[column] ?? MISSING[table]?.[column] ?? null)
+      );
       const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
       queries.push(
         sql.query(`insert into ${quoted(table)} (${columns.map(quoted).join(", ")}) values (${placeholders})`, values)

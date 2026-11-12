@@ -18,8 +18,9 @@ export async function measureContrast(page: Page): Promise<ContrastResult[]> {
         .trim();
       const box = el.getBoundingClientRect();
       if (!text || box.width === 0 || box.height === 0) return [];
-      // WCAG doesn't require contrast for disabled controls (like "Saving...").
-      if (el.closest(":disabled")) return [];
+      // WCAG doesn't require contrast for disabled controls (like "Saving...",
+      // or Move up on the first folder, which keeps focus with aria-disabled).
+      if (el.closest(':disabled, [aria-disabled="true"]')) return [];
 
       const style = getComputedStyle(el);
       // A faded parent (like opacity-75 on read cards) fades the text too.

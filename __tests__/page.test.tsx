@@ -1966,14 +1966,15 @@ describe("folders inside folders", () => {
     await act(async () => {
       fireEvent.change(menu, { target: { value: "f4" } });
     });
-    expect(moveFolder).toHaveBeenCalledWith("f1", "f4");
+    expect(moveFolder).toHaveBeenCalledWith("f1", "f4", undefined);
     expect(screen.getByText('"Work" moved to Home')).toBeDefined();
     expect(within(screen.getByRole("navigation", { name: "Folder path" })).getByRole("button", { name: "Home" })).toBeDefined();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     });
-    expect(moveFolder).toHaveBeenLastCalledWith("f1", null);
+    // Back where it was: first at the top level.
+    expect(moveFolder).toHaveBeenLastCalledWith("f1", null, 0);
   });
 
   test("a refused move says why", async () => {
@@ -2172,5 +2173,205 @@ describe("sliding along the phone's tab bar, like Instagram", () => {
     fireEvent.pointerMove(nav, { pointerId: 3, clientX: 260, clientY: 730 });
     fireEvent.pointerUp(nav, { pointerId: 3, clientX: 260, clientY: 730 });
     expect(screen.getByRole("dialog", { name: "Save a link" })).toBeDefined();
+  });
+});
+
+describe("drag and drop", () => {
+  const work = { id: "f1", name: "Work", position: 0 };
+  const clients = { id: "f2", name: "Clients", parentId: "f1", position: 0 };
+  const home = { id: "f4", name: "Home", position: 1 };
+  const plan = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000d1", url: "https://plan.com", title: "Plan", createdAt: "2026-10-02T12:00:00.000Z" };
+  const memo = { id: "5f0c6c1e-1b1a-4c3e-9a7e-0000000000d2", url: "https://memo.com", title: "Memo", createdAt: "2026-10-01T12:00:00.000Z" };
+  const sidebar = () => within(screen.getByRole("list", { name: "Folders" }));
+  const row = (name: string) => sidebar().getByRole("button", { name });
+  const card = (title: string) => cards().getByRole("link", { name: title }).closest("li[class*='glass']") as HTMLElement;
+  const mouse = { pointerId: 1, pointerType: "mouse", button: 0 };
+
+  function renderFolders(links = [plan, memo]) {
+    return render(<LinkManager initialLinks={links} initialFolders={[work, clients, home]} />);
+  }
+
+  // jsdom has no layout: say what's under the pointer, and how big each row is
+  // (40 pixels tall, from the top of the window).
+  function pointAt(element: HTMLElement) {
+    document.elementFromPoint = () => element;
+    element.getBoundingClientRect = () => ({ left: 0, top: 100, width: 200, height: 40, right: 200, bottom: 140, x: 0, y: 100, toJSON() {} });
+  }
+
+  // A mouse drag from `from` to the middle of `to` (or a spot in it).
+  function mouseDrag(from: HTMLElement, to: HTMLElement, y = 120) {
+    fireEvent.pointerDown(from, { ...mouse, clientX: 10, clientY: 300 });
+    pointAt(to);
+    fireEvent.pointerMove(window, { ...mouse, clientX: 30, clientY: 200 });
+    fireEvent.pointerMove(window, { ...mouse, clientX: 50, clientY: y });
+  }
+
+  test("a link dropped on a sidebar folder moves there, with Undo", async () => {
+    renderFolders();
+
+    mouseDrag(card("Plan"), row("Home"));
+    // The folder lights up, and the link's ghost follows the pointer.
+    expect(row("Home").className).toContain("drop-into");
+    expect(screen.getByText("Over Home")).toBeDefined();
+    // The click the drag ends with doesn't open the link's details.
+    await act(async () => {
+      fireEvent.pointerUp(window, { ...mouse, clientX: 50, clientY: 120 });
+      fireEvent.click(card("Plan"));
+    });
+    expect(screen.queryByRole("complementary")).toBeNull();
+
+    expect(moveLinksToFolder).toHaveBeenCalledWith([plan.id], "f4");
+    expect(screen.getByText("Moved to Home")).toBeDefined();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    expect(moveLinksToFolder).toHaveBeenLastCalledWith([plan.id], null);
+  });
+
+  test("on Home, a link from Recently saved dropped on a folder tile moves there", async () => {
+    window.history.replaceState(null, "", "/");
+    renderFolders();
+    const row = within(screen.getByRole("list", { name: "Recently saved" })).getByText("Plan").closest("li")!;
+    const tile = within(screen.getByRole("list", { name: "Your folders" })).getByText("Home").closest("button")!;
+
+    mouseDrag(row, tile);
+    await act(async () => {
+      fireEvent.pointerUp(window, { ...mouse, clientX: 50, clientY: 120 });
+    });
+
+    expect(moveLinksToFolder).toHaveBeenCalledWith([plan.id], "f4");
+  });
+
+  test("links ticked in Select mode move together", async () => {
+    renderFolders();
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Plan" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Memo" }));
+
+    mouseDrag(card("Plan"), row("Work"));
+    expect(screen.getByText("Moving 2 links")).toBeDefined();
+    await act(async () => {
+      fireEvent.pointerUp(window, { ...mouse, clientX: 50, clientY: 120 });
+    });
+
+    expect(moveLinksToFolder).toHaveBeenCalledWith([plan.id, memo.id], "f1");
+    expect(screen.getByText("2 links moved to Work")).toBeDefined();
+  });
+
+  test("a folder dropped near the top of another goes before it; in the middle, inside it", async () => {
+    renderFolders();
+
+    mouseDrag(row("Home"), row("Work"), 102);
+    await act(async () => {
+      fireEvent.pointerUp(window, { ...mouse, clientX: 50, clientY: 102 });
+    });
+    expect(moveFolder).toHaveBeenCalledWith("f4", null, 0);
+    expect(sidebar().getAllByRole("button", { name: /^(Work|Home)$/ }).map((b) => b.textContent?.replace(/\d/g, ""))).toEqual(["Home", "Work"]);
+    expect(screen.getByText('"Home" moved up')).toBeDefined();
+
+    mouseDrag(row("Home"), row("Work"));
+    await act(async () => {
+      fireEvent.pointerUp(window, { ...mouse, clientX: 50, clientY: 120 });
+    });
+    expect(moveFolder).toHaveBeenLastCalledWith("f4", "f1", undefined);
+    expect(screen.getByText('"Home" moved to Work')).toBeDefined();
+  });
+
+  test("a folder can't be dropped inside itself, and Esc puts it back", () => {
+    renderFolders();
+    fireEvent.click(sidebar().getByRole("button", { name: "Show folders in Work" }));
+
+    mouseDrag(row("Work"), row("Clients"));
+    expect(row("Clients").className).not.toContain("drop-into");
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.pointerUp(window, { ...mouse, clientX: 50, clientY: 120 });
+
+    expect(moveFolder).not.toHaveBeenCalled();
+    expect(screen.getByText("Work put back")).toBeDefined();
+  });
+
+  test("a finger presses and holds to pick a link up; moving at once scrolls instead", async () => {
+    vi.useFakeTimers();
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
+    renderFolders();
+    const finger = { pointerId: 7, pointerType: "touch" };
+
+    // Moving straight away is a scroll: nothing is picked up.
+    fireEvent.pointerDown(card("Plan"), { ...finger, clientX: 10, clientY: 300 });
+    fireEvent.pointerMove(window, { ...finger, clientX: 10, clientY: 250 });
+    act(() => vi.advanceTimersByTime(500));
+    expect(screen.queryByText("Picked up Plan", { exact: false })).toBeNull();
+
+    // Holding still picks it up, with a small buzz.
+    fireEvent.pointerDown(card("Plan"), { ...finger, clientX: 10, clientY: 300 });
+    act(() => vi.advanceTimersByTime(400));
+    expect(vibrate).toHaveBeenCalled();
+    expect(screen.getByText("Picked up Plan", { exact: false })).toBeDefined();
+    // Phones have no sidebar: the folders show at the bottom to drop on.
+    const panel = screen.getByText("Drop on a folder").parentElement!;
+    vi.useRealTimers();
+    pointAt(within(panel).getByText("Work"));
+    fireEvent.pointerMove(window, { ...finger, clientX: 50, clientY: 120 });
+    await act(async () => {
+      fireEvent.pointerUp(window, { ...finger, clientX: 50, clientY: 120 });
+    });
+
+    expect(moveLinksToFolder).toHaveBeenCalledWith([plan.id], "f1");
+  });
+
+  test("the keyboard moves folders with Alt and the arrows", async () => {
+    renderFolders();
+
+    await act(async () => {
+      fireEvent.keyDown(row("Home"), { key: "ArrowUp", altKey: true });
+    });
+    expect(moveFolder).toHaveBeenLastCalledWith("f4", null, 0);
+    // Alt+→: into the folder above it (Work is below Home now, so nothing).
+    fireEvent.keyDown(row("Home"), { key: "ArrowRight", altKey: true });
+    expect(screen.getByText("There's no folder above Home to put it in")).toBeDefined();
+
+    await act(async () => {
+      fireEvent.keyDown(row("Work"), { key: "ArrowRight", altKey: true });
+    });
+    expect(moveFolder).toHaveBeenLastCalledWith("f1", "f4", undefined);
+    // Alt+←: out one level, just after the folder it was in.
+    await act(async () => {
+      fireEvent.keyDown(row("Work"), { key: "ArrowLeft", altKey: true });
+    });
+    expect(moveFolder).toHaveBeenLastCalledWith("f1", null, 1);
+  });
+
+  test("the sidebar can sort folders A to Z, remembered on this device", () => {
+    renderFolders();
+    const names = () => sidebar().getAllByRole("button", { name: /^(Work|Home)$/ }).map((b) => b.textContent?.replace(/\d/g, ""));
+    expect(names()).toEqual(["Work", "Home"]);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Folder order" }), { target: { value: "name" } });
+    expect(names()).toEqual(["Home", "Work"]);
+    expect(localStorage.getItem("linkwell:folder-order")).toBe("name");
+    // In A to Z, up and down aren't yours to choose.
+    fireEvent.keyDown(row("Home"), { key: "ArrowDown", altKey: true });
+    expect(moveFolder).not.toHaveBeenCalled();
+    expect(screen.getByText("Folders are sorted A to Z", { exact: false })).toBeDefined();
+  });
+
+  test("the Edit folder panel has Move up and Move down, with Undo", async () => {
+    renderFolders();
+    fireEvent.click(row("Home"));
+    fireEvent.click(screen.getByRole("button", { name: "Edit folder" }));
+    expect(screen.getByRole("button", { name: "Move down" }).getAttribute("aria-disabled")).toBe("true");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Move up" }));
+    });
+    expect(moveFolder).toHaveBeenCalledWith("f4", null, 0);
+    expect(screen.getByText('"Home" moved up')).toBeDefined();
+    expect(screen.getByRole("button", { name: "Move up" }).getAttribute("aria-disabled")).toBe("true");
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    expect(moveFolder).toHaveBeenLastCalledWith("f4", null, 1);
   });
 });
