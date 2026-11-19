@@ -32,6 +32,9 @@ jobs:
 
   e2e:
     name: Browser tests
+    # Paused 2026-11-19: Neon's free allowance ran out (see ROADMAP v2.5.1).
+    # Remove this line once the database answers again.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
