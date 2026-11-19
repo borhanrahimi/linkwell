@@ -10,17 +10,20 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ---
 
-## 📌 Next time (updated 2026-11-18)
+## 📌 Next time (updated 2026-11-19)
 
-**Where we are:** v2.4 Drag and drop is **live** (pull request #22). **v2.5 Ready for 10,000 links** is built and tested, but **not committed yet**: the changes are on your computer, on `main`. Next on the roadmap: v2.6 A private vault.
+**⚠️ The live site is down (since 2026-11-19).** Neon's free allowance ran out, so the database refuses every query: nobody can sign in, and the browser tests fail. The demo (`/demo`) still works. **Start with v2.5.1 "Staying up for free"** (below v2.5): its "Right now" list gets the site back, and the rest stops it happening again, all free.
+
+**Where we are:** v2.4 Drag and drop is **live** (pull request #22). **v2.5 Ready for 10,000 links** is committed on the branch `ready-for-10000-links` and pushed. Its browser tests failed only because of the outage above. After v2.5.1: v2.6 A private vault.
 
 **Shipping v2.5** (it needs migration `0018`: four indexes, no new columns, so it's safe to run before the code):
 - [x] `npm run check` (527 unit tests) and `npm run e2e` (49 browser tests, the whole suite twice in a row) pass
 - [x] Migration `0018` on the test database (2026-11-18)
 - [ ] Migration `0018` on your dev database: `npx drizzle-kit migrate`
 - [ ] Try it: `npm run dev`, then open All links, scroll to the bottom, search, open a folder, and Select → Select all. The demo (`localhost:3000/demo`) should work as before
-- [ ] Move the work onto a branch and commit: `git switch -c ready-for-10000-links`, `git add -A`, `git commit` (Claude can suggest small commits, one per step)
-- [ ] Push and open a pull request
+- [x] Move the work onto a branch and commit: `git switch -c ready-for-10000-links`, `git add -A`, `git commit`
+- [x] Push (2026-11-19)
+- [ ] Open the pull request, and wait for ✅ (the browser tests need the database back first: see v2.5.1)
 - [ ] **Before merging:** `npm run backup`, then migration `0018` on production (see `MAINTENANCE.md`)
 - [ ] Merge with a normal merge (not "Squash and merge")
 - [ ] Optional: the Next.js build said the installed Next.js has a known security problem, but `npm audit` found nothing. Check for a newer 16.x version (`npm outdated next`), or wait for Dependabot's weekly update
@@ -390,6 +393,7 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 | v2.3 A real Home screen 🏡 | Its folder tiles and tabs build on the folder tree |
 | ✅ v2.4 Drag and drop ✋ | Moving links and folders by hand, once there's a tree to drag into |
 | ✅ v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
+| v2.5.1 Staying up for free 🛟 | Added 2026-11-19 after the free database allowance ran out and took the live site down. Comes first: nothing else matters if nobody can sign in |
 | v2.6 A private vault 🔐 | Links only you can read, not even the developer. Last, because it changes what the server can do for you (see its trade-offs), and it's easiest once everything else is settled |
 
 ## ✅ v2.1: Trash and Undo 🗑️ (done 2026-11-03)
@@ -675,6 +679,45 @@ Choices made while building it (2026-11-18):
 - **No special search index yet:** 6.5 ms for 10,000 links is fast enough; a trigram index can come when it isn't
 
 **You'll learn:** measuring before optimising, database indexes, `EXPLAIN` in SQL, pagination, infinite scrolling, and full-text search.
+
+## 🔜 v2.5.1: Staying up for free 🛟 (planned 2026-11-19)
+
+**What happened:** on 2026-11-19 the live site went down (`/api/health` said `"down"`, nobody could sign in) and every browser test failed at "create the test user". The code was fine: Neon refused every query with *"Your account or project has exceeded the quota"* (HTTP 402). Linkwell is on Neon's free plan, and it ran out of its monthly allowance.
+
+**Why:**
+- **The uptime monitor never let the database sleep.** UptimeRobot opens `/api/health` every 5 minutes, and that check asks the database a question. Neon puts a database to sleep after 5 minutes of no questions, so it was awake 24 hours a day. That alone is more than the free plan's compute hours.
+- **The live site, dev and the tests share one allowance.** Heavy testing (the 10,000-link `npm run measure` runs on 2026-11-18) used up the same hours the live site needs.
+- **Backups are by hand.** The newest one is from 2026-10-21, so the live database couldn't have been moved without losing a month of links.
+
+**The rule for this milestone: it all stays free.** No paid plans.
+
+**Right now (you):**
+- [ ] Neon console → **Usage**: which limit ran out (compute hours or data transfer), for one project or the whole account, and the date it resets
+- [ ] Either wait for the reset (nothing lost), or, if only one project ran out, move the live site to a new free project from the 2026-10-21 backup (steps in `MAINTENANCE.md` → "Restore one"; links saved after 2026-10-21 are copied over once the old project answers again)
+- [ ] The moment the database answers again: `npm run backup`, then re-run the failed browser tests on GitHub (pull request for `ready-for-10000-links`)
+
+**1. Let the database sleep:**
+- [ ] You: UptimeRobot → the `Linkwell` monitor → interval from **5 minutes to 60 minutes** (free, no code)
+- [ ] Claude: `/api/health` checks the database at most once an hour and reuses that answer in between, so the monitor can't keep it awake even at 5 minutes. The app itself is still checked every time
+
+**2. More databases (one free Neon project each):**
+- [ ] You: create a second free Neon project, **Linkwell tests**, for the browser tests, GitHub's runs and `npm run dev`. The live site keeps its project to itself
+- [ ] You: run the migrations on it (`npx drizzle-kit migrate`), then put its connection string in `.env.local` (`E2E_DATABASE_URL` and the dev `DATABASE_URL`) and in GitHub's `E2E_DATABASE_URL` secret. Never paste it into the chat
+- [ ] Claude: update `MAINTENANCE.md` ("Where everything lives", "Secrets")
+
+**3. Automatic backups:**
+- [ ] Claude: a weekly GitHub job that runs the backup and keeps the file for 90 days. **The repo is public**, so the job locks the file with a password before saving it, and anyone else who downloads it sees only scrambled data
+- [ ] Claude: `npm run unlock-backup` to turn a locked backup back into the normal file that `npm run restore` reads
+- [ ] You: add two GitHub secrets: `BACKUP_PASSWORD` (a long password kept in your password manager; without it, the backups can't be opened) and `PRODUCTION_DATABASE_URL` (read access is enough)
+- [ ] Together: the restore fire drill, unlocking the newest weekly backup and restoring it into an empty Neon branch
+
+**4. Spending less of the free allowance:**
+- [ ] Claude: a warning on `npm run measure` (in `MAINTENANCE.md` and when it starts): 10,000 links use a big piece of the month's allowance, so run it only on the tests project, and only with a reason
+- [ ] Claude: `MAINTENANCE.md` → "When the uptime monitor emails you" gets this outage: how to spot the 402, and what to do
+
+**Later, only if it happens again:** a spare free database at a second company, filled from the weekly backup, so the live site can switch to it in Vercel. It needs a code change (today's database connection only works with Neon), so it isn't worth it unless 1–3 aren't enough.
+
+**You'll learn:** how serverless databases charge (compute hours, sleeping, data transfer), why a health check can cost money, keeping test and live data apart, and automated, encrypted backups.
 
 ## 🔜 v2.6: A private vault 🔐 (planned 2026-11-03)
 
