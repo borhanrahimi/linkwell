@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   childFolders,
-  countWithInside,
+  countInside,
   flattenTree,
   folderAndInside,
   folderPath,
@@ -99,8 +99,8 @@ describe("folders inside folders", () => {
   });
 
   test("counts a folder's links together with those in the folders inside it", () => {
-    const links = [{ folderId: "w" }, { folderId: "c" }, { folderId: "a" }, { folderId: "a" }, {}];
-    expect(countWithInside(folders, links)).toEqual({ w: 4, c: 3, a: 2, i: 0, h: 0 });
+    // How many each folder holds itself: Work 1, Clients 1, Acme 2.
+    expect(countInside(folders, { w: 1, c: 1, a: 2 })).toEqual({ w: 4, c: 3, a: 2, i: 0, h: 0 });
   });
 
   test("renames folders moving up next to one with the same name", () => {

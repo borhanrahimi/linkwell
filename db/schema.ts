@@ -1,4 +1,5 @@
-import { integer, pgTable, primaryKey, text, timestamp, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { index, integer, pgTable, primaryKey, text, timestamp, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 export const folders = pgTable("folders", {
@@ -25,7 +26,10 @@ export const folders = pgTable("folders", {
   // Its place among the folders next to it (same parent), from 0: the order
   // you drag them into. Ties (folders that moved up a level) go by created_at.
   position: integer("position").notNull().default(0),
-});
+}, (table) => [
+  // Every folder query starts with "this user's folders" (v2.5).
+  index("folders_user_idx").on(table.userId),
+]);
 
 export const links = pgTable("links", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -55,7 +59,17 @@ export const links = pgTable("links", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-});
+}, (table) => [
+  // Indexes for what's asked most (v2.5). Without them the database reads
+  // every user's links to find yours. "where deleted_at is null" leaves the
+  // Trash out of them, as almost every query does.
+  // A user's links, newest first: lists, pages ("after this date and id"), Home.
+  index("links_user_created_idx").on(table.userId, table.createdAt, table.id).where(sql`${table.deletedAt} is null`),
+  // A user's links in a folder: opening a folder, counting each folder.
+  index("links_user_folder_idx").on(table.userId, table.folderId).where(sql`${table.deletedAt} is null`),
+  // The Trash: only deleted links, so it stays small.
+  index("links_user_trash_idx").on(table.userId, table.deletedAt).where(sql`${table.deletedAt} is not null`),
+]);
 
 export type LinkRow = typeof links.$inferSelect;
 export type FolderRow = typeof folders.$inferSelect;

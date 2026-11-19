@@ -2375,3 +2375,42 @@ describe("drag and drop", () => {
     expect(moveFolder).toHaveBeenLastCalledWith("f4", null, 1);
   });
 });
+
+describe("a long list (v2.5)", () => {
+  const many: Link[] = Array.from({ length: 120 }, (_, i) => ({
+    id: String(i),
+    url: `https://example.com/${i}`,
+    title: `Link ${i}`,
+    tags: [],
+    createdAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+  }));
+
+  test("draws 50 links at a time, and Show more draws the next 50", () => {
+    render(<LinkManager initialLinks={many} />);
+
+    expect(cardCount()).toBe(50);
+    expect(screen.getByText("120 links")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Show more links" }));
+    expect(cardCount()).toBe(100);
+    fireEvent.click(screen.getByRole("button", { name: "Show more links" }));
+    expect(cardCount()).toBe(120);
+    expect(screen.queryByRole("button", { name: "Show more links" })).toBeNull();
+  });
+
+  test("Select all ticks all 120, not just the ones drawn", () => {
+    render(<LinkManager initialLinks={many} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select all 120" }));
+
+    expect(screen.getByText("120 selected")).toBeDefined();
+  });
+
+  test("search also looks inside tags now", () => {
+    render(<LinkManager initialLinks={[...many.slice(0, 3), { ...many[3], tags: ["sourdough"] }]} />);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search links" }), { target: { value: "sourdough" } });
+
+    expect(cardCount()).toBe(1);
+  });
+});

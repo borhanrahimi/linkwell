@@ -13,17 +13,12 @@ import {
   NOTE_MAX_LENGTH,
   getFaviconUrl,
   parseTags,
-  filterByTag,
-  searchLinks,
-  sortLinks,
   toLink,
   getArchiveUrl,
   setReadAt,
   pickRediscover,
-  countLinks,
   toFolder,
   setFolder,
-  filterByFolder,
   clearFolder,
   cleanNewLink,
   cleanTags,
@@ -291,94 +286,6 @@ describe("parseTags", () => {
   });
 });
 
-describe("filterByTag", () => {
-  const react = createLink("https://react.dev", "", ["react", "docs"]);
-  const news = createLink("https://news.ycombinator.com", "", ["news"]);
-  const old = {
-    id: "old",
-    url: "https://old.com",
-    createdAt: "2026-01-01T00:00:00.000Z",
-  };
-
-  test("returns every link when no tag is chosen", () => {
-    expect(filterByTag([react, news, old], null)).toEqual([react, news, old]);
-  });
-
-  test("keeps only links with the chosen tag", () => {
-    expect(filterByTag([react, news, old], "react")).toEqual([react]);
-  });
-
-  test("skips links saved before tags existed", () => {
-    expect(filterByTag([old], "react")).toEqual([]);
-  });
-});
-
-describe("searchLinks", () => {
-  const react = createLink("https://react.dev", "React docs");
-  const news = createLink("https://news.ycombinator.com");
-
-  test("returns every link when the search is empty", () => {
-    expect(searchLinks([react, news], "  ")).toEqual([react, news]);
-  });
-
-  test("finds links by title, ignoring case", () => {
-    expect(searchLinks([react, news], "DOCS")).toEqual([react]);
-  });
-
-  test("finds links by url", () => {
-    expect(searchLinks([react, news], "ycombinator")).toEqual([news]);
-  });
-
-  test("returns nothing when no link matches", () => {
-    expect(searchLinks([react, news], "vue")).toEqual([]);
-  });
-
-  test("finds links by their note", () => {
-    const noted = { ...news, note: "For the interview on Monday" };
-
-    expect(searchLinks([react, noted], "interview")).toEqual([noted]);
-  });
-});
-
-describe("sortLinks", () => {
-  const first = {
-    id: "1",
-    url: "https://zebra.com",
-    createdAt: "2026-10-01T12:00:00.000Z",
-  };
-  const second = {
-    id: "2",
-    url: "https://apple.com",
-    title: "Banana",
-    createdAt: "2026-10-02T12:00:00.000Z",
-  };
-  const third = {
-    id: "3",
-    url: "https://cherry.com",
-    title: "apple pie",
-    createdAt: "2026-10-03T12:00:00.000Z",
-  };
-  const links = [second, third, first];
-
-  test("puts the newest link first", () => {
-    expect(sortLinks(links, "newest")).toEqual([third, second, first]);
-  });
-
-  test("puts the oldest link first", () => {
-    expect(sortLinks(links, "oldest")).toEqual([first, second, third]);
-  });
-
-  test("sorts by title A to Z, ignoring case, using the domain when there's no title", () => {
-    expect(sortLinks(links, "title")).toEqual([third, second, first]);
-  });
-
-  test("does not change the original list", () => {
-    sortLinks(links, "oldest");
-
-    expect(links).toEqual([second, third, first]);
-  });
-});
-
 describe("freeFolderName", () => {
   test("keeps a free name, and numbers a taken one (ignoring case)", () => {
     expect(freeFolderName("Reading", ["Work"])).toBe("Reading");
@@ -516,32 +423,6 @@ describe("setReadAt", () => {
   });
 });
 
-describe("countLinks", () => {
-  test("counts all, unread and broken links", () => {
-    const links = [
-      { id: "1", url: "https://a.com", createdAt: "2020-01-01T00:00:00.000Z" },
-      {
-        id: "2",
-        url: "https://b.com",
-        createdAt: "2020-01-01T00:00:00.000Z",
-        readAt: "2020-01-02T00:00:00.000Z",
-      },
-      {
-        id: "3",
-        url: "https://c.com",
-        createdAt: "2020-01-01T00:00:00.000Z",
-        status: "broken" as const,
-      },
-    ];
-
-    expect(countLinks(links)).toEqual({ total: 3, unread: 2, broken: 1 });
-  });
-
-  test("is all zeros when there are no links", () => {
-    expect(countLinks([])).toEqual({ total: 0, unread: 0, broken: 0 });
-  });
-});
-
 describe("pickRediscover", () => {
   const now = new Date("2026-10-20T12:00:00.000Z");
   const saved = (id: string, createdAt: string) => ({
@@ -635,19 +516,6 @@ describe("setFolder", () => {
     expect(
       setFolder([inFolder], first.id, undefined)[0].folderId
     ).toBeUndefined();
-  });
-});
-
-describe("filterByFolder", () => {
-  const work = { ...createLink("https://github.com"), folderId: "f1" };
-  const loose = createLink("https://react.dev");
-
-  test("returns every link when no folder is chosen", () => {
-    expect(filterByFolder([work, loose], null)).toEqual([work, loose]);
-  });
-
-  test("keeps only the links in the chosen folder", () => {
-    expect(filterByFolder([work, loose], "f1")).toEqual([work]);
   });
 });
 

@@ -17,7 +17,8 @@ Most bookmark tools are where links go to die. Linkwell keeps three promises:
 
 ## Highlights
 
-- **Tested**: ~490 unit tests and ~40 browser tests, including WCAG AA contrast checks on every page, in light and dark mode.
+- **Tested**: ~530 unit tests and ~50 browser tests, including WCAG AA contrast checks on every page, in light and dark mode.
+- **Fast with 10,000 links**: measured first, then the database took over the counting, searching and sorting. Lists load 50 links at a time (keyset pagination on a partial index), so All links on a phone went from 53 seconds to under 2.
 - **Nothing lost by one wrong tap**: a Trash that keeps deleted links and folders for 30 days (soft deletes and a daily clean-up), and Undo after every delete, move or read change, putting back each link's own earlier state.
 - **Folders inside folders**: a tree built in the browser from one flat list, loops refused by a `WITH RECURSIVE` query, and nested bookmark folders kept on import and export.
 - **Secure by default**: server-side validation on every action, SSRF protection on every fetch and redirect, a per-request nonce CSP, rate limits, and per-user data access.
@@ -44,11 +45,13 @@ npm run dev               # http://localhost:3000
 | `npm run e2e` | Browser tests against the test database |
 | `npm run backup` | Saves the production data to `backups/` |
 | `npm run screenshots` | Retakes the landing page's screenshots |
+| `npm run measure` | Times the app with 10,000 links in the test database (see the roadmap's v2.5) |
 
 ## Documentation
 
 | | |
 |---|---|
+| [Project map](docs/project-map.html) | An interactive picture of the whole app: download it and open it in a browser |
 | [Architecture](docs/ARCHITECTURE.md) | How the code is organized and how data flows |
 | [Decisions](docs/DECISIONS.md) | Why each choice was made |
 | [Case study](docs/CASE_STUDY.md) | The story of building it, and what was learned |

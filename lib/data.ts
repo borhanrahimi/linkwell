@@ -4,6 +4,19 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne, sql } from "dri
 import { db } from "@/db";
 import { folders, links, rateLimits, user } from "@/db/schema";
 import { toFolder, toLink } from "@/lib/links";
+import {
+  FOLDER_IMAGES,
+  HOME_RECENT,
+  HOME_REDISCOVER,
+  HOME_UNREAD,
+  makeCursor,
+  PAGE_SIZE,
+  readCursor,
+  searchWords,
+  type LinkPage,
+  type LinkQuery,
+  type LinkSummary,
+} from "@/lib/linkQuery";
 import type { Folder, FolderColor, FolderIcon, Link, LinkDetails, LinkStatus } from "@/types/link";
 
 // Every function takes the signed-in user's id and only touches that user's rows.
@@ -33,6 +46,171 @@ export async function getLinks(userId: string): Promise<Link[]> {
     .where(and(eq(links.userId, userId), isNull(links.deletedAt)))
     .orderBy(desc(links.createdAt));
   return rows.map(toLink);
+}
+
+// ---- Lists a page at a time (v2.5) ----
+// The rules are in lib/linkQuery.ts (matchesQuery, compareLinks); these
+// follow them in SQL, so the database does the filtering, counting and
+// sorting, and only one page of links travels to the browser.
+
+const live = (userId: string) => and(eq(links.userId, userId), isNull(links.deletedAt));
+
+// A search word inside LIKE: % and _ (and the escape character, \) are
+// meant literally, not as wildcards.
+function likeWord(word: string) {
+  return `%${word.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+// Everything a link's search looks in, as one text: title, address, note, tags.
+// (No search word has a space in it, so a space between them is enough.)
+const searchText = sql`concat_ws(' ', ${links.title}, ${links.url}, ${links.note}, array_to_string(${links.tags}, ' '))`;
+
+function queryWhere(userId: string, query: LinkQuery) {
+  return and(
+    live(userId),
+    query.list === "unread" ? isNull(links.readAt) : undefined,
+    query.list === "broken" ? eq(links.status, "broken") : undefined,
+    query.list === "unsorted" ? isNull(links.folderId) : undefined,
+    query.folderIds ? (query.folderIds.length > 0 ? inArray(links.folderId, query.folderIds) : sql`false`) : undefined,
+    query.notInFolder ? sql`${links.folderId} is distinct from ${query.notInFolder}::uuid` : undefined,
+    query.tag ? sql`${query.tag} = any(${links.tags})` : undefined,
+    ...searchWords(query.search).map((word) => sql`${searchText} ilike ${likeWord(word)}`)
+  );
+}
+
+// "Title (A–Z)" sorts by the title, or the site's name when there's none
+// (lib/linkQuery.ts titleKey: the host without "www.").
+// The host is the 3rd group of HOST: after "scheme://", an optional "www."
+// and an optional "user@".
+const HOST = String.raw`^[a-z][a-z0-9+.-]*://(www\.)?([^/:?#@]*@)?([^/:?#]*).*$`;
+const titleKey = sql<string>`lower(coalesce(nullif(${links.title}, ''), regexp_replace(${links.url}, ${HOST}, ${String.raw`\3`}, 'i')))`;
+// The sort key as text, for the cursor: exact to the microsecond for dates
+// (a JavaScript date only keeps milliseconds, and would skip links).
+function sortKey(query: LinkQuery) {
+  return query.sort === "title" ? titleKey : sql<string>`${links.createdAt}::text`;
+}
+
+function orderFor(query: LinkQuery) {
+  if (query.sort === "title") return [asc(titleKey), asc(links.id)];
+  if (query.sort === "oldest") return [asc(links.createdAt), asc(links.id)];
+  return [desc(links.createdAt), desc(links.id)];
+}
+
+// Keyset pagination: "after this link", not "skip 500 rows". The database
+// jumps straight there through the index, however deep into the list.
+function afterCursor(query: LinkQuery, cursor: string | null) {
+  const after = readCursor(cursor);
+  if (!after) return undefined;
+  if (query.sort === "title") return sql`(${titleKey}, ${links.id}) > (${after.key}, ${after.id}::uuid)`;
+  if (query.sort === "oldest") return sql`(${links.createdAt}, ${links.id}) > (${after.key}::timestamptz, ${after.id}::uuid)`;
+  return sql`(${links.createdAt}, ${links.id}) < (${after.key}::timestamptz, ${after.id}::uuid)`;
+}
+
+export async function getLinkPage(userId: string, query: LinkQuery, cursor: string | null = null, limit = PAGE_SIZE): Promise<LinkPage> {
+  const where = queryWhere(userId, query);
+  const [rows, [{ total }]] = await db.batch([
+    db
+      .select({ link: links, key: sortKey(query) })
+      .from(links)
+      .where(and(where, afterCursor(query, cursor)))
+      .orderBy(...orderFor(query))
+      // One more than a page: if it's there, there is a next page.
+      .limit(limit + 1),
+    db.select({ total: sql<number>`count(*)::int` }).from(links).where(where),
+  ]);
+  const page = rows.slice(0, limit);
+  const last = page.at(-1);
+  return {
+    links: page.map((row) => toLink(row.link)),
+    total,
+    next: rows.length > limit && last ? makeCursor(last.key, last.link.id) : null,
+  };
+}
+
+// How many links a query finds.
+export async function countMatching(userId: string, query: LinkQuery): Promise<number> {
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(links).where(queryWhere(userId, query));
+  return total;
+}
+
+// Every link a query finds (Select all on a long list), up to `limit`.
+export async function getAllMatching(userId: string, query: LinkQuery, limit: number): Promise<Link[]> {
+  const rows = await db.select().from(links).where(queryWhere(userId, query)).orderBy(...orderFor(query)).limit(limit);
+  return rows.map(toLink);
+}
+
+// The counts, tags and Home's few links, in one trip to the database (a
+// batch). lib/linkQuery.ts summarize() is the same in memory.
+export async function getLinkSummary(userId: string, now = new Date()): Promise<LinkSummary> {
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const [[counts], folderRows, tagRows, imageRows, unreadRows, recentRows, rediscoverRows] = await db.batch([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        unread: sql<number>`(count(*) filter (where ${links.readAt} is null))::int`,
+        broken: sql<number>`(count(*) filter (where ${links.status} = 'broken'))::int`,
+        unsorted: sql<number>`(count(*) filter (where ${links.folderId} is null))::int`,
+        thisWeek: sql<number>`(count(*) filter (where ${links.createdAt} > ${weekAgo}))::int`,
+      })
+      .from(links)
+      .where(live(userId)),
+    db
+      .select({ folderId: links.folderId, count: sql<number>`count(*)::int` })
+      .from(links)
+      .where(and(live(userId), isNotNull(links.folderId)))
+      .groupBy(links.folderId),
+    db.execute<{ tag: string; count: number }>(sql`
+      select tag, count(*)::int as count
+      from ${links}, unnest(${links.tags}) as tag
+      where ${links.userId} = ${userId} and ${links.deletedAt} is null
+      group by tag
+      order by count desc, tag`),
+    // The newest few pictures in each folder: number each folder's links
+    // newest first (row_number() over a "window"), keep the first few.
+    db.execute<{ folder_id: string; image: string; created_at: string }>(sql`
+      select folder_id, image, created_at from (
+        select ${links.folderId} as folder_id, ${links.image} as image, ${links.createdAt} as created_at,
+          row_number() over (partition by ${links.folderId} order by ${links.createdAt} desc, ${links.id} desc) as n
+        from ${links}
+        where ${links.userId} = ${userId} and ${links.deletedAt} is null
+          and ${links.folderId} is not null and ${links.image} <> ''
+      ) as pictures
+      where n <= ${FOLDER_IMAGES}`),
+    db.select().from(links).where(and(live(userId), isNull(links.readAt))).orderBy(desc(links.createdAt), desc(links.id)).limit(HOME_UNREAD),
+    db.select().from(links).where(live(userId)).orderBy(desc(links.createdAt), desc(links.id)).limit(HOME_RECENT),
+    db
+      .select()
+      .from(links)
+      .where(and(live(userId), isNull(links.readAt), sql`${links.status} is distinct from 'broken'`, lt(links.createdAt, weekAgo)))
+      .orderBy(asc(links.createdAt), asc(links.id))
+      .limit(HOME_REDISCOVER),
+  ]);
+  const images: LinkSummary["images"] = {};
+  for (const row of imageRows.rows) {
+    (images[row.folder_id] ??= []).push({ image: row.image, createdAt: new Date(row.created_at).toISOString() });
+  }
+  return {
+    ...counts,
+    byFolder: Object.fromEntries(folderRows.map((row) => [row.folderId!, row.count])),
+    tags: tagRows.rows,
+    images,
+    unreadLinks: unreadRows.map(toLink),
+    recentLinks: recentRows.map(toLink),
+    rediscoverLinks: rediscoverRows.map(toLink),
+  };
+}
+
+// How many links the user has (not counting the Trash): for the link limit.
+export async function countUserLinks(userId: string): Promise<number> {
+  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(links).where(live(userId));
+  return count;
+}
+
+// Just the addresses of the user's links (not the Trash's), to spot a link
+// saved twice: much less to send than whole links.
+export async function getLinkUrls(userId: string): Promise<string[]> {
+  const rows = await db.select({ url: links.url }).from(links).where(live(userId));
+  return rows.map((row) => row.url);
 }
 
 export async function insertLink(userId: string, link: Link) {

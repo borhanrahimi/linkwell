@@ -172,6 +172,23 @@ The tables are defined in `db/schema.ts` (and `db/auth-schema.ts`).
    Production first, then the code: new code on an old database breaks; an
    added column on a database whose code doesn't use it yet is harmless.
 
+**Indexes** (like `0018`) are safe at any time: they change no data, and the
+old code simply gets faster. Building one stops writes to that table for as
+long as it takes, which is well under a second for Linkwell's tables today.
+If a table ever holds millions of rows, write the migration by hand with
+`CREATE INDEX CONCURRENTLY` instead (it builds without stopping writes).
+
+## Checking the speed
+
+`npm run measure` fills a brand-new test account with 10,000 made-up links in
+200 folders, times Home, All links, a search and opening a folder (on a
+computer, and on a phone-sized screen with the processor slowed down 4×), and
+prints what the database does with the main questions (`EXPLAIN ANALYZE`).
+It only uses the test database and deletes the account afterwards. Run it
+after a change that could make big collections slower, and compare with the
+numbers in the roadmap (v2.5). Times include the trip from your computer to
+Neon, so they vary a little between runs.
+
 ## When the uptime monitor emails you
 
 UptimeRobot opens `/api/health` every 5 minutes. It answers `{"status":"ok"}`
