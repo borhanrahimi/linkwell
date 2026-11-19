@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linkwell Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one wide map in four columns (browser → Vercel → shared code → outside), a detail panel under it, then a folder guide. */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --ink: #16202c;
+  --muted: #5b6878;
+  --line: #8a96a6;
+  --zone: #e9eef5;
+  --accent: #0a6cdf;
+  --accent-soft: #dcebff;
+  --halo: #f5f7fa;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #18202b; --ink: #e6ebf2; --muted: #9aa6b6; --line: #6b7889;
+    --zone: #141b24; --accent: #4ea1ff; --accent-soft: #15304f; --halo: #0f141b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #18202b; --ink: #e6ebf2; --muted: #9aa6b6; --line: #6b7889;
+  --zone: #141b24; --accent: #4ea1ff; --accent-soft: #15304f; --halo: #0f141b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 32px 56px; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; max-width: 70ch; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 21px; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+.lead { color: var(--muted); }
+
+.flows { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.flows span { color: var(--muted); font-size: 13px; margin-right: 4px; }
+.flows button {
+  font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 6px 14px; cursor: pointer;
+}
+.flows button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.flows button:focus-visible, .node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mapbox { overflow-x: auto; background: var(--surface); border-radius: 16px; border: 1px solid color-mix(in srgb, var(--line) 35%, transparent); }
+figure { margin: 0; }
+svg#map { display: block; width: 100%; min-width: 920px; height: auto; font-family: var(--font-body); }
+figcaption { font-size: 13px; color: var(--muted); padding: 10px 16px 14px; }
+
+.zone rect { fill: var(--zone); }
+.zone text { fill: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.node { cursor: pointer; }
+.node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1; transition: opacity .2s, stroke .2s; }
+.node.group > rect { fill: none; stroke-dasharray: 4 3; }
+.node .t { fill: var(--ink); font-size: 13px; font-weight: 600; }
+.node .s { fill: var(--muted); font-size: 10.5px; }
+.node:hover rect, .node.selected rect { stroke: var(--accent); stroke-width: 2; }
+.edge .halo { stroke: var(--halo); stroke-width: 6; fill: none; }
+.edge .ln { stroke: var(--line); stroke-width: 1.4; fill: none; transition: stroke .2s; }
+.edge text { fill: var(--muted); font-size: 10.5px; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.edge .num { display: none; }
+.edge .num circle { fill: var(--accent); }
+.edge .num text { fill: #fff; stroke: none; font-size: 11px; font-weight: 600; }
+#arrow path { fill: var(--line); }
+#arrowOn path { fill: var(--accent); }
+
+svg.flowing .node:not(.on), svg.flowing .edge:not(.on) { opacity: .22; }
+svg.flowing .node.on rect { stroke: var(--accent); }
+svg.flowing .edge.on .ln { stroke: var(--accent); stroke-width: 2.2; }
+svg.flowing .edge.on text.lbl { fill: var(--ink); }
+svg.flowing .edge.on .num { display: inline; }
+@media (prefers-reduced-motion: reduce) { .node rect, .edge .ln { transition: none; } }
+
+.panel {
+  background: var(--surface); border-radius: 16px; padding: 20px 22px; display: grid; gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 35%, transparent); min-width: 0;
+}
+.panel .kind { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 600; }
+.panel ol { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 10px; }
+.panel ol li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+.panel ol li b {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.files { display: flex; flex-wrap: wrap; gap: 6px; }
+.files code { background: var(--accent-soft); color: var(--ink); padding: 2px 8px; border-radius: 6px; }
+.panel p { max-width: 75ch; }
+.panel .note { color: var(--muted); font-size: 14px; }
+
+.guide { display: grid; gap: 12px; }
+.tablebox { overflow-x: auto; background: var(--surface); border-radius: 16px; border: 1px solid color-mix(in srgb, var(--line) 35%, transparent); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 14px; }
+th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid color-mix(in srgb, var(--line) 25%, transparent); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+.layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.layer { background: var(--surface); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; border: 1px solid color-mix(in srgb, var(--line) 35%, transparent); }
+.layer h3 { margin: 0; font-size: 15px; font-family: var(--font-display); }
+.layer p { color: var(--muted); font-size: 14px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">How Linkwell fits together · November 2026 (v2.5)</div>
+    <h1>Linkwell, from your tap to the database</h1>
+    <p class="lead">Four columns, left to right: what runs in the browser, what runs on Vercel, the shared code in <code>lib/</code>, and the services outside. Click any box to see what it does and where its code is. Pick a flow to light up the path a request takes, step by step.</p>
+  </header>
+
+  <div class="flows" role="group" aria-label="Follow a request">
+    <span>Follow a request:</span>
+    <button type="button" data-flow="open" aria-pressed="false">Open the app</button>
+    <button type="button" data-flow="save" aria-pressed="false">Save a link</button>
+    <button type="button" data-flow="scroll" aria-pressed="false">Scroll or search</button>
+    <button type="button" data-flow="delete" aria-pressed="false">Delete and Undo</button>
+    <button type="button" data-flow="signin" aria-pressed="false">Sign in</button>
+    <button type="button" data-flow="daily" aria-pressed="false">The daily check</button>
+    <button type="button" data-flow="ship" aria-pressed="false">Ship a change</button>
+  </div>
+
+  <figure class="mapbox">
+    <svg id="map" viewBox="0 0 1210 690" role="img" aria-label="Linkwell's map: the browser app talks to Next.js on Vercel through proxy.ts, pages, Server Actions and /api/links; those use shared code in lib/, and lib/data.ts is the only way into Neon Postgres. safeFetch reaches other websites, Better Auth reaches Google, Vercel Cron and UptimeRobot call in from outside, and GitHub deploys on merge.">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker>
+        <marker id="arrowOn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z"/></marker>
+      </defs>
+      <g id="zones"></g>
+      <g id="edges"></g>
+      <g id="nodes"></g>
+    </svg>
+    <figcaption>Arrows point the way a request goes. <code>lib/data.ts</code> is the only door into the database, and <code>safeFetch</code> the only door to other websites.</figcaption>
+  </figure>
+
+  <section class="panel" id="panel" aria-live="polite"></section>
+
+  <section class="guide" aria-labelledby="layers-h">
+    <h2 id="layers-h">The four layers, and the one rule between them</h2>
+    <p class="lead">Each layer only uses the ones below it. The build fails if a browser component imports <code>lib/data.ts</code> or <code>db/</code>, because both start with <code>import "server-only"</code>.</p>
+    <div class="layers">
+      <div class="layer"><h3>app/</h3><p>Routes only: pages, Server Actions (<code>actions.ts</code>) and API routes. The doors in from the internet.</p></div>
+      <div class="layer"><h3>components/</h3><p>The interactive screens (React, <code>"use client"</code>): LinkManager, Home, the sidebar, cards, dragging.</p></div>
+      <div class="layer"><h3>lib/</h3><p>Plain TypeScript. The rules (used on both sides), the database questions, safe fetching, sign-in, limits.</p></div>
+      <div class="layer"><h3>db/ · types/ · drizzle/</h3><p>Table definitions, shared types, and the numbered SQL migrations (0000 to 0018). Committed, never edited.</p></div>
+    </div>
+  </section>
+
+  <section class="guide" aria-labelledby="where-h">
+    <h2 id="where-h">Where the code lives</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Folder or file</th><th>On the map</th><th>What's in it</th></tr></thead>
+        <tbody>
+          <tr><td><code>components/LinkManager.tsx</code></td><td>The app</td><td>The links page's state: links, folders, Trash, summary, Undo. Every change starts here.</td></tr>
+          <tr><td><code>components/useLinkList.ts</code></td><td>useLinkList</td><td>The list on screen, 50 at a time: from memory (demo, tests) or from <code>/api/links</code> (signed in).</td></tr>
+          <tr><td><code>app/page.tsx</code></td><td>Pages</td><td>Landing page or the app; loads the summary and the first page.</td></tr>
+          <tr><td><code>app/actions.ts</code></td><td>Server Actions</td><td>Every change: save, move, read, delete, restore, folders, import, username.</td></tr>
+          <tr><td><code>app/api/</code></td><td>/api/links, cron, export, health, auth</td><td>Plain HTTP routes: reading pages of links, the daily job, the bookmarks file, the health check, sign-in.</td></tr>
+          <tr><td><code>lib/linkQuery.ts</code></td><td>The rules</td><td>What a list shows and in what order, the summary, cursors. The demo and the SQL both follow it.</td></tr>
+          <tr><td><code>lib/data.ts</code></td><td>lib/data.ts</td><td>Every database question, always for one user's rows.</td></tr>
+          <tr><td><code>lib/safeUrl.ts</code>, <code>fetchTitle.ts</code>, <code>checkLink.ts</code></td><td>safeFetch</td><td>Fetching other websites without letting them trick the server into reading private addresses.</td></tr>
+          <tr><td><code>db/schema.ts</code></td><td>Neon Postgres</td><td>Tables <code>links</code>, <code>folders</code>, <code>rate_limits</code> and the sign-in tables, with their indexes.</td></tr>
+          <tr><td><code>proxy.ts</code>, <code>lib/csp.ts</code></td><td>proxy.ts</td><td>Runs before every page: a fresh nonce and the Content-Security-Policy.</td></tr>
+          <tr><td><code>__tests__/</code>, <code>e2e/</code></td><td>GitHub</td><td>527 unit tests (Vitest) and 49 browser tests (Playwright), run on every pull request. <code>npm run measure</code> times 10,000 links.</td></tr>
+          <tr><td><code>extension/</code>, <code>scripts/</code></td><td>Save from anywhere, backups</td><td>The browser extension (opens <code>/share</code>), and <code>npm run backup</code> / <code>restore</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+const NODES = {
+  app: { x: 30, y: 90, w: 200, h: 330, t: "The app", s: "LinkManager and its parts", group: true, kind: "In the browser",
+    what: "The signed-in links page. LinkManager holds the state (links, folders, the Trash, the summary, the Undo message) and draws Home, the sidebar, the list, the details panel and the phone's tab bar. A change shows at once: the page changes its own copy first, then tells the server.",
+    files: ["components/LinkManager.tsx", "HomeView.tsx", "Sidebar.tsx", "LinkCard.tsx", "DragAndDrop.tsx", "UndoToast.tsx"],
+    note: "The chosen list, folder and tag live in the address (/?list=unread), so Back and refresh keep your place." },
+  listhook: { x: 45, y: 300, w: 170, h: 44, t: "useLinkList", s: "the list, 50 at a time", kind: "In the browser · new in v2.5",
+    what: "Holds the list on screen. Signed in, it keeps the ids of the pages loaded so far and asks /api/links for the next 50 when the end scrolls near. A new search waits 250 ms after typing stops, and an older question is cancelled. In the demo and tests it works the list out from memory instead, with the same rules.",
+    files: ["components/useLinkList.ts", "lib/linkSource.ts"],
+    note: "Select all asks the server for every link of the list, so it means all 2,340, not just the 50 drawn." },
+  demo: { x: 30, y: 440, w: 200, h: 52, t: "The demo · /demo", s: "every link in memory", kind: "In the browser",
+    what: "The real app with sample links and stand-in actions given through a React context. Nothing reaches the server, and a refresh starts over. It uses the same rules as the server (lib/linkQuery.ts), in memory.",
+    files: ["components/DemoApp.tsx", "lib/demo.ts", "components/LinkActions.tsx"] },
+  share: { x: 30, y: 508, w: 200, h: 52, t: "Save from anywhere", s: "extension · bookmarklet · share", kind: "In the browser",
+    what: "The bookmarklet, the browser extension and the phone's share menu all just open /share?url=…. Nothing is saved until you click Save link there, because any website could open that address.",
+    files: ["extension/", "components/ShareForm.tsx", "app/share/page.tsx"] },
+  landing: { x: 30, y: 576, w: 200, h: 52, t: "Landing page", s: "what visitors see first", kind: "In the browser",
+    what: "Signed out, / shows the landing page: the three promises, screenshots, Try the demo and Sign in.",
+    files: ["components/Landing.tsx"] },
+
+  proxy: { x: 350, y: 90, w: 240, h: 48, t: "proxy.ts", s: "nonce + security policy", kind: "On Vercel",
+    what: "Runs before every page. Makes a fresh random nonce and sends a Content-Security-Policy that only lets scripts carrying that nonce run, so injected scripts can't.",
+    files: ["proxy.ts", "lib/csp.ts", "next.config.ts"] },
+  pages: { x: 350, y: 156, w: 240, h: 52, t: "Pages", s: "app/page.tsx · account · share", kind: "On Vercel",
+    what: "Server Components. app/page.tsx reads the session: signed out it shows the landing page; signed in it loads folders, the Trash, the summary and the first 50 links of the list in the address, and hands them to LinkManager.",
+    files: ["app/page.tsx", "app/account/", "app/share/", "app/demo/"] },
+  actions: { x: 350, y: 226, w: 240, h: 52, t: "Server Actions", s: "save · move · delete · folders", kind: "On Vercel",
+    what: "Every change goes through here. Server Actions are public addresses, so each one asks who is calling (getUserId), checks the rate limit, and cleans its input again, never trusting the browser.",
+    files: ["app/actions.ts", "lib/limits.ts", "lib/session.ts"],
+    note: "Components don't import them directly: they call useLinkActions(), so the demo can swap in stand-ins." },
+  api: { x: 350, y: 296, w: 240, h: 52, t: "/api/links", s: "pages · summary · count", kind: "On Vercel · new in v2.5",
+    what: "Plain GET routes for reading: a page of 50 links (with the total and the next cursor), every link of a list (&all=1), just the count (&count=1), and the summary (/api/links/summary). GETs can be cancelled and run side by side, unlike Server Actions.",
+    files: ["app/api/links/route.ts", "app/api/links/summary/route.ts"],
+    note: "The question is read with queryFromParams, which keeps only what it understands." },
+  auth: { x: 350, y: 366, w: 240, h: 48, t: "/api/auth", s: "Better Auth's routes", kind: "On Vercel",
+    what: "Sign-in and sign-out. Better Auth handles the Google redirect and keeps sessions in Postgres, signed with BETTER_AUTH_SECRET.",
+    files: ["app/api/auth/[...all]/route.ts"] },
+  cron: { x: 350, y: 450, w: 240, h: 52, t: "/api/cron/check-links", s: "the daily job", kind: "On Vercel",
+    what: "Once a day: checks every link (is it still alive?), looks for preview pictures for older links, clears old rate-limit counts, and deletes what's been in the Trash for 30 days. Refused without CRON_SECRET.",
+    files: ["app/api/cron/check-links/route.ts", "vercel.json"] },
+  other: { x: 350, y: 526, w: 240, h: 52, t: "/api/export · /api/health", s: "bookmarks file · is it up?", kind: "On Vercel",
+    what: "Export downloads your links as a bookmarks file (nested folders kept). Health runs select 1 and answers ok or down, never cached.",
+    files: ["app/api/export/route.ts", "app/api/health/route.ts", "lib/bookmarks.ts"] },
+
+  rules: { x: 700, y: 90, w: 220, h: 48, t: "The rules", s: "used in browser and server", kind: "Shared code",
+    what: "Pure functions with no React and no database, so the browser, the server and the demo all use the same ones: cleaning input, what a list shows and in what order (matchesQuery, compareLinks), the summary, the folder tree.",
+    files: ["lib/links.ts", "lib/linkQuery.ts", "lib/folders.ts", "lib/address.ts"],
+    note: "A browser test (e2e/pages.spec.ts) checks the SQL gives the same answers as these rules." },
+  data: { x: 700, y: 156, w: 220, h: 200, t: "lib/data.ts", s: "every database question", kind: "Shared code · server only",
+    what: "The only file that talks to the database. Every function takes the signed-in user's id and every query matches it, so a guessed id from another account changes nothing. Things in the Trash are skipped everywhere except the Trash's own functions.",
+    files: ["lib/data.ts", "db/index.ts", "db/schema.ts"],
+    note: "v2.5 added getLinkSummary (counts, tags, Home's links in one batch), getLinkPage (keyset pages) and countMatching." },
+  authlib: { x: 700, y: 366, w: 220, h: 48, t: "lib/auth.ts", s: "Better Auth setup", kind: "Shared code · server only",
+    what: "Sets up Better Auth with Google and the database. getUserId() in lib/session.ts uses it to answer \"who is asking?\" for every action and route.",
+    files: ["lib/auth.ts", "lib/session.ts", "db/auth-schema.ts"] },
+  safe: { x: 700, y: 446, w: 220, h: 56, t: "safeFetch", s: "fetchTitle · checkLink", kind: "Shared code · server only",
+    what: "The only way the server fetches another website. It looks up the address first and refuses private, loopback and cloud-metadata addresses, again on every redirect, so a saved link can't trick the server into reading its own secrets (SSRF).",
+    files: ["lib/safeUrl.ts", "lib/fetchTitle.ts", "lib/checkLink.ts"] },
+
+  github: { x: 1020, y: 90, w: 170, h: 52, t: "GitHub", s: "checks · Dependabot", kind: "Outside",
+    what: "Every pull request runs the Checks (types, lint, unit and browser tests). main is protected; merging deploys to Vercel. Dependabot opens package updates weekly.",
+    files: [".github/workflows/ci.yml", "MAINTENANCE.md"] },
+  db: { x: 1020, y: 200, w: 170, h: 112, t: "Neon Postgres", s: "links · folders · users", kind: "Outside",
+    what: "The database, with three branches: production, dev (your computer) and test (browser tests). Migrations are numbered SQL files and run on production before the code that needs them is merged.",
+    files: ["drizzle/0000 … 0018", "db/schema.ts"],
+    note: "Indexes from migration 0018: links by user and date, by user and folder, the Trash, and folders by user. Before them, every question read every user's rows." },
+  google: { x: 1020, y: 366, w: 170, h: 48, t: "Google", s: "who you are", kind: "Outside",
+    what: "Linkwell has no passwords of its own: you sign in with Google, and Better Auth keeps the session.",
+    files: [] },
+  web: { x: 1020, y: 446, w: 170, h: 56, t: "Other websites", s: "the links you saved", kind: "Outside",
+    what: "Read for a title and preview picture when you save, and checked daily for being broken. Always through safeFetch.",
+    files: [] },
+  vcron: { x: 1020, y: 540, w: 170, h: 52, t: "Vercel Cron", s: "once a day", kind: "Outside",
+    what: "Calls the daily job with CRON_SECRET, as set in vercel.json.",
+    files: ["vercel.json"] },
+  uptime: { x: 1020, y: 612, w: 170, h: 48, t: "UptimeRobot", s: "every 5 minutes", kind: "Outside",
+    what: "Asks /api/health every 5 minutes and emails you if the app or the database stops answering.",
+    files: ["MAINTENANCE.md (When the uptime monitor emails you)"] },
+};
+
+const ZONES = [
+  { x: 15, w: 230, t: "In the browser" },
+  { x: 335, w: 270, t: "On Vercel · Next.js 16" },
+  { x: 685, w: 250, t: "lib/ · shared code" },
+  { x: 1005, w: 200, t: "Outside" },
+];
+
+// points, label, label position [x, y, rotation]
+const EDGES = {
+  req: { p: [[230,114],[350,114]], l: "every request", at: [290,107] },
+  pp: { p: [[470,138],[470,156]] },
+  html: { p: [[350,182],[230,182]], l: "HTML + first 50", at: [290,175] },
+  act: { p: [[230,252],[350,252]], l: "save · move · delete", at: [290,245] },
+  list: { p: [[215,322],[350,322]], l: "GET pages · search", at: [283,315] },
+  signin: { p: [[230,390],[350,390]], l: "sign in", at: [290,383] },
+  pd: { p: [[590,182],[700,182]], l: "summary + page 1", at: [645,175] },
+  ad: { p: [[590,240],[700,240]], l: "check, then write", at: [645,233] },
+  apid: { p: [[590,322],[700,322]], l: "51 rows after cursor", at: [645,315] },
+  as: { p: [[590,266],[660,266],[660,462],[700,462]], l: "title + picture", at: [653,400,-90] },
+  aa: { p: [[590,390],[700,390]], l: "uses", at: [625,383] },
+  cs: { p: [[590,484],[700,484]], l: "check each", at: [628,477] },
+  dd: { p: [[920,256],[1020,256]], l: "SQL (Drizzle)", at: [970,249] },
+  ag: { p: [[920,390],[1020,390]], l: "OAuth", at: [970,383] },
+  sw: { p: [[920,474],[1020,474]], l: "fetch, no private IPs", at: [970,467] },
+  vc: { p: [[1020,566],[645,566],[645,494],[590,494]], l: "daily, with CRON_SECRET", at: [830,559] },
+  up: { p: [[1020,636],[625,636],[625,552],[590,552]], l: "GET /api/health", at: [830,629] },
+  gh: { p: [[1105,90],[1105,40],[470,40],[470,90]], l: "merge to main = deploy", at: [790,33] },
+};
+
+const FLOWS = {
+  open: { title: "Open the app", nodes: ["app","proxy","pages","data","db"], steps: [
+    ["req", "Your browser asks for /. proxy.ts makes a fresh nonce and sends the security policy with the page."],
+    ["pd", "app/page.tsx checks who you are, then asks lib/data.ts for your folders, the Trash, the summary (counts, tags, Home's links) and the first 50 links of the list in the address."],
+    ["dd", "The summary is one batch of SQL. The indexes from migration 0018 make the page query take about 0.1 ms."],
+    ["html", "The page arrives with only what's on screen: 179 kB for an account of 10,000 links, instead of 4.6 MB before v2.5."],
+  ]},
+  save: { title: "Save a link", nodes: ["app","actions","data","db","safe","web"], steps: [
+    ["act", "LinkForm calls saveLink, a Server Action. It runs on the server, and anyone could call it, so it trusts nothing the browser sends."],
+    ["ad", "It checks who you are, the rate limit and the address, then looks for a copy among your saved addresses (only the url column, not whole links)."],
+    ["as", "No title typed? fetchPageInfo reads the page for its title and preview picture. With a title, it answers at once and looks for the picture just after."],
+    ["sw", "safeFetch refuses private addresses, on every redirect too. If the site doesn't answer, the site's name becomes the title."],
+    ["dd", "insertLink writes the row. The card appears with what the server saved, and the sidebar's counts are asked for again 300 ms later."],
+  ]},
+  scroll: { title: "Scroll or search", nodes: ["app","listhook","api","data","db"], steps: [
+    ["list", "Near the end of the list (or 250 ms after you stop typing), useLinkList asks GET /api/links with the list, folder, tag, search, sort and the cursor. An older search is cancelled."],
+    ["apid", "The route reads the question with queryFromParams, which keeps only what it understands, and asks for 51 links after the cursor (one extra tells it there's a next page)."],
+    ["dd", "Keyset pagination: the index jumps straight to \"after this date and id\", 0.1 ms even deep in the list. Search looks in the title, address, note and tags: 6.5 ms for 10,000 links."],
+  ]},
+  delete: { title: "Delete and Undo", nodes: ["app","actions","data","db"], steps: [
+    ["act", "The card disappears at once and the Undo message shows for 6 seconds; then removeLinks runs on the server."],
+    ["ad", "trashLinks sets deleted_at to now. The row stays, and every normal question skips it, so lists, counts, search and the export need no changes of their own."],
+    ["dd", "Undo or Restore sets deleted_at back to empty. The daily job deletes what has been in the Trash for 30 days."],
+  ]},
+  signin: { title: "Sign in", nodes: ["app","auth","authlib","google","db"], steps: [
+    ["signin", "Sign in with Google goes to Better Auth's route."],
+    ["aa", "Better Auth (lib/auth.ts) sends you to Google and back."],
+    ["ag", "Google says who you are. The session is saved in Postgres; every action then asks getUserId() for it."],
+  ]},
+  daily: { title: "The daily check", nodes: ["vcron","cron","safe","web","data","db"], steps: [
+    ["vc", "Once a day Vercel Cron calls /api/cron/check-links with CRON_SECRET. Without it the route refuses."],
+    ["cs", "Every link is checked with checkLink. Each status is saved through lib/data.ts, so Broken links get their badge and an archived copy."],
+    ["sw", "The same safeFetch as saving. Then pictures for 50 older links, and the Trash's 30-day clean-up."],
+  ]},
+  ship: { title: "Ship a change", nodes: ["github","proxy","uptime","other"], steps: [
+    ["gh", "A branch, a pull request, the Checks (types, lint, 527 unit tests, 49 browser tests), then Merge: Vercel deploys main. A migration runs on production first, after npm run backup."],
+    ["up", "UptimeRobot then asks /api/health every 5 minutes and emails you if anything stops answering."],
+  ]},
+};
+
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+const svg = document.getElementById("map");
+
+for (const z of ZONES) {
+  const g = el("g", { class: "zone" }, svg.querySelector("#zones"));
+  el("rect", { x: z.x, y: 58, width: z.w, height: 618, rx: 14 }, g);
+  el("text", { x: z.x + 14, y: 78 }, g).textContent = z.t;
+}
+
+const edgeEls = {};
+for (const [id, e] of Object.entries(EDGES)) {
+  const g = el("g", { class: "edge", "data-id": id }, svg.querySelector("#edges"));
+  const d = e.p.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+  el("path", { d, class: "halo" }, g);
+  el("path", { d, class: "ln", "marker-end": "url(#arrow)" }, g);
+  if (e.l) {
+    const [x, y, r] = e.at;
+    const t = el("text", { x, y, "text-anchor": "middle", class: "lbl", ...(r ? { transform: `rotate(${r} ${x} ${y})` } : {}) }, g);
+    t.textContent = e.l;
+  }
+  const num = el("g", { class: "num" }, g);
+  const mid = e.p[Math.floor((e.p.length - 1) / 2)], nxt = e.p[Math.floor((e.p.length - 1) / 2) + 1];
+  const cx = (mid[0] + nxt[0]) / 2, cy = (mid[1] + nxt[1]) / 2;
+  el("circle", { cx, cy, r: 9 }, num);
+  el("text", { x: cx, y: cy + 4, "text-anchor": "middle" }, num);
+  edgeEls[id] = g;
+}
+
+const nodeEls = {};
+const order = Object.keys(NODES).sort((a, b) => (NODES[a].group ? -1 : 0) - (NODES[b].group ? -1 : 0));
+for (const id of order) {
+  const n = NODES[id];
+  const g = el("g", { class: "node" + (n.group ? " group" : ""), tabindex: 0, role: "button", "aria-label": `${n.t}: ${n.s}`, "data-id": id }, svg.querySelector("#nodes"));
+  el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 10 }, g);
+  el("text", { x: n.x + 12, y: n.y + 20, class: "t" }, g).textContent = n.t;
+  el("text", { x: n.x + 12, y: n.y + 35, class: "s" }, g).textContent = n.s;
+  g.addEventListener("click", (ev) => { ev.stopPropagation(); showNode(id); });
+  g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); showNode(id); } });
+  nodeEls[id] = g;
+}
+
+const panel = document.getElementById("panel");
+const buttons = [...document.querySelectorAll("[data-flow]")];
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+function clearFlow() {
+  svg.classList.remove("flowing");
+  for (const g of [...Object.values(nodeEls), ...Object.values(edgeEls)]) g.classList.remove("on");
+  for (const g of Object.values(edgeEls)) g.querySelector(".ln").setAttribute("marker-end", "url(#arrow)");
+  buttons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+}
+
+function showNode(id) {
+  clearFlow();
+  Object.values(nodeEls).forEach((g) => g.classList.toggle("selected", g === nodeEls[id]));
+  const n = NODES[id];
+  panel.innerHTML = `
+    <div class="kind">${esc(n.kind)}</div>
+    <h2>${esc(n.t)}</h2>
+    <p>${esc(n.what)}</p>
+    ${n.files.length ? `<div class="files">${n.files.map((f) => `<code>${esc(f)}</code>`).join("")}</div>` : ""}
+    ${n.note ? `<p class="note">${esc(n.note)}</p>` : ""}`;
+}
+
+function showFlow(name) {
+  clearFlow();
+  Object.values(nodeEls).forEach((g) => g.classList.remove("selected"));
+  const f = FLOWS[name];
+  svg.classList.add("flowing");
+  f.nodes.forEach((id) => nodeEls[id]?.classList.add("on"));
+  f.steps.forEach(([edge], i) => {
+    const g = edgeEls[edge];
+    g.classList.add("on");
+    g.querySelector(".ln").setAttribute("marker-end", "url(#arrowOn)");
+    g.querySelector(".num text").textContent = i + 1;
+  });
+  if (name === "open") edgeEls.pp.classList.add("on");
+  buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.flow === name)));
+  panel.innerHTML = `
+    <div class="kind">Follow a request</div>
+    <h2>${esc(f.title)}</h2>
+    <ol>${f.steps.map(([, text], i) => `<li><b>${i + 1}</b><span>${esc(text)}</span></li>`).join("")}</ol>
+    <p class="note">Click a box on the map for what it does and where its code is.</p>`;
+}
+
+buttons.forEach((b) => b.addEventListener("click", () => (b.getAttribute("aria-pressed") === "true" ? (clearFlow(), showNode("app")) : showFlow(b.dataset.flow))));
+showFlow("scroll");
+</script>

@@ -51,6 +51,7 @@ npm run dev               # http://localhost:3000
 
 | | |
 |---|---|
+| [Project map](docs/project-map.html) | An interactive picture of the whole app: download it and open it in a browser |
 | [Architecture](docs/ARCHITECTURE.md) | How the code is organized and how data flows |
 | [Decisions](docs/DECISIONS.md) | Why each choice was made |
 | [Case study](docs/CASE_STUDY.md) | The story of building it, and what was learned |
