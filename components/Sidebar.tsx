@@ -3,14 +3,16 @@
 import { useState } from "react";
 import CheckLinksButton from "@/components/CheckLinksButton";
 import FolderBar from "@/components/FolderBar";
-import { countWithInside } from "@/lib/folders";
-import { countLinks, countTags, type SmartList } from "@/lib/links";
+import { countInside } from "@/lib/folders";
+import type { SmartList } from "@/lib/links";
+import type { LinkSummary } from "@/lib/linkQuery";
 import ListIcon from "@/components/ListIcon";
 import type { Folder, Link } from "@/types/link";
 
 
 type SidebarProps = {
-  links: Link[];
+  // The counts and tags (worked out by the database when signed in).
+  summary: LinkSummary;
   folders: Folder[];
   activeList: SmartList;
   activeFolder: string | null;
@@ -32,7 +34,7 @@ type SidebarProps = {
 // screen, and the More part of Home.
 export default function Sidebar(props: SidebarProps) {
   const {
-    links,
+    summary,
     folders,
     activeList,
     activeFolder,
@@ -40,10 +42,9 @@ export default function Sidebar(props: SidebarProps) {
     trashCount = 0,
   } = props;
 
-  const { total, unread, broken } = countLinks(links);
+  const { total, unread, broken, tags } = summary;
   // A folder's count includes the links in the folders inside it.
-  const folderCounts = countWithInside(folders, links);
-  const tags = countTags(links);
+  const folderCounts = countInside(folders, summary.byFolder);
   // The 5 most used tags, plus the chosen one; "Show all" lists the rest.
   const [allTags, setAllTags] = useState(false);
   const TOP_TAGS = 5;

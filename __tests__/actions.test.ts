@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { checkAllLinks, createFolder, deleteFolder, deleteForever, moveFolder, emptyTrash, removeLinks, restoreFolder, restoreLinkByUrl, restoreLinks, setReadDates, renameFolder, setFolderColor, setFolderIcon, importBookmarks, importLinks, markLinksRead, moveLinksToFolder, moveToFolder, removeLink, saveLink, saveLinkDetails, saveReadStatus, saveUsername } from "@/app/actions";
-import { countAction, getFolderAncestors, updateFolderPlace, deleteForever as deleteForeverFromTrash, emptyTrash as emptyTrashNow, findTrashedLink, getTrash, restoreFolder as restoreFolderFromTrash, restoreLinks as restoreLinksFromTrash, trashFolder, trashLinks, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
+import { countAction, getFolderAncestors, updateFolderPlace, deleteForever as deleteForeverFromTrash, emptyTrash as emptyTrashNow, findTrashedLink, countUserLinks, getLinkUrls, getTrash, restoreFolder as restoreFolderFromTrash, restoreLinks as restoreLinksFromTrash, trashFolder, trashLinks, getFolders, getLinks, insertFolder, insertLink, insertLinks, isUsernameTaken, updateFolderColor, updateFolderIcon, updateFolderName, updateLinkFolder, updateLinkReadAt, updateLinksFolder, updateLinksReadAt, updateLinkImage, updateLinkDetails, updateLinkStatus, updateUsername } from "@/lib/data";
 import { checkLink } from "@/lib/checkLink";
 import { fetchPageInfo } from "@/lib/fetchTitle";
 import { after } from "next/server";
@@ -10,6 +10,8 @@ import { IN_TRASH } from "@/lib/links";
 
 vi.mock("@/lib/data", () => ({
   getLinks: vi.fn(async () => []),
+  getLinkUrls: vi.fn(async () => []),
+  countUserLinks: vi.fn(async () => 0),
   insertLink: vi.fn(async () => {}),
   insertLinks: vi.fn(async () => {}),
   // Rate limits: the first use in every window, unless a test says otherwise.
@@ -151,7 +153,19 @@ describe("saveLink", () => {
   test("only looks for duplicates among the user's own links", async () => {
     await saveLink(link);
 
-    expect(getLinks).toHaveBeenCalledWith("u1");
+    expect(getLinkUrls).toHaveBeenCalledWith("u1");
+  });
+
+  test("never loads every whole link just to save one (v2.5)", async () => {
+    await saveLink(link);
+
+    expect(getLinks).not.toHaveBeenCalled();
+  });
+
+  test("spots a duplicate written differently (a host in capitals, no slash)", async () => {
+    vi.mocked(getLinkUrls).mockResolvedValueOnce(["https://EXAMPLE.com"]);
+
+    expect(await saveLink({ ...link, url: "https://example.com/" })).toBe("You already saved this link!");
   });
 
   test("fills in the page's title and preview picture when no title was given", async () => {
@@ -203,7 +217,7 @@ describe("saveLink", () => {
   });
 
   test("refuses a link that is already saved", async () => {
-    vi.mocked(getLinks).mockResolvedValueOnce([link]);
+    vi.mocked(getLinkUrls).mockResolvedValueOnce([link.url]);
 
     expect(await saveLink({ ...link, id: "2" })).toBe("You already saved this link!");
     expect(insertLink).not.toHaveBeenCalled();
@@ -280,7 +294,7 @@ describe("the Trash", () => {
   });
 
   test("restoreLinks refuses to go over the link limit", async () => {
-    vi.mocked(getLinks).mockResolvedValueOnce(Array.from({ length: MAX_LINKS }, (_, i) => ({ ...link, id: String(i) })));
+    vi.mocked(countUserLinks).mockResolvedValueOnce(MAX_LINKS);
 
     expect(await restoreLinks([a])).toBe(TOO_MANY_LINKS);
     expect(restoreLinksFromTrash).not.toHaveBeenCalled();
@@ -399,7 +413,7 @@ describe("importLinks", () => {
   });
 
   test("skips links that are already in the database", async () => {
-    vi.mocked(getLinks).mockResolvedValueOnce([link]);
+    vi.mocked(getLinkUrls).mockResolvedValueOnce([link.url]);
 
     expect(await importLinks([{ ...old, url: "https://example.com" }])).toEqual([]);
     expect(insertLink).not.toHaveBeenCalled();
@@ -718,7 +732,7 @@ describe("importBookmarks", () => {
   });
 
   test("skips links you already have, and repeats in the file", async () => {
-    vi.mocked(getLinks).mockResolvedValueOnce([{ ...link, url: "https://example.com/soup" }]);
+    vi.mocked(getLinkUrls).mockResolvedValueOnce(["https://example.com/soup"]);
 
     const result = await importBookmarks([soup, { ...soup, url: "https://example.com/a" }, { ...soup, url: "https://example.com/a" }]);
 
@@ -803,14 +817,14 @@ describe("account limits", () => {
   const full = Array.from({ length: MAX_LINKS }, (_, i) => ({ ...link, id: String(i), url: `https://example.com/${i}` }));
 
   test("saveLink refuses a new link when the account is full", async () => {
-    vi.mocked(getLinks).mockResolvedValueOnce(full);
+    vi.mocked(getLinkUrls).mockResolvedValueOnce(full.map((l) => l.url));
 
     expect(await saveLink({ ...link, url: "https://example.com/one-more" })).toBe(TOO_MANY_LINKS);
     expect(insertLink).not.toHaveBeenCalled();
   });
 
   test("importBookmarks stops at the link limit and counts the rest as skipped", async () => {
-    vi.mocked(getLinks).mockResolvedValueOnce(full.slice(1));
+    vi.mocked(getLinkUrls).mockResolvedValueOnce(full.slice(1).map((l) => l.url));
 
     const result = await importBookmarks([
       { url: "https://example.com/x", tags: [] },

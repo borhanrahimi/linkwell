@@ -11,6 +11,7 @@
     "check": "next typegen && tsc --noEmit && eslint && vitest run",
     "e2e": "playwright test",
     "screenshots": "SCREENSHOTS=1 playwright test e2e/screenshots.spec.ts",
+    "measure": "SCALE=1 playwright test e2e/scale.spec.ts --reporter=list",
     "backup": "node scripts/backup.mjs",
     "restore": "node scripts/restore.mjs"
   },

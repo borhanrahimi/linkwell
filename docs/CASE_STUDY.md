@@ -55,6 +55,7 @@ The full list, with the reasoning, is the
 | **Soft deletes**: a `deleted_at` column instead of deleting the row, and a daily clean-up after 30 days | Every delete can be undone. The data layer hides the Trash in one place, so lists, counts, search, the export and the daily check didn't need their own changes |
 | **Undo puts back exact earlier values**, per link | Select mode changes many links that each had their own folder and read date; an Undo that guesses would be wrong |
 | **Folders form a tree from one flat list**, and the database refuses loops (`WITH RECURSIVE`) | The page already loads every folder, so the browser builds the tree itself; the server asks the database whether a move would put a folder inside itself |
+| **Measure before optimising**: 10,000 made-up links, timed on a computer and a slowed-down phone, before and after | The numbers showed the real problem was drawing 10,000 cards (53 s on a phone), not the database. After: lists 50 at a time with keyset pagination, counts and search in SQL, and All links in 1.7 s on the same phone |
 
 ## What was hard
 
@@ -73,6 +74,18 @@ The full list, with the reasoning, is the
   subfolders up a level; restoring it has to move them back, but not the ones
   you've moved somewhere else since. Each moved thing remembers the folder it
   came from (`came_from_folder_id`), and moving it by hand clears that.
+- **Making it fast for 10,000 links without making it feel slower.** Loading a
+  page at a time means the page no longer has every link, but marking one read
+  still has to move it out of Unread at once. The page changes its own copy
+  first and checks its links against the list's rules on every render, then
+  asks the server for new counts. Two browser tests caught real races: a
+  link restored just before opening All links was missing (the list was asked
+  for before the restore was saved), and "No links yet" stayed next to a
+  first link until the server answered. Now questions wait for changes still
+  being saved, and a new link counts at once. Two more showed up only one
+  run in three: a late answer bringing a deleted link back, and a list
+  revisited after a restore showing its old pages. Running the suite many
+  times over (`--repeat-each`) is what found them.
 - **Keeping it running without me.** CI caught the first two big package
   upgrades (TypeScript 7, ESLint 10) failing *before* they reached the live
   site; it turned out the tools Next.js's lint setup is built on don't support
@@ -121,3 +134,8 @@ Questions I should be able to answer, and where the answer lives:
 | How does the Trash work, and why not just `DELETE`? | `lib/data.ts` (`trashLinks`, `restoreLinks`, `deleteOldTrash`), `docs/DECISIONS.md` |
 | How does Undo know what to put back? | `components/LinkManager.tsx` (`moveMany`, `markManyRead`), `components/UndoToast.tsx` |
 | How do you store a tree in a table, and stop a folder going inside itself? | `db/schema.ts` (`parent_id`), `lib/folders.ts`, `getFolderAncestors` in `lib/data.ts` |
+| How did you make it fast for 10,000 links? How did you know it worked? | `docs/ROADMAP.md` (v2.5, the numbers), `e2e/scale.spec.ts` (`npm run measure`) |
+| What's keyset pagination, and why not `OFFSET`? Why does the cursor keep the date as text? | `getLinkPage` in `lib/data.ts`, `docs/DECISIONS.md` |
+| What does `EXPLAIN ANALYZE` tell you? Which indexes are there, and why partial ones? | `drizzle/0018_add_link_indexes.sql`, `db/schema.ts`, the plans printed by `npm run measure` |
+| How does the page stay instant when it only has some of the links? | `components/useLinkList.ts`, `changed()` and `afterSaving` in `components/LinkManager.tsx` |
+| How do the demo and the database agree on what a list shows? | `lib/linkQuery.ts`, `e2e/pages.spec.ts` |

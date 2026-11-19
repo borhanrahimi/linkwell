@@ -38,9 +38,9 @@ adding code. It describes how things are **now**; why they got that way is in
 
 | Folder | Holds |
 |---|---|
-| `app/` | Pages, layouts, `actions.ts` (Server Actions), `api/` (auth, cron, export, health), metadata files (`manifest.ts`, icons, sharing pictures) |
+| `app/` | Pages, layouts, `actions.ts` (Server Actions), `api/` (auth, cron, export, health, `links`: pages of links and the summary), metadata files (`manifest.ts`, icons, sharing pictures) |
 | `components/` | React components. `illustrations/` holds the drawings: the character's parts in `Character.tsx`, one scene per file |
-| `lib/` | Plain TypeScript, no React: rules and helpers (`links.ts`), the folder tree (`folders.ts`), the database (`data.ts`), fetching other sites (`safeUrl.ts`, `fetchTitle.ts`, `checkLink.ts`), security (`csp.ts`, `limits.ts`), sign-in (`auth.ts`, `session.ts`) |
+| `lib/` | Plain TypeScript, no React: rules and helpers (`links.ts`), what a list is and how it's paged (`linkQuery.ts`), asking `/api/links` (`linkSource.ts`), reading the address (`address.ts`), the folder tree (`folders.ts`), the database (`data.ts`), fetching other sites (`safeUrl.ts`, `fetchTitle.ts`, `checkLink.ts`), security (`csp.ts`, `limits.ts`), sign-in (`auth.ts`, `session.ts`) |
 | `db/` | Connection and table definitions (`schema.ts`, `auth-schema.ts`). Server-only |
 | `drizzle/` | Generated SQL migrations. Committed, never edited |
 | `types/` | Shared types (`Link`, `Folder`) |
@@ -83,11 +83,23 @@ Each layer only uses the layers **below** it:
 1. `proxy.ts` makes a fresh **nonce** and sends the Content-Security-Policy
    (`lib/csp.ts`). Only scripts carrying that nonce can run.
 2. `app/page.tsx` (a Server Component) reads the session. Signed out, it shows
-   `Landing`. Signed in, it loads links, folders and the Trash together
-   (`Promise.all([getLinks(), getFolders(), getTrash()])`) and renders
-   `LinkManager` with them, the server's time (`now`) and the address's query
-   (`initialSearch`).
-3. `LinkManager` (client) keeps the links and folders in state from then on.
+   `Landing`. Signed in, it loads the folders, the Trash and the **summary**
+   together (`getLinkSummary`: counts, tags, each folder's newest pictures,
+   and Home's Unread, Recently saved and Rediscover links, in one batch),
+   plus the **first page** (50 links) of the list in the address, if one is
+   shown. Not every link: since v2.5 an account can hold 10,000.
+3. `LinkManager` (client) keeps what it got in state: `links` (every link the
+   page has seen so far), `folders`, the `trash` and the summary. More links
+   come a page at a time from `GET /api/links` (below).
+
+```
+ app/page.tsx ──► getFolders · getTrash · getLinkSummary · getLinkPage(first 50)
+                       │
+                       ▼
+ LinkManager ── useLinkList ── scroll near the end ──► GET /api/links?…&after=<cursor>
+      │                   └── search, sort, another list ──► GET /api/links?…
+      └── after a change ──► GET /api/links/summary (new counts), ?count=1 (the list's length)
+```
 
 ### Saving a link
 
@@ -175,20 +187,52 @@ folder in the sidebar. The sidebar can show My order or A to Z
 
 ### What the list shows
 
-`LinkManager` stores only facts: `links`, `folders`, the `trash`, the search
-text, the sort order, the open details panel, the Undo message and whether the
-phone's Folders screen is open. Everything else is **derived** on each render
-and never stored:
+`LinkManager` stores only facts: `links`, `folders`, the `trash`, the summary,
+the search text, the sort order, the open details panel, the Undo message and
+whether the phone's Folders screen is open. Everything else is **derived**.
 
-```
-visibleLinks = sort(search(filterByTag(filterByFolder(filterByList(links)))))
-```
+**What a list is** lives in `lib/linkQuery.ts`, once. The address and the
+toolbar become a `LinkQuery` (`shownQuery`: list, folders, tag, search,
+sort; `null` on Home, Folders and the Trash), and the rules say which links
+it finds (`matchesQuery`) and in what order (`compareLinks`, ties by id).
+
+**Two modes**, behind one hook (`components/useLinkList.ts`):
+
+| | Signed in (server mode) | The demo and unit tests (local mode) |
+|---|---|---|
+| The page gets | A summary and the first page | Every link |
+| Counts, tags, Home | The summary, from the database (`getLinkSummary`) | `summarize(links)` on each render |
+| A list | Pages of 50 from `/api/links` (the SQL in `lib/data.ts` follows the rules) | `queryLinks(links, query)`, drawn 50 at a time |
+| Search | In the database, 250 ms after typing stops; an older question is cancelled | At once, in memory |
+| Select all | Asks the server for every link of the list | Every link of the list |
+
+In server mode a change still shows at once: the page changes its own copy
+of the link, the list checks its links against the query again on every
+render (a link marked read leaves Unread), and `liveSummary` does the same
+for Home. Then `changed()` asks for the new counts, 300 ms after the last
+change; if links may have joined the list on screen (moved into the open
+folder, say), the list is loaded again from the top. Questions to the server
+wait for the changes still being saved (`afterSaving`), so an answer never
+misses one. Links from the server are only added, never written over
+(`addNewLinks`): the page's own copy may hold a change still on its way. Links
+deleted on the page are never added back by a late answer, and each visit to
+a list asks for it again (`useLinkList`), so nothing from a visit before
+shows up stale.
+
+**Pages** use keyset pagination: each page ends with a cursor, the last
+link's sort key (its date exactly as the database wrote it, to the
+microsecond, or its title key) and id; the next page is "after that". The
+index `links_user_created_idx` makes that a jump, however deep in the list.
+The end of the list has a **Show more links** button that an
+`IntersectionObserver` presses on its own when it scrolls near.
 
 The chosen **list, folder, tag and view live in the address**
-(`/?folder=…&tag=react&view=list`, `components/useAddressState.ts`), so Back,
-refresh and bookmarks keep your place. `/` is **Home** (`HomeView`); the lists
-are `?list=all`, `unread`, `broken`, `unsorted` (not in a folder) and `trash`. Per-device choices (the view, the share
-page's last folder) live in `localStorage`.
+(`/?folder=…&tag=react&view=list`, `lib/address.ts` and
+`components/useAddressState.ts`), so Back, refresh and bookmarks keep your
+place. `/` is **Home** (`HomeView`); the lists are `?list=all`, `unread`,
+`broken`, `unsorted` (not in a folder) and `trash`. Per-device choices (the
+view, the share page's last folder) live in `localStorage`. The search box
+keeps what's typed itself (`SearchBox`), so a key press only redraws the box.
 
 **Server and browser must render the same first time (hydration).** The server
 picks `now` once and passes it down; anything only the browser knows (storage,
@@ -201,6 +245,8 @@ snapshot matches what the server rendered.
 |---|---|
 | Save from anywhere | Bookmarklet, extension and phone share all open `/share?url=…`. Nothing is saved until the user clicks **Save link** (any site could open that address) |
 | Daily check | Vercel Cron → `/api/cron/check-links` (needs `CRON_SECRET`) → `checkLink` per link via `safeFetch` → `updateLinkStatus`; then preview pictures for up to 50 older links (`fetchPageInfo` → `updateLinkImage`); then the Trash's 30-day clean-up (`deleteOldTrash`) |
+| Pages of links | `GET /api/links?list=…&folder=…&tag=…&q=…&sort=…&after=…` → 50 links, how many the list has, and the next cursor. `&all=1`: every link of the list (Select all); `&count=1`: just how many. The question is read with `queryFromParams`, which keeps only what it understands. Never cached |
+| Summary | `GET /api/links/summary` → counts, tags, pictures and Home's links (`LinkSummary`) |
 | Export | `/api/export` → the user's links as a bookmarks file, nested folders as nested lists (the Trash is left out) |
 | Health | `/api/health` → `select 1` → 200 `ok` or 503 `down`, never cached |
 
@@ -215,7 +261,7 @@ possible: pages load data on the server and hand it to one client component.
 | Pages | `app/page.tsx` (landing or the app), `account/`, `share/`, `demo/`, `privacy/`, `terms/` |
 | The app | `LinkManager` (state and layout) → `Header` + `LinkForm` (top bar), `Sidebar` + `FolderBar` (lists, the folder tree, tags, Trash; wide screens only; phones use the Folders screen and Home's More part), `HomeView` (the first screen), `TrashView`, `UndoToast`, `BottomBar` (phones, on every signed-in page: Home, Folders, +, Unread, You; tap, or press and slide along it), `Rediscover` (banner on Home), `LinkCard` (card or list row; Select mode ticks), `LinkDetails` (panel; a bottom sheet below `lg`), `FolderActions` (the pencil next to a folder's name and its Edit folder panel: name, colour, icon, Pin to Home, New folder inside, Move folder to, Move up / Move down, Delete), `DragAndDrop` (picking links and folders up, with a mouse, a finger or the keyboard), `AddLinksSheet` (fill a folder like a playlist), `FolderPicker` |
 | Shared pieces | `LinkParts` (`Favicon`, `PreviewImage`, `Badges`, `StickyNote`, `EditForm`), `Sheet` (bottom sheet on phones, dialog on wider screens), `LogoMark`, `FolderIcon`, `ListIcon` |
-| Hooks | `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useOpenFolders` (open folders in the tree, per device), `useFolderOrder` (My order or A to Z, per device), `useDrag` (what's picked up, and where it would land), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
+| Hooks | `useLinkList` (the list on screen, a page at a time, in either mode), `useAddressState` (state in the address), `useLinkView` (Cards or List per device), `useOpenFolders` (open folders in the tree, per device), `useFolderOrder` (My order or A to Z, per device), `useDrag` (what's picked up, and where it would land), `useLinkActions` (server or demo actions), `useSwipeToClose` (a sheet's handle) |
 | Around it | `Landing`, `ShareForm`, `ImportBookmarks`, `Bookmarklet`, `UsernameForm`, `DeleteAccount`, `LegalPage`, `Footer` |
 
 Props from server to client must be serializable (plain data and `Date`s; no
@@ -238,6 +284,12 @@ signed-in user's id, and every read, update and delete matches it
 
 In the app, dates are ISO strings and missing values are `undefined`; in the
 database they're timestamps and `null`. `toLink` / `toFolder` convert.
+
+**Indexes** (migration `0018`): `links (user_id, created_at, id)` and
+`links (user_id, folder_id)`, both only for rows not in the Trash
+(`WHERE deleted_at IS NULL`); `links (user_id, deleted_at)` for the Trash;
+`folders (user_id)`. Check what the database does with a question with
+`EXPLAIN ANALYZE` (`npm run measure` prints the plans of the main ones).
 
 **Three databases** (Neon branches): `DATABASE_URL` (dev, your computer),
 `E2E_DATABASE_URL` (browser tests and CI), `PROD_DATABASE_URL` (production,
@@ -278,7 +330,8 @@ How to report a problem: [SECURITY.md](../SECURITY.md).
 | Kind | Tool | Covers |
 |---|---|---|
 | Unit | Vitest + Testing Library (jsdom) | `lib/` rules, Server Actions (with `lib/data` mocked), components acting like a user, the demo never calling the server |
-| Browser | Playwright (`e2e/`), against the test database | Sign-in, saving, folders inside folders, Trash and Undo, Home and the phone's tab bar, Back and refresh, the share page, the demo, security headers (no blocked resources), health |
+| Browser | Playwright (`e2e/`), against the test database | Sign-in, saving, folders inside folders, Trash and Undo, Home and the phone's tab bar, Back and refresh, the share page, the demo, dragging, paging and server search checked against `lib/linkQuery.ts` (`pages.spec.ts`), security headers (no blocked resources), health |
+| Speed | `npm run measure` (`e2e/scale.spec.ts`), only when asked | Fills a test account with 10,000 links, times Home, All links, search and a folder on a computer and a slowed-down phone, and prints `EXPLAIN ANALYZE` plans. The numbers are in the roadmap (v2.5) |
 | Accessibility | Playwright, `e2e/contrast.ts` | Every text on every page and state meets WCAG AA contrast, in light and dark mode |
 
 Rules:

@@ -7,12 +7,14 @@ import { Favicon, PreviewImage } from "@/components/LinkParts";
 import ListIcon from "@/components/ListIcon";
 import Rediscover from "@/components/Rediscover";
 import EmptyBox from "@/components/illustrations/EmptyBox";
-import { childFolders, countWithInside, folderAndInside, FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
-import { countTags, getDomain, timeAgo, type SmartList } from "@/lib/links";
+import { countInside, FOLDER_COLORS, FOLDER_DOT_CLASS, FOLDER_TEXT_CLASS } from "@/lib/folders";
+import { getDomain, timeAgo, type SmartList } from "@/lib/links";
+import { homeFolders, imagesInside, type LinkSummary } from "@/lib/linkQuery";
 import type { Folder, Link } from "@/types/link";
 
 type HomeViewProps = {
-  links: Link[];
+  // Counts, tags and the few links Home shows (lib/linkQuery.ts).
+  summary: LinkSummary;
   folders: Folder[];
   now?: Date;
   // Old unread links for the Rediscover banner.
@@ -35,7 +37,6 @@ const UNREAD_SHOWN = 8;
 const UNREAD_SHOWN_WIDE = 4;
 const FOLDERS_SHOWN = 6;
 const RECENT_SHOWN = 6;
-const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 // Home's links can be picked up too, and dropped on a folder (in the
 // sidebar, on Home's folder tiles, or on phones the folders that come up).
@@ -62,12 +63,12 @@ function today() {
 // A greeting with a one-line summary (and nudges about broken or unsorted
 // links), Rediscover, one row of Unread, then Recently saved and Your
 // folders side by side. Empty sections hide themselves.
-export default function HomeView({ links, folders, now, rediscover, onSelectList, onSelectFolder, onShowDetails, onSortThem, onShowFolders, trashCount, onSelectTag }: HomeViewProps) {
+export default function HomeView({ summary, folders, now, rediscover, onSelectList, onSelectFolder, onShowDetails, onSortThem, onShowFolders, trashCount, onSelectTag }: HomeViewProps) {
   const hello = useSyncExternalStore(noSubscription, greeting, () => "Welcome back");
   const date = useSyncExternalStore(noSubscription, today, () => "");
   const drag = useDrag();
 
-  if (links.length === 0 && folders.length === 0) {
+  if (summary.total === 0 && folders.length === 0) {
     return (
       <div className="mt-6 text-center">
         <EmptyBox className="mx-auto w-48" />
@@ -76,18 +77,17 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
     );
   }
 
-  const newest = [...links].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const unread = newest.filter((link) => !link.readAt);
-  const counts = countWithInside(folders, links);
+  const { broken, unsorted, tags, thisWeek } = summary;
+  // How many are unread, and the newest few of them.
+  const unreadCount = summary.unread;
+  const unread = summary.unreadLinks;
+  const newest = summary.recentLinks;
+  const counts = countInside(folders, summary.byFolder);
   // Pinned folders first, then the rest in their usual order.
-  const topFolders = childFolders(folders, null).sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
-  const broken = links.filter((link) => link.status === "broken").length;
-  const unsorted = links.filter((link) => !link.folderId).length;
-  const tags = countTags(links);
-  const thisWeek = now ? links.filter((link) => now.getTime() - new Date(link.createdAt).getTime() < WEEK).length : 0;
+  const topFolders = homeFolders(folders);
 
-  const summary = [
-    unread.length > 0 ? `${unread.length} unread` : "All caught up",
+  const line = [
+    unreadCount > 0 ? `${unreadCount.toLocaleString("en")} unread` : "All caught up",
     ...(thisWeek > 0 ? [`${thisWeek} saved this week`] : []),
   ].join(" · ");
 
@@ -101,7 +101,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
           {hello}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted">
-          <span>{summary}</span>
+          <span>{line}</span>
           {broken > 0 && (
             <button onClick={() => onSelectList("broken")} className="rounded-full bg-danger/10 px-3 py-1 font-medium text-danger hover:bg-danger/15">
               {broken === 1 ? "1 broken link" : `${broken} broken links`}
@@ -121,7 +121,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
       {now && rediscover.length > 0 && <Rediscover links={rediscover} now={now} />}
 
       {unread.length > 0 && (
-        <Section id="home-unread" title="Unread" count={unread.length} seeAllLabel="See all unread links" onSeeAll={() => onSelectList("unread")}>
+        <Section id="home-unread" title="Unread" count={unreadCount} seeAllLabel="See all unread links" onSeeAll={() => onSelectList("unread")}>
           <ul aria-label="Unread links" className={`${ROW} sm:grid-cols-2 lg:grid-cols-4`}>
             {unread.slice(0, UNREAD_SHOWN).map((link, index) => (
               <LinkTile key={link.id} link={link} onShowDetails={onShowDetails} hideWhenWide={index >= UNREAD_SHOWN_WIDE} />
@@ -173,10 +173,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
                   folder={folder}
                   count={counts[folder.id] ?? 0}
                   // The pictures of the links inside it, folders inside included.
-                  images={links
-                    .filter((link) => link.image && link.folderId && folderAndInside(folders, folder.id).has(link.folderId))
-                    .map((link) => link.image!)
-                    .slice(0, 4)}
+                  images={imagesInside(folders, summary.images, folder.id)}
                   onOpen={() => onSelectFolder(folder.id)}
                 />
               ))}
@@ -194,7 +191,7 @@ export default function HomeView({ links, folders, now, rediscover, onSelectList
         <ul aria-label="More lists" className="glass divide-y divide-line rounded-2xl">
           {(
             [
-              { list: "all", label: "All links", count: links.length },
+              { list: "all", label: "All links", count: summary.total },
               ...(broken > 0 ? [{ list: "broken", label: "Broken", count: broken }] : []),
               ...(unsorted > 0 ? [{ list: "unsorted", label: "Not in a folder", count: unsorted }] : []),
               { list: "trash", label: "Trash", count: trashCount },

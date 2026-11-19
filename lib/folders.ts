@@ -57,7 +57,7 @@ export function isFolderIcon(value: unknown): value is FolderIcon {
 // its parentId); these build the tree from it. A folder whose parent isn't in
 // the list (deleted, or never there) counts as a top-level folder.
 
-type TreeFolder = { id: string; name: string; parentId?: string };
+export type TreeFolder = { id: string; name: string; parentId?: string };
 
 function parentOf<F extends TreeFolder>(folders: F[], folder: F): string | undefined {
   return folder.parentId && folders.some((other) => other.id === folder.parentId) ? folder.parentId : undefined;
@@ -128,12 +128,10 @@ export function nameTakenIn<F extends TreeFolder>(folders: F[], name: string, pa
   );
 }
 
-// How many links each folder holds, counting the folders inside it too.
-export function countWithInside<F extends TreeFolder>(folders: F[], links: { folderId?: string }[]): Record<string, number> {
-  const own: Record<string, number> = {};
-  for (const link of links) {
-    if (link.folderId) own[link.folderId] = (own[link.folderId] ?? 0) + 1;
-  }
+// How many links each folder holds, counting the folders inside it too, from
+// how many each folder holds itself (the database counts those: see
+// LinkSummary.byFolder in lib/linkQuery.ts).
+export function countInside<F extends TreeFolder>(folders: F[], own: Record<string, number>): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const folder of folders) {
     let total = 0;

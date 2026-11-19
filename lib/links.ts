@@ -250,51 +250,7 @@ export function parseTags(input: string): string[] {
   return [...new Set(tags)];
 }
 
-export function filterByTag(links: Link[], tag: string | null): Link[] {
-  if (!tag) {
-    return links;
-  }
-  return links.filter((link) => link.tags?.includes(tag));
-}
-
-export function filterByFolder(links: Link[], folderId: string | null): Link[] {
-  if (!folderId) {
-    return links;
-  }
-  return links.filter((link) => link.folderId === folderId);
-}
-
-export function searchLinks(links: Link[], query: string): Link[] {
-  const text = query.trim().toLowerCase();
-  if (!text) {
-    return links;
-  }
-  return links.filter(
-    (link) =>
-      link.url.toLowerCase().includes(text) ||
-      link.title?.toLowerCase().includes(text) ||
-      link.note?.toLowerCase().includes(text)
-  );
-}
-
 export type SortOrder = "newest" | "oldest" | "title";
-
-export function sortLinks(links: Link[], order: SortOrder): Link[] {
-  const sorted = [...links];
-  if (order === "title") {
-    return sorted.sort((a, b) =>
-      (a.title || getDomain(a.url)).localeCompare(
-        b.title || getDomain(b.url),
-        "en",
-        {
-          sensitivity: "base",
-        }
-      )
-    );
-  }
-  sorted.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  return order === "oldest" ? sorted : sorted.reverse();
-}
 
 export function toLink(row: LinkRow): Link {
   return {
@@ -329,26 +285,10 @@ export function toFolder(row: FolderRow): Folder {
   };
 }
 
-export function countLinks(links: Link[]) {
-  return {
-    total: links.length,
-    unread: links.filter((link) => !link.readAt).length,
-    broken: links.filter((link) => link.status === "broken").length,
-  };
-}
-
 // What the page shows: Home (the first screen, a few of everything), the
 // smart lists, links not in a folder (for sorting them), the Trash (which
 // shows deleted things instead) and Folders (all folders, as a tree).
 export type SmartList = "home" | "all" | "unread" | "broken" | "unsorted" | "trash" | "folders";
-
-export function filterByList(links: Link[], list: SmartList): Link[] {
-  if (list === "unread") return links.filter((link) => !link.readAt);
-  if (list === "broken") return links.filter((link) => link.status === "broken");
-  if (list === "unsorted") return links.filter((link) => !link.folderId);
-  if (list === "trash" || list === "folders") return [];
-  return links;
-}
 
 // Every tag in use, with how many links have it: most used first, then A to Z.
 export function countTags(links: Link[]): { tag: string; count: number }[] {

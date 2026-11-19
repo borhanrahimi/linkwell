@@ -10,18 +10,20 @@ Each milestone is small enough to finish and ship on its own. The **"You'll lear
 
 ---
 
-## 📌 Next time (updated 2026-11-11)
+## 📌 Next time (updated 2026-11-18)
 
-**Where we are:** v2.1–v2.3 and the phone navigation round are **live** (pull requests #16 and #17). **v2.4 Drag and drop** is done on the branch **`drag-and-drop`**, not merged yet. Next on the roadmap: v2.5 Ready for 10,000 links.
+**Where we are:** v2.4 Drag and drop is **live** (pull request #22). **v2.5 Ready for 10,000 links** is built and tested, but **not committed yet**: the changes are on your computer, on `main`. Next on the roadmap: v2.6 A private vault.
 
-**Shipping `drag-and-drop`** (it needs migration `0017`, a new `position` column):
-- [x] `npm run check` (512 tests) and `npm run e2e` (44 tests) pass
-- [x] Migration `0017` on the test database (2026-11-11)
-- [ ] Migration `0017` on your dev database: `npx drizzle-kit migrate` (until then, the signed-in page on `localhost` can't load folders; the demo works)
-- [ ] Try it in the demo (`localhost:3000/demo`): drag a card onto a folder, a folder between two others, and on a phone press and hold a card
-- [ ] Commit, push the branch and open a pull request
-- [ ] **Before merging:** `npm run backup`, then migration `0017` on production (see `MAINTENANCE.md`)
+**Shipping v2.5** (it needs migration `0018`: four indexes, no new columns, so it's safe to run before the code):
+- [x] `npm run check` (527 unit tests) and `npm run e2e` (49 browser tests, the whole suite twice in a row) pass
+- [x] Migration `0018` on the test database (2026-11-18)
+- [ ] Migration `0018` on your dev database: `npx drizzle-kit migrate`
+- [ ] Try it: `npm run dev`, then open All links, scroll to the bottom, search, open a folder, and Select → Select all. The demo (`localhost:3000/demo`) should work as before
+- [ ] Move the work onto a branch and commit: `git switch -c ready-for-10000-links`, `git add -A`, `git commit` (Claude can suggest small commits, one per step)
+- [ ] Push and open a pull request
+- [ ] **Before merging:** `npm run backup`, then migration `0018` on production (see `MAINTENANCE.md`)
 - [ ] Merge with a normal merge (not "Squash and merge")
+- [ ] Optional: the Next.js build said the installed Next.js has a known security problem, but `npm audit` found nothing. Check for a newer 16.x version (`npm outdated next`), or wait for Dependabot's weekly update
 
 **Lesson from v2.1–v2.3:** pull request #16 was merged before production had migrations `0014`–`0016`, so the signed-in page broke until they were run. Always back up and migrate production **before** merging code that needs new columns.
 
@@ -387,7 +389,7 @@ Linkwell should keep running, safe and up to date, even when nobody works on it 
 | v2.2 Folders inside folders 📁 | The big folder change, with Undo already there |
 | v2.3 A real Home screen 🏡 | Its folder tiles and tabs build on the folder tree |
 | ✅ v2.4 Drag and drop ✋ | Moving links and folders by hand, once there's a tree to drag into |
-| v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
+| ✅ v2.5 Ready for 10,000 links ⚡ | Speed for big collections, measured before and after |
 | v2.6 A private vault 🔐 | Links only you can read, not even the developer. Last, because it changes what the server can do for you (see its trade-offs), and it's easiest once everything else is settled |
 
 ## ✅ v2.1: Trash and Undo 🗑️ (done 2026-11-03)
@@ -567,7 +569,7 @@ RECENTLY SAVED                                See all →
 
 **You'll learn:** designing from what the user needs first, sideways scrolling sections, combining several views of the same data on one screen, frosted glass with `backdrop-filter`, animating with CSS transforms, and page transitions.
 
-## ✅ v2.4: Drag and drop ✋ (done 2026-11-11, branch `drag-and-drop`)
+## ✅ v2.4: Drag and drop ✋ (done 2026-11-11, pull request #22)
 
 With a folder tree, people want to pick things up and put them where they belong, and to choose the order of their folders instead of A to Z.
 
@@ -611,30 +613,66 @@ Choices made while building it (2026-11-11):
 
 **You'll learn:** pointer events (one code path for mouse, finger and pen), drag and drop that works for everyone, and saving a hand-made order in the database.
 
-## 🔜 v2.5: Ready for 10,000 links ⚡ (planned)
+## ✅ v2.5: Ready for 10,000 links ⚡ (done 2026-11-18)
 
-Today the page loads **every** link and folder into the browser and counts and searches them there. That's fast for 50 links and slow for 5,000, and accounts can hold 10,000.
+Before this, the page loaded **every** link and folder into the browser and counted, searched and drew them all there. That's fast for 50 links and slow for 5,000, and accounts can hold 10,000.
+
+```
+BEFORE                                   AFTER
+server ──── all 10,000 links ───► page   server ── counts + Home's few links ──► page
+            (4.6 MB)                     (the summary)                (179 kB)
+page draws 10,000 cards                  ── 50 links ──► page draws 50 cards
+                                         scroll near the end ──► 50 more (/api/links)
+                                         search ──► the database looks, 50 come back
+```
 
 **Step 1: measure first**
-- [ ] A script that fills a test account with 10,000 made-up links in 200 folders
-- [ ] Write down how long the first screen, search and opening a folder take, on a computer and a phone, so we know the changes help
+- [x] A script that fills a test account with 10,000 made-up links in 200 folders (`npm run measure`, `e2e/scale.spec.ts`). It only ever uses the test database, and deletes the account afterwards
+- [x] Write down how long the first screen, search and opening a folder take, on a computer and a phone (a phone-sized screen with the processor slowed down 4×)
 
 **Step 2: the database does the heavy work**
-- [ ] Indexes for what we ask most (`links` by user and date, by user and folder)
-- [ ] Counts for the sidebar and Home (`COUNT … GROUP BY`) instead of counting in the browser
-- [ ] Rediscover picks its links on the server
+- [x] Indexes for what we ask most (migration `0018`): a user's links by date, by folder, and in the Trash; a user's folders. Before this, `links` and `folders` had **no** indexes: every question read every user's rows
+- [x] Counts for the sidebar and Home (`COUNT … FILTER`, `GROUP BY`), tags (`unnest`), and each folder's newest pictures (`row_number() OVER`), in one trip to the database (`getLinkSummary`)
+- [x] Rediscover, Unread and Recently saved are picked on the server
+- [x] Saving a link no longer loads every link to look for a copy: only the addresses (`getLinkUrls`), and a `count(*)` for the limit
+- [x] Checked with `EXPLAIN ANALYZE` (printed by `npm run measure`): pages use the new index
 
 **Step 3: links a page at a time**
-- [ ] The list loads 50 links, and the next 50 as you scroll near the end (keyset pagination: "after this date and id", which stays fast deep into the list)
-- [ ] Select mode's **Select all** means all of the list (for example 2,340 links), not just the ones loaded so far
+- [x] The list loads 50 links, and the next 50 as you scroll near the end (keyset pagination: "after this date and id", which stays fast deep into the list). A **Show more links** button does the same for keyboards and screen readers
+- [x] Select mode's **Select all** means all of the list ("Select all 2,340"), not just the ones loaded so far. Bulk actions go to the server in batches of 500
+- [x] Home's folder tiles, counts and tags come from the summary
 
 **Step 4: search on the server**
-- [ ] Search runs in the database and also looks inside notes and tags (Postgres full-text search, or trigram matching for parts of words)
-- [ ] It waits until you stop typing for a moment, and shows the newest answer only
+- [x] Search runs in the database and also looks inside notes and tags (`ILIKE` on title, address, note and tags; every word must be found). `%` and `_` are just characters
+- [x] It waits until you stop typing for a moment (250 ms), and shows the newest answer only (an older question is cancelled)
 
 **Step 5: check the numbers again**
-- [ ] The same measurements as Step 1, written down here next to the old ones
-- [ ] The demo keeps working in memory
+- [x] The same measurements as Step 1, below
+- [x] The demo keeps working in memory (and the unit tests too): the same rules, in `lib/linkQuery.ts`
+
+**The numbers** (10,000 links in 200 folders, measured from this laptop against the test database):
+
+| | Computer before | Computer after | Phone before | Phone after |
+|---|---|---|---|---|
+| Home: page size | 4.6 MB | **179 kB** | 4.6 MB | **179 kB** |
+| Home: until it can be used | 1.6 s | **1.0 s** | 7.0 s | **1.7 s** |
+| All links: page size | 30.6 MB | **298 kB** | 30.6 MB | **298 kB** |
+| All links: until it can be used | 15.5 s | **1.0 s** | 53.0 s | **1.7 s** |
+| All links: things drawn on the page | 264,000 | **1,900** | 264,000 | **1,900** |
+| Search: the slowest key press | 1.0 s | **0.04 s** | 3.4 s | **0.04 s** |
+| Search: answer after the last key | 0.04 s | 0.6–0.9 s | 0.08 s | 1.2 s |
+| Opening the biggest folder | 0.3 s | 0.6–1.1 s | 3.8 s | **1.8 s** |
+
+What the numbers say:
+- Everything people **wait for** got much faster, most of all on phones (53 s → 1.7 s for All links).
+- Two things got slower on a computer: the answer to a search and opening a folder. Before, the browser already had every link, so they cost nothing to fetch, but the page was frozen while you typed. Now each one is a trip to the database: about 0.2–0.5 s from this laptop to Neon, and much less from Vercel, which is close to it. The database part itself takes under 10 ms (see `EXPLAIN`).
+- `EXPLAIN ANALYZE` on 10,000 links: a page of links takes 0.1 ms using `links_user_created_idx`, deep into the list too. Counts (2 ms) and search (6.5 ms) read the user's whole collection, which is the right choice when you need most of the rows anyway.
+
+Choices made while building it (2026-11-18):
+- **Two modes, one set of rules.** Signed in, the page gets a summary and pages from `/api/links`. The demo and tests still have every link in memory. Both follow `lib/linkQuery.ts` (`matchesQuery`, `compareLinks`, `summarize`), and a browser test checks the SQL gives the same answers
+- **Reading uses plain `GET` requests (`/api/links`), not Server Actions:** an old search can be cancelled, and several questions can be asked at once (Server Actions run one at a time)
+- **Changes still show at once:** the page changes its own copy first, then asks the server for the new counts. Questions wait for the changes still being saved, so the answer includes them
+- **No special search index yet:** 6.5 ms for 10,000 links is fast enough; a trigram index can come when it isn't
 
 **You'll learn:** measuring before optimising, database indexes, `EXPLAIN` in SQL, pagination, infinite scrolling, and full-text search.
 
@@ -719,6 +757,10 @@ Not planned yet, but worth remembering:
 - Docker: only if Linkwell ever moves off Vercel and Neon to a server we run ourselves. Not needed while Vercel runs the app and Neon runs the database
 - Fetch each page's description (and maybe a preview image) when it's saved
 - Optional: a weekly email digest of forgotten links (needs the deployed app, accounts, a schedule and an email service)
+- **Left over from v2.5** (big collections):
+  - The sidebar's **Check links** button checks every link in one request, all at once. With thousands of links it would run out of time: check the ones checked longest ago, a few hundred per click, a few at a time
+  - The Trash still loads everything in it. Fine while a Trash holds tens of things; page it like the lists if it ever holds thousands
+  - Opening a folder waits for a trip to the database. Asking for its first page when the pointer moves over it (prefetching) would make it feel instant
 
 ## How to use this roadmap
 

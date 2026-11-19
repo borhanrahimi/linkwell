@@ -23,7 +23,8 @@ type Fixtures = {
   // Signs a brand-new user in. Each test gets its own user, so tests can run
   // in parallel without seeing each other's links. The user (and, through
   // ON DELETE CASCADE, their links and folders) is deleted afterwards.
-  signIn: (name?: string) => Promise<void>;
+  // Returns the new user's id, for tests that write data for them directly.
+  signIn: (name?: string) => Promise<string>;
 };
 
 export const test = base.extend<Fixtures>({
@@ -38,6 +39,7 @@ export const test = base.extend<Fixtures>({
       userIds.push(user.id);
       await context.clearCookies();
       await context.addCookies(await ctx.test.getCookies({ userId: user.id, domain: "localhost" }));
+      return user.id;
     });
 
     for (const id of userIds) {

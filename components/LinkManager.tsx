@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import Header from "@/components/Header";
 import LinkForm from "@/components/LinkForm";
@@ -20,7 +20,7 @@ import FolderIconDrawing from "@/components/FolderIcon";
 import { DRAG_SOURCE_CLASS, DragProvider, useDrag, type DragItem, type DropSpot } from "@/components/DragAndDrop";
 import {
   childFolders,
-  countWithInside,
+  countInside,
   flattenTree,
   folderAndInside,
   folderPath,
@@ -42,23 +42,21 @@ import UndoToast, { type Toast } from "@/components/UndoToast";
 import { useLinkActions } from "@/components/LinkActions";
 import type { SaveProblem } from "@/components/LinkForm";
 import {
+  BULK_MAX,
   createLink,
-  filterByFolder,
-  filterByList,
   type SmartList,
   isDuplicate,
   normalizeUrl,
-  pickRediscover,
   setReadAt,
   cleanDetails,
   updateDetails,
   parseTags,
-  filterByTag,
   getDomain,
-  searchLinks,
   type SortOrder,
-  sortLinks,
 } from "@/lib/links";
+import { addNewLinks, liveSummary, matchesQuery, shownQuery, summarize, withNewLink, type LinkPage, type LinkSummary } from "@/lib/linkQuery";
+import { SERVER_SOURCE, type LinkSource } from "@/lib/linkSource";
+import { useLinkList } from "@/components/useLinkList";
 import type {
   Folder,
   FolderColor,
@@ -84,7 +82,16 @@ const LIST_TITLES: Record<SmartList, string> = {
 };
 
 type LinkManagerProps = {
+  // Every link (the demo and tests), or, with initialSummary, the links the
+  // server sent with the page (Home's and the first page of the list).
   initialLinks: Link[];
+  // Signed in (v2.5): the counts, tags and Home's links, worked out by the
+  // database. With it, lists load a page at a time through `source`.
+  initialSummary?: LinkSummary;
+  // The first page of the list in the address, if one is shown.
+  initialPage?: { key: string; page: LinkPage } | null;
+  // Where pages come from (tests pass a fake).
+  source?: LinkSource;
   initialFolders?: Folder[];
   // What's in the Trash when the page opens.
   initialTrash?: { links: Link[]; folders: Folder[] };
@@ -100,6 +107,9 @@ type LinkManagerProps = {
 
 export default function LinkManager({
   initialLinks,
+  initialSummary,
+  initialPage,
+  source: givenSource = SERVER_SOURCE,
   initialFolders = [],
   initialTrash = { links: [], folders: [] },
   now,
@@ -107,7 +117,15 @@ export default function LinkManager({
   topBarEnd,
   initialSearch,
 }: LinkManagerProps) {
-  // The server's actions, or the demo's stand-ins (see LinkActions).
+  // Changes still being saved. Asking the server for a list or the counts
+  // waits for them first, so the answer includes them (a link restored just
+  // before opening All links is in it).
+  const [saving] = useState(() => new Set<Promise<unknown>>());
+  const source = useMemo(() => afterSaving(givenSource, saving), [givenSource, saving]);
+  // The server's actions, or the demo's stand-ins (see LinkActions), each
+  // one remembered in `saving` until it's done.
+  const givenActions = useLinkActions();
+  const actions = useMemo(() => remembered(givenActions, saving), [givenActions, saving]);
   const {
     createFolder,
     moveToFolder,
@@ -129,7 +147,7 @@ export default function LinkManager({
     setReadDates,
     moveFolder,
     setFolderPinned,
-  } = useLinkActions();
+  } = actions;
   const [links, setLinks] = useState(initialLinks);
   const [folders, setFolders] = useState(initialFolders);
   // The folders as they are now, for Undo: its callback was made a render ago.
@@ -138,6 +156,15 @@ export default function LinkManager({
     latestFolders.current = folders;
   });
   const [trash, setTrash] = useState(initialTrash);
+  // Links deleted on this page. An answer the server sent before a delete
+  // reached it still has them, and mustn't bring them back. Restoring them
+  // takes them off again.
+  const [deleted] = useState(() => new Set<string>());
+  // Links that came from the server join the ones the page has (see addNewLinks).
+  const learn = useCallback(
+    (incoming: Link[]) => setLinks((current) => addNewLinks(current, incoming.filter((link) => !deleted.has(link.id)))),
+    [deleted]
+  );
   // The small message after a change, with Undo (see UndoToast).
   const [toast, setToast] = useState<Toast | null>(null);
   const toastCount = useRef(0);
@@ -154,6 +181,8 @@ export default function LinkManager({
   // A folder that no longer exists (deleted, or an old bookmark) means no folder.
   const activeFolder = folders.some((folder) => folder.id === address.folder) ? address.folder : null;
   const activeTag = address.tag;
+  // The search the list shows. The box keeps what's typed itself (see
+  // SearchBox), so a key press only redraws the box, not every card.
   const [query, setQuery] = useState("");
   // In a folder: also show the links in the folders inside it.
   const [withInside, setWithInside] = useState(false);
@@ -173,6 +202,17 @@ export default function LinkManager({
   // "Add links" to the open folder, like filling a playlist.
   const [addingLinks, setAddingLinks] = useState(false);
   const closeAddLinks = useCallback(() => setAddingLinks(false), []);
+  // Signed in, the Add links sheet asks the server for the links not in the
+  // open folder. Stable, so the sheet only asks again when the search changes.
+  const addingTo = addingLinks ? address.folder : null;
+  const findLinksToAdd = useCallback(
+    async (search: string) => {
+      const page = await source.page({ list: "all", folderIds: null, notInFolder: addingTo, tag: null, search, sort: "newest" }, null);
+      learn(page.links);
+      return page;
+    },
+    [source, addingTo, learn]
+  );
   // Phones: the save box opens in a sheet from the bottom bar's +.
   // The account page's + comes here as /?save=1, to open the sheet at once.
   const [savingOnPhone, setSavingOnPhone] = useState(() => new URLSearchParams(initialSearch).has("save"));
@@ -187,14 +227,18 @@ export default function LinkManager({
   // Select mode: tick several links, then move them or mark them read.
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // The open folder, and the folders inside it when those are included too.
-  const shownFolders = activeFolder && withInside ? folderAndInside(folders, activeFolder) : null;
-  const inFolder = shownFolders
-    ? filterByList(links, activeList).filter((link) => link.folderId && shownFolders.has(link.folderId))
-    : filterByFolder(filterByList(links, activeList), activeFolder);
-  const visibleLinks = sortLinks(searchLinks(filterByTag(inFolder, activeTag), query), sortOrder);
+  // Signed in, the server sent a summary and lists come a page at a time;
+  // otherwise (the demo, tests) every link is here and everything is worked
+  // out from them (see lib/linkQuery.ts).
+  const server = initialSummary !== undefined;
+  const [serverSummary, setServerSummary] = useState(initialSummary);
+  const summary = serverSummary ? liveSummary(serverSummary, links) : summarize(links, now);
+  // The list on screen (null on Home, Folders and the Trash).
+  const listQuery = shownQuery(folders, address, { withInside, search: query, sort: sortOrder });
+  const list = useLinkList({ server, query: listQuery, links, learn, source, initial: initialPage });
+  const visibleLinks = list.links;
   // Up to ten old links; the banner shows one at a time.
-  const rediscover = now ? pickRediscover(links, now, 10) : [];
+  const rediscover = summary.rediscoverLinks;
   // Home is the first screen; a folder or a tag shows a list instead.
   const showHome = activeList === "home" && !activeFolder && !activeTag;
   // The phone's tab for what's showing: a folder is in Folders.
@@ -205,7 +249,34 @@ export default function LinkManager({
   // the ones inside it (tiles above its links).
   const parentFolders = selectedFolder ? folderPath(folders, selectedFolder.id).slice(0, -1) : [];
   const insideFolders = selectedFolder ? childFolders(folders, selectedFolder.id) : [];
-  const counts = countWithInside(folders, links);
+  // A folder's count includes the links in the folders inside it.
+  const counts = countInside(folders, summary.byFolder);
+  const hasLinks = summary.total > 0 || visibleLinks.length > 0;
+
+  // After a change, signed in: the server is asked for the new counts (and
+  // the list for its new length), once things settle. reload: links may have
+  // joined the list on screen, so it's loaded again from the top.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  function changed({ reload = false } = {}) {
+    if (!server) return;
+    if (reload) list.reload();
+    clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => {
+      source.summary().then(
+        (fresh) => {
+          learn([...fresh.unreadLinks, ...fresh.recentLinks, ...fresh.rediscoverLinks]);
+          setServerSummary(fresh);
+        },
+        () => {}
+      );
+      if (!reload) list.refreshCount();
+    }, 300);
+  }
+  // Would any of these links (as they are after a change) join the list on
+  // screen? Then it has to be loaded again to show them in their place.
+  function joinsList(changedLinks: Link[]) {
+    return listQuery !== null && changedLinks.some((link) => matchesQuery(link, listQuery) && !list.has(link.id));
+  }
 
   async function addLink(url: string, title: string, tags: string, folderId = ""): Promise<SaveProblem | null> {
     if (isDuplicate(links, url)) {
@@ -231,6 +302,9 @@ export default function LinkManager({
     }
 
     setLinks((current) => [result, ...current]);
+    setServerSummary((current) => current && withNewLink(current, result));
+    list.addNewest(result);
+    changed();
     return null;
   }
 
@@ -302,15 +376,18 @@ export default function LinkManager({
     const deletedAt = new Date().toISOString();
     const gone = links.filter((link) => chosen.has(link.id)).map((link) => ({ ...link, deletedAt }));
     if (gone.length === 0) return;
+    for (const link of gone) deleted.add(link.id);
     setLinks((current) => current.filter((link) => !chosen.has(link.id)));
     setTrash((current) => ({ ...current, links: [...gone, ...current.links] }));
     showToast(gone.length === 1 ? "Link moved to the Trash" : `${gone.length} links moved to the Trash`, () => restoreLinksNow(gone));
-    await (gone.length === 1 ? removeLink(gone[0].id) : removeLinks(gone.map((link) => link.id)));
+    await (gone.length === 1 ? removeLink(gone[0].id) : inBatches(gone.map((link) => link.id), removeLinks));
+    changed();
   }
 
   // Out of the Trash at once; a link whose folder is gone comes back without one.
   async function restoreLinksNow(items: Link[]) {
     const ids = new Set(items.map((link) => link.id));
+    for (const id of ids) deleted.delete(id);
     const live = new Set(folders.map((folder) => folder.id));
     const back = items.map((link) => ({
       ...link,
@@ -319,13 +396,16 @@ export default function LinkManager({
     }));
     setTrash((current) => ({ ...current, links: current.links.filter((link) => !ids.has(link.id)) }));
     setLinks((current) => [...back, ...current.filter((link) => !ids.has(link.id))]);
-    const result = await restoreLinks([...ids]);
+    const answers = await inBatches([...ids], restoreLinks);
     // Refused (the link limit): back into the Trash, and say why.
-    if (typeof result === "string") {
+    const refused = answers.find((answer) => typeof answer === "string");
+    if (refused) {
+      for (const id of ids) deleted.add(id);
       setLinks((current) => current.filter((link) => !ids.has(link.id)));
       setTrash((current) => ({ ...current, links: [...items, ...current.links] }));
-      showToast(result);
+      showToast(refused);
     }
+    changed({ reload: joinsList(back) });
   }
 
   // The folder comes back (renamed if its name was taken meanwhile), and so
@@ -354,6 +434,7 @@ export default function LinkManager({
       )
     );
     if (result.name !== folder.name) showToast(`Restored as "${result.name}"`);
+    changed({ reload: listQuery !== null });
   }
 
   function restoreFromTrash(kind: "link" | "folder", id: string) {
@@ -387,6 +468,7 @@ export default function LinkManager({
     setLinks((current) => updateDetails(current, id, cleanDetails(input)));
     const saved = await saveLinkDetails(id, input);
     setLinks((current) => updateDetails(current, id, saved));
+    changed();
   }
   async function toggleRead(id: string) {
     const link = links.find((l) => l.id === id);
@@ -403,14 +485,17 @@ export default function LinkManager({
     setLinks((current) => current.map((link) => (chosen.has(link.id) ? { ...link, readAt } : link)));
     const what = before.length === 1 ? "Marked as" : `${before.length} links marked as`;
     showToast(`${what} ${read ? "read" : "unread"}`, () => putReadDatesBack(before));
-    await (one ? saveReadStatus(before[0].id, read) : markLinksRead(ids, read));
+    const after = links.filter((link) => chosen.has(link.id)).map((link) => ({ ...link, readAt }));
+    await (one ? saveReadStatus(before[0].id, read) : inBatches(ids, (batch) => markLinksRead(batch, read)));
+    changed({ reload: joinsList(after) });
   }
 
   async function putReadDatesBack(before: { id: string; readAt: string | null }[]) {
     for (const { id, readAt } of before) {
       setLinks((current) => setReadAt(current, id, readAt ?? undefined));
     }
-    await setReadDates(before);
+    await inBatches(before, setReadDates);
+    changed();
   }
 
   // Several links into one folder (or out of folders, with null), at once,
@@ -432,7 +517,9 @@ export default function LinkManager({
           : `${before.length} links taken out of their folders`;
       showToast(message, () => moveBack(before));
     }
-    await (one ? moveToFolder(before[0].id, folderId) : moveLinksToFolder(before.map((link) => link.id), folderId));
+    const after = links.filter((link) => chosen.has(link.id)).map((link) => ({ ...link, folderId: folderId ?? undefined }));
+    await (one ? moveToFolder(before[0].id, folderId) : inBatches(before.map((link) => link.id), (batch) => moveLinksToFolder(batch, folderId)));
+    changed({ reload: joinsList(after) });
   }
 
   async function moveBack(before: { id: string; folderId: string | null }[]) {
@@ -601,7 +688,7 @@ export default function LinkManager({
     const parent = folderPath(folders, id).at(-2);
     const movingFolders = childFolders(folders, id).length;
     if (movingFolders > 0) {
-      const ownLinks = links.filter((link) => link.folderId === id).length;
+      const ownLinks = summary.byFolder[id] ?? 0;
       const what = [movingFolders === 1 ? "1 folder" : `${movingFolders} folders`, ...(ownLinks ? [ownLinks === 1 ? "1 link" : `${ownLinks} links`] : [])].join(" and ");
       const where = parent ? `up into ${parent.name}` : "up to the top level";
       if (!window.confirm(`Delete "${folder.name}"? Its ${what} move ${where}.`)) return;
@@ -622,6 +709,26 @@ export default function LinkManager({
     updateAddress({ folder: null }, { replace: true });
     showToast(`"${folder.name}" moved to the Trash`, () => restoreFolderNow(trashed));
     await deleteFolder(id);
+    changed();
+  }
+
+  // Select all: every link of the list, not just the ones drawn so far
+  // (signed in, the server is asked for the rest).
+  const [selectingAll, setSelectingAll] = useState(false);
+  async function selectAll() {
+    const ids = list.allIds();
+    if (Array.isArray(ids)) {
+      setSelected(new Set(ids));
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      setSelected(new Set(await ids));
+    } catch {
+      showToast("Couldn't select them all. Try again.");
+    } finally {
+      setSelectingAll(false);
+    }
   }
   return (
     <DragProvider canDrop={canDrop} onDrop={drop} folderName={(id) => folders.find((f) => f.id === id)?.name ?? ""}>
@@ -637,9 +744,10 @@ export default function LinkManager({
       <h1 className="sr-only">Your links</h1>
 
       <ImportBanner
-        onImported={(imported) =>
-          setLinks((current) => [...imported, ...current])
-        }
+        onImported={(imported) => {
+          setLinks((current) => [...imported, ...current]);
+          changed({ reload: true });
+        }}
       />
 
       {/* The sidebar on the left (on phones, the Folders tab's full screen), the list on the right. */}
@@ -650,7 +758,7 @@ export default function LinkManager({
         }`}
       >
         <Sidebar
-          links={links}
+          summary={summary}
           folders={folders}
           activeList={activeList}
           activeFolder={activeFolder}
@@ -660,7 +768,11 @@ export default function LinkManager({
           onSelectTag={toggleTag}
           onCreateFolder={addFolder}
           onMoveFolder={moveFolderNow}
-          onChecked={setLinks}
+          onChecked={(checked) => {
+            // Every link, with its new status.
+            setLinks(checked);
+            changed({ reload: true });
+          }}
           trashCount={trash.links.length + trash.folders.length}
         />
 
@@ -680,7 +792,7 @@ export default function LinkManager({
                   label="All folders"
                   roomy
                   folders={folders}
-                  counts={countWithInside(folders, links)}
+                  counts={counts}
                   activeFolder={null}
                   onSelect={(folderId) => folderId && selectFolder(folderId)}
                   onCreate={addFolder}
@@ -700,7 +812,7 @@ export default function LinkManager({
             />
           ) : showHome ? (
             <HomeView
-              links={links}
+              summary={summary}
               folders={folders}
               now={now}
               rediscover={rediscover}
@@ -789,7 +901,7 @@ export default function LinkManager({
             )}
             {/* How many links the list is showing, with search and tag applied. */}
             <span className="ml-auto shrink-0 text-sm text-muted">
-              {visibleLinks.length === 1 ? "1 link" : `${visibleLinks.length} links`}
+              {list.loading === "new" ? "" : list.total === 1 ? "1 link" : `${list.total.toLocaleString("en")} links`}
             </span>
             {selectedFolder && (
               <button onClick={() => setAddingLinks(true)} className="btn-secondary flex items-center gap-1.5">
@@ -800,14 +912,8 @@ export default function LinkManager({
           </div>
           {/* The toolbar: search, sort and the view. */}
           <div className="mt-4 flex flex-wrap gap-2">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search links..."
-              aria-label="Search links"
-              className="field min-w-0 flex-1 basis-full sm:basis-0"
-            />
+            {/* Signed in, the server is asked once typing stops for a moment. */}
+            <SearchBox search={query} onSearch={setQuery} wait={server ? 250 : 0} />
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as SortOrder)}
@@ -838,7 +944,7 @@ export default function LinkManager({
                 </button>
               ))}
             </div>
-            {links.length > 0 && (
+            {hasLinks && (
               <button
                 onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
                 aria-pressed={selecting}
@@ -882,7 +988,7 @@ export default function LinkManager({
               </button>
             </div>
           )}
-          {links.length === 0 && (
+          {!hasLinks && !list.loading && (
             <div className="mt-6 text-center">
               <EmptyBox className="mx-auto w-48" />
               <p className="mt-2 text-muted">
@@ -890,7 +996,20 @@ export default function LinkManager({
               </p>
             </div>
           )}
-          {links.length > 0 && visibleLinks.length === 0 && (
+          {list.loading === "new" && (
+            <p role="status" className="mt-6 text-center text-muted">
+              Loading links…
+            </p>
+          )}
+          {list.failed && (
+            <div role="alert" className="mt-6 text-center text-muted">
+              <p>Your links didn&apos;t load. Check your connection and try again.</p>
+              <button onClick={list.reload} className="btn-secondary mt-3">
+                Try again
+              </button>
+            </div>
+          )}
+          {hasLinks && visibleLinks.length === 0 && !list.loading && !list.failed && (
             <div className="mt-6 text-center">
               {emptyState().drawing}
               <p className="mt-2 text-muted">{emptyState().text}</p>
@@ -934,6 +1053,8 @@ export default function LinkManager({
               ))}
             </ul>
           )}
+          {/* A page at a time: the next one comes as the end of the list gets near. */}
+          {list.hasMore && <ShowMore onMore={list.loadMore} />}
           </>
           )}
         </div>
@@ -941,7 +1062,8 @@ export default function LinkManager({
         {addingLinks && selectedFolder && (
           <AddLinksSheet
             folderName={selectedFolder.name}
-            links={links.filter((link) => link.folderId !== selectedFolder.id)}
+            links={server ? undefined : links.filter((link) => link.folderId !== selectedFolder.id)}
+            find={server ? findLinksToAdd : undefined}
             onAdd={(ids) => {
               closeAddLinks();
               moveMany(ids, selectedFolder.id);
@@ -962,8 +1084,8 @@ export default function LinkManager({
             </span>
             {/* Nothing ticked yet: no greyed-out buttons, just a quick way to tick them all. */}
             {selected.size === 0 ? (
-              <button onClick={() => setSelected(new Set(visibleLinks.map((link) => link.id)))} className="btn-secondary whitespace-nowrap">
-                Select all
+              <button onClick={selectAll} disabled={selectingAll} className="btn-secondary whitespace-nowrap disabled:opacity-60">
+                {selectingAll ? "Selecting…" : list.total > visibleLinks.length ? `Select all ${list.total.toLocaleString("en")}` : "Select all"}
               </button>
             ) : (
               // On phones the actions get a row of their own, under the count.
@@ -1060,6 +1182,96 @@ export default function LinkManager({
       {/* Room under the last link, so the bottom bar never covers it. */}
       <div aria-hidden="true" className="h-24 md:hidden" />
     </DragProvider>
+  );
+}
+
+// The search box keeps what's typed itself, and passes it on at once (in
+// memory) or once typing stops for `wait` ms (signed in: one question to
+// the server instead of one per key). `search`: the search the list shows,
+// for when the box comes back (after Home, say).
+function SearchBox({ search, onSearch, wait }: { search: string; onSearch: (text: string) => void; wait: number }) {
+  const [text, setText] = useState(search);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return (
+    <input
+      type="search"
+      value={text}
+      onChange={(e) => {
+        const next = e.target.value;
+        setText(next);
+        clearTimeout(timer.current);
+        if (wait === 0) onSearch(next);
+        else timer.current = setTimeout(() => onSearch(next), wait);
+      }}
+      placeholder="Search links..."
+      aria-label="Search links"
+      className="field min-w-0 flex-1 basis-full sm:basis-0"
+    />
+  );
+}
+
+// The actions, each one's work remembered in `saving` until it's done.
+function remembered<A extends Record<string, (...args: never[]) => Promise<unknown>>>(actions: A, saving: Set<Promise<unknown>>): A {
+  return Object.fromEntries(
+    Object.entries(actions).map(([name, action]) => [
+      name,
+      (...args: never[]) => {
+        const work = action(...args);
+        saving.add(work);
+        work.then(
+          () => saving.delete(work),
+          () => saving.delete(work)
+        );
+        return work;
+      },
+    ])
+  ) as A;
+}
+
+// A LinkSource whose questions wait for the changes still being saved.
+function afterSaving(source: LinkSource, saving: Set<Promise<unknown>>): LinkSource {
+  const settled = () => Promise.allSettled([...saving]);
+  return {
+    page: async (...args) => (await settled(), source.page(...args)),
+    all: async (...args) => (await settled(), source.all(...args)),
+    count: async (...args) => (await settled(), source.count(...args)),
+    summary: async () => (await settled(), source.summary()),
+  };
+}
+
+// Bulk actions take at most BULK_MAX links at a time (the server drops the
+// rest), so a longer selection goes in several batches, one after another.
+async function inBatches<T, R>(items: T[], action: (batch: T[]) => Promise<R>): Promise<R[]> {
+  const answers: R[] = [];
+  for (let i = 0; i < items.length; i += BULK_MAX) answers.push(await action(items.slice(i, i + BULK_MAX)));
+  return answers;
+}
+
+// The end of a long list: the next links come on their own as it scrolls
+// into view (with room to spare, so there's no wait), and the button is
+// there for keyboards, screen readers and browsers without that.
+function ShowMore({ onMore }: { onMore: () => void }) {
+  const button = useRef<HTMLButtonElement>(null);
+  const latest = useRef(onMore);
+  useEffect(() => {
+    latest.current = onMore;
+  });
+  useEffect(() => {
+    const element = button.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => entries.some((entry) => entry.isIntersecting) && latest.current(), {
+      rootMargin: "800px 0px",
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div className="mt-4 text-center">
+      <button ref={button} onClick={onMore} className="btn-secondary">
+        Show more links
+      </button>
+    </div>
   );
 }
 

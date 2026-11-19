@@ -8,7 +8,9 @@ import {
   getFolderAncestors,
   updateFolderPlace,
   updateFolderPinned,
+  countUserLinks,
   getLinks,
+  getLinkUrls,
   getTrash,
   restoreFolder as restoreFolderFromTrash,
   restoreLinks as restoreLinksFromTrash,
@@ -35,7 +37,7 @@ import {
 import { checkLink } from "@/lib/checkLink";
 import { fetchPageInfo } from "@/lib/fetchTitle";
 import { getUserId } from "@/lib/session";
-import { cleanDate, cleanDetails, cleanFolderName, cleanIds, cleanNewLink, IN_TRASH, isDuplicate, normalizeUrl } from "@/lib/links";
+import { cleanDate, cleanDetails, cleanFolderName, cleanIds, cleanNewLink, IN_TRASH, normalizeUrl } from "@/lib/links";
 import { cleanBookmark, IMPORT_BATCH_SIZE } from "@/lib/bookmarks";
 import { childFolders, freeFolderName, isFolderColor, isFolderIcon, nameTakenIn, nextFolderColor, placeFolder, renamesMovingUp } from "@/lib/folders";
 import {
@@ -80,8 +82,10 @@ export async function saveLink(input: Link): Promise<Link | string> {
   if (typeof link === "string") {
     return link;
   }
-  const saved = await getLinks(userId);
-  if (isDuplicate(saved, link.url)) {
+  // Just the addresses, not whole links: an account can hold 10,000.
+  const saved = await getLinkUrls(userId);
+  const target = normalizeUrl(link.url);
+  if (saved.some((url) => normalizeUrl(url) === target)) {
     return "You already saved this link!";
   }
   // Not a copy of a link in the Trash: the browser offers to restore that one.
@@ -130,7 +134,7 @@ export async function removeLinks(ids: string[]) {
 export async function restoreLinks(ids: string[]): Promise<Link[] | string> {
   const userId = await getUserId();
   const chosen = cleanIds(ids);
-  if ((await getLinks(userId)).length + chosen.length > MAX_LINKS) {
+  if ((await countUserLinks(userId)) + chosen.length > MAX_LINKS) {
     return TOO_MANY_LINKS;
   }
   return restoreLinksFromTrash(userId, chosen);
@@ -248,9 +252,9 @@ export async function importLinks(oldLinks: Link[]): Promise<Link[]> {
   if (await isTooFast(userId, "importLinks")) {
     return [];
   }
-  const [saved, trash] = await Promise.all([getLinks(userId), getTrash(userId)]);
+  const [saved, trash] = await Promise.all([getLinkUrls(userId), getTrash(userId)]);
   // Links in the Trash count as saved: importing doesn't make copies of them.
-  const known = new Set([...saved, ...trash.links].map((link) => normalizeUrl(link.url)));
+  const known = new Set([...saved, ...trash.links.map((link) => link.url)].map(normalizeUrl));
   const imported: Link[] = [];
 
   for (const old of oldLinks) {
@@ -300,8 +304,8 @@ export async function importBookmarks(
     return TOO_FAST;
   }
 
-  const [saved, trash] = await Promise.all([getLinks(userId), getTrash(userId)]);
-  const known = new Set([...saved, ...trash.links].map((link) => normalizeUrl(link.url)));
+  const [saved, trash] = await Promise.all([getLinkUrls(userId), getTrash(userId)]);
+  const known = new Set([...saved, ...trash.links.map((link) => link.url)].map(normalizeUrl));
   const folders = await getFolders(userId);
   const added: Link[] = [];
 
